@@ -1,0 +1,11 @@
+Goal: Go through the entire codebase of the web, list out everything related to the branding, so later we can rebrand the frontend.
+
+1. List all non-functional texts related to the current brand.
+2. List all fav-icons, brand icons related to the current brand.
+3. List all external links(docs, github, etc) related to the current brand.
+4. List all images, logos, and other media assets related to the current brand.
+5. List all functional texts related to the current brand (e.g., buttons, labels, etc.).
+
+
+Clean and Clearly categorize the output in a structured format, so that it can be easily used for rebranding purposes.
+Output to developments/frontend/current_design

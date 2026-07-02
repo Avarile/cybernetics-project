@@ -63,7 +63,7 @@ export const PLANE_COMMUNITY_PRODUCTS: Record<string, IPaymentProduct> = {
     id: EProductSubscriptionEnum.BUSINESS,
     name: "Plane Business",
     description:
-      "The earliest packaging of Business at $10 a seat a month billed annually, $12 a seat a month billed monthly for Plane Cloud",
+      "The earliest packaging of Business at $10 a seat a month billed annually, $12 a seat a month billed monthly for Cybernetics Cloud",
     type: "BUSINESS",
     prices: [
       {

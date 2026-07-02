@@ -1,0 +1,493 @@
+# Plane Web Frontend — Current Branding Inventory
+
+> A complete, categorized inventory of everything tied to the current **"Plane"** brand in the web
+> frontend, so it can be systematically rebranded.
+>
+> - **Current brand:** Plane — by *Plane Software, Inc.*, GitHub org `makeplane`, domain `plane.so`.
+> - **Generated:** 2026-07-02 (branch `preview`). File:line refs are relative to repo root.
+
+---
+
+## 0. Scope, method & how to use this doc
+
+Audited the **web frontend** (`apps/web`) **plus the shared workspace packages it consumes** where
+branding actually lives:
+
+| Path | Role | Branding? |
+|------|------|-----------|
+| `apps/web` | Main web app (Vite + React Router SPA) | ✅ assets, `<head>` meta, hardcoded strings, links |
+| `packages/constants` | Shared constants (URLs, metadata, plans) | ✅ **central** brand URLs / metadata / plan names |
+| `packages/i18n` | Localization — 19 locales | ✅ **most** user-facing copy |
+| `packages/propel` | Design-system / icon library | ✅ **the logo & wordmark SVG components** |
+| `packages/ui`, `packages/editor` | Shared UI / rich-text editor | ⚠️ only license-header comments — no user-facing brand text |
+
+**Out of scope** (separate frontends that reuse the packages above): `apps/space`, `apps/admin`,
+`apps/live`, `apps/api`. Editing the shared packages covers a lot of them automatically, but their
+own `public/` assets and `<head>` meta must be audited separately if the rebrand is product-wide.
+
+**Method:** `ripgrep`/`find` sweeps + parallel exploration agents over the scope, then direct
+verification of asset references and the central constants files.
+
+**How to read the entries:** each item shows `path:line` → the exact current value → a short note.
+Categories map 1:1 to the request:
+1. Non-functional texts · 2. Favicons & brand icons · 3. External links · 4. Images/logos/media · 5. Functional texts.
+
+---
+
+## 🎯 Central replacement points (edit these first — highest leverage)
+
+| File | Holds |
+|------|-------|
+| `packages/constants/src/metadata.ts` | `SITE_NAME`, `SITE_TITLE`, `SITE_DESCRIPTION`, `SITE_KEYWORDS`, `SITE_URL`, `TWITTER_USER_NAME` + all `SPACE_*` equivalents |
+| `packages/constants/src/endpoints.ts` | `WEBSITE_URL`, `SUPPORT_EMAIL`, `MARKETING_*` links (env-overridable via `VITE_WEBSITE_URL`, `VITE_SUPPORT_EMAIL`) |
+| `packages/constants/src/payment.ts` | Plan names (`Plane Pro/Business/Enterprise`), `TALK_TO_SALES_URL`, `SUBSCRIPTION_*_URLS` |
+| `packages/propel/src/icons/brand/` | `PlaneLockup`, `PlaneLogo`, `PlaneWordmark` — the actual logo SVGs |
+| `apps/web/app/root.tsx` | **Active** `<head>`: title, OG/Twitter meta, favicon links, theme-color, `application-name` |
+| `apps/web/app/layout.tsx` | **Duplicate** legacy layout with the SAME meta — update in tandem |
+| `apps/web/manifest.json` + `apps/web/public/*.json` | PWA manifests (name / short_name / description / icons) |
+| `packages/i18n/src/locales/**` | Translated brand copy — every brand key must change in **all 19 locales** |
+
+## ⚠️ Rebrand gotchas
+
+1. **Two head/layout files.** `apps/web/app/root.tsx` is the *active* React-Router root;
+   `apps/web/app/layout.tsx` is a parallel legacy Next-style layout with the **same** meta/favicon
+   config. Update both (or delete the unused one) — otherwise OG/favicon output is inconsistent.
+2. **19 locales.** Brand copy in §1F / §5F is the English source; the same keys exist in
+   `cs, de, es, fr, id, it, ja, ko, pl, pt-BR, ro, ru, sk, tr-TR, ua, vi-VN, zh-CN, zh-TW` and must all change.
+3. **Pre-existing typo `planes.so`** (extra "s") in template privacy/terms placeholders — see §3 & §5F.
+4. **License headers** — ~2,400 files carry `Copyright (c) 2023-present Plane Software, Inc.` (never
+   rendered; change only if the legal entity is rebranded) — see §1G.
+5. **Orphaned brand assets** under `apps/web/app/assets/plane-logos/` + `plane-takeoff.png` are
+   unreferenced in `apps/web` — see §4C.
+6. **Customer showcase logos** (Accenture, Dolby, Sony, Zerodha) render on the auth screen — see §4B.
+   Third-party marks; likely *removed* in a rebrand, not replaced.
+7. **Multiple, inconsistent PWA manifests** — see §2.2.
+
+---
+---
+
+# 1. Non-functional texts (descriptive / marketing / meta)
+
+Copy that is informational, not interactive: brand name, taglines, meta/SEO, page titles,
+onboarding/tour prose, empty-state descriptions, alt text, marketing sentences, copyright.
+
+## 1A. Core brand identity strings — `packages/constants/src/metadata.ts`
+
+| Line | Constant | Current value |
+|------|----------|---------------|
+| 7 | `SITE_NAME` | `Plane \| Simple, extensible, open-source project management tool.` |
+| 8 | `SITE_TITLE` | `Plane \| Simple, extensible, open-source project management tool.` |
+| 9-10 | `SITE_DESCRIPTION` | `Open-source project management tool to manage work items, cycles, and product roadmaps easily` |
+| 11-12 | `SITE_KEYWORDS` | `software development, plan, ship, software, accelerate, ... kanban, collaboration` |
+| 13 | `SITE_URL` | `https://app.plane.so/` |
+| 14 | `TWITTER_USER_NAME` | `Plane \| Simple, extensible, open-source project management tool.` |
+| 17 | `SPACE_SITE_NAME` | `Plane Publish \| Make your Plane boards and roadmaps pubic with just one-click. ` (sic "pubic") |
+| 18 | `SPACE_SITE_TITLE` | `Plane Publish \| Make your Plane boards public with one-click` |
+| 19 | `SPACE_SITE_DESCRIPTION` | `Plane Publish is a customer feedback management tool built on top of plane.so` |
+| 20-21 | `SPACE_SITE_KEYWORDS` | `software development, customer feedback, ...` |
+| 22 | `SPACE_SITE_URL` | `https://app.plane.so/` |
+| 23 | `SPACE_TWITTER_USER_NAME` | `planepowers` |
+
+## 1B. HTML `<head>` / meta / OpenGraph / Twitter
+
+**`apps/web/app/root.tsx` (ACTIVE root):**
+| Line | Current value | Note |
+|------|---------------|------|
+| 36 | `APP_TITLE = "Plane \| Simple, extensible, open-source project management tool."` | base title |
+| 67 | `<meta name="application-name" content="Plane" />` | literal, hardcoded |
+| 70 | `<meta name="apple-mobile-web-app-title" content={SITE_NAME} />` | via constant |
+| 98 | `{ title: APP_TITLE }` | document title |
+| 100 | `{ property: "og:title", content: APP_TITLE }` | |
+| 109 | `{ property: "og:image:alt", content: "Plane - Modern project management" }` | |
+| 120 | `{ property: "twitter:image:alt", content: "Plane - Modern project management" }` | |
+
+**`apps/web/app/layout.tsx` (LEGACY duplicate — same values):**
+| Line | Current value |
+|------|---------------|
+| 28 | `{ title: "Plane \| Simple, extensible, open-source project management tool." }` |
+| 40 | `og:title` = same title string |
+| 49 | `og:image:alt` = `Plane - Modern project management` |
+| 55 | `twitter:image:alt` = `Plane - Modern project management` |
+| 70 | `<meta name="application-name" content="Plane" />` |
+| 73 | `<meta name="apple-mobile-web-app-title" content={SITE_NAME} />` |
+
+*(URL/handle meta — `og:url`, `og:image`, `twitter:site` — are in §3.)*
+
+## 1C. Page titles / `document.title`
+
+| Path:line | Current value |
+|-----------|---------------|
+| `apps/web/core/components/core/page-title.tsx:19` | default fallback `Plane \| Simple, extensible, open-source project management tool.` |
+| `apps/web/core/components/auth-screens/header.tsx:73` | `<PageHead title={pageTitle + " - Plane"} />` (suffix on all auth pages) |
+| `apps/web/app/(all)/accounts/forgot-password/layout.tsx:14` | `Forgot Password - Plane` |
+| `apps/web/app/(all)/accounts/reset-password/layout.tsx:14` | `Reset Password - Plane` |
+| `apps/web/app/(all)/accounts/set-password/layout.tsx:14` | `Set Password - Plane` |
+| `apps/web/app/(all)/sign-up/layout.tsx:11` | `Sign up - Plane` |
+| `.../[projectId]/intake/page.tsx:70` | `workspace: "Plane"` fallback used in intake page title |
+
+## 1D. Onboarding / tour marketing prose (hardcoded)
+
+| Path:line | Current value |
+|-----------|---------------|
+| `apps/web/ce/components/onboarding/tour/root.tsx:42` | `The work item is the building block of the Plane. Most concepts in Plane are either associated with work items…` |
+| `apps/web/ce/components/onboarding/tour/root.tsx:102` | `Welcome to Plane, {first_name} …` |
+| `apps/web/ce/components/onboarding/tour/root.tsx:105` | `We're glad that you decided to try out Plane. …` |
+| `apps/web/ce/components/onboarding/tour/sidebar.tsx:56` | `Get more out of Plane.` |
+| `apps/web/core/components/onboarding/steps/profile/root.tsx:150` | `This is how you will appear in Plane.` |
+| `apps/web/core/components/onboarding/steps/role/root.tsx:95` | `Let's set up Plane for how you work.` |
+| `apps/web/core/components/onboarding/steps/usecase/root.tsx:89` | `What brings you to Plane?` |
+| `apps/web/core/components/onboarding/steps/team/root.tsx:346` | `Work in plane happens best with your team. Invite them now to use Plane to its potential.` |
+| `apps/web/core/components/onboarding/invite-members.tsx:343` | same as above |
+
+## 1E. Auth / instance / marketing body text (hardcoded)
+
+| Path:line | Current value |
+|-----------|---------------|
+| `apps/web/core/components/auth-screens/footer.tsx:35` | `Join 10,000+ teams building with Plane` |
+| `apps/web/core/components/instance/not-ready-view.tsx:42` | `Welcome to Plane` (h1) |
+| `apps/web/ce/components/instance/maintenance-message.tsx:20` | `🚧 Looks like Plane didn't start up correctly!` |
+| `apps/web/core/components/account/auth-forms/auth-header.tsx:31/35/39` | `Welcome back to Plane.` |
+| `apps/web/core/components/account/auth-forms/auth-header.tsx:45/49/53` | `Create your Plane account.` |
+| `apps/web/app/(all)/workspace-invitations/page.tsx:89/99/106` | `…organize different streams of work in your Plane account.` |
+| `apps/web/core/components/integration/single-integration-card.tsx:40` | `Connect with GitHub with your Plane workspace to sync project work items.` |
+| `apps/web/core/components/integration/single-integration-card.tsx:45` | `Connect with Slack with your Plane workspace to sync project work items.` |
+
+## 1F. Billing plan comparison marketing copy — `apps/web/core/components/workspace/billing/comparison/plans.tsx`
+
+Feature descriptions mentioning "Plane" at lines: **101, 540, 616, 660, 752, 971, 982, 1004, 1015,
+1061, 1072, 1085, 1096, 1118, 1137, 1148**. Examples: *"…without leaving Plane."*, *"Write Plane
+Query Language in search…"*, *"Sync Plane work items and states to GitHub…"*, *"…make Plane secure
+with any IdP."*, *"…self-hosted Plane instance…"*. Also `packages/constants/src/payment.ts:66`
+→ *"…$12 a seat a month billed monthly for Plane Cloud"*.
+
+## 1G. Image `alt` text mentioning the brand
+
+| Path:line | Current value |
+|-----------|---------------|
+| `apps/web/core/components/instance/not-ready-view.tsx:40` | `alt="Plane Logo"` |
+| `apps/web/core/layouts/auth-layout/workspace-wrapper.tsx:174` | `alt="Plane logo"` |
+| `apps/web/core/components/common/latest-feature-block.tsx:36` | `alt="Plane Work items"` |
+
+## 1H. i18n non-functional strings — `packages/i18n/src/locales/en/*.json`
+
+> Same keys exist in all 19 locales. 82 non-functional brand strings. Grouped by source file.
+
+**auth.json** — SAML/OIDC setup descriptions (×4) `…identifies this Plane app as an authorized service…`;
+`auth.common.new_to_plane` = `New to Plane?`.
+
+**common.json** — `powered_by_plane_pages` = `Powered by Plane Pages`;
+`self_hosted_maintenance_message.*` = `Plane didn't start up. This could be because one or more Plane services failed to start.`
+
+**empty-state.json** — `common_empty_state.not_found.description` = `We are unable to fetch your plane account…`;
+`workspace_empty_state.wiki.description` = `Pages are thought spotting space in Plane. …`
+
+**home.json** — `home.empty.create_project.description` = `Most things start with a project in Plane.`;
+`home.empty.personalize_account.title` = `Make Plane yours.`; `home.new_at_plane.title` = `New at Plane`.
+
+**integration.json** — ~30 connector descriptions/warnings, e.g. GitHub/GitLab/Slack/Sentry/Bitbucket
+`Connect and sync your … with Plane`, `…now connected to Plane`, `Map your … with Plane projects`,
+`Data from … will replace data in Linked Plane Work Item`, `gitlab_integration.plane_project_connection`
+= `Plane Project Connection`, OAuth-bridge `…for Plane API access`.
+
+**project-settings.json** — automations `Plane will auto archive / automatically close / send reminders…`;
+intake `…anyone who sends an email to a Plane email address.`
+
+**project.json** — `Work items are building blocks in Plane.`; `Redesign the Plane UI, Rebrand the company…`;
+page empty states `Get Galileo, Plane's AI assistant, to help you get started` / `…invoke Galileo, Plane's AI…`.
+
+**settings.json** — `profile.empty_state.activity.description` = `…Explore more in Plane to see your activity.`
+
+**template.json** — `templates.empty_state.upgrade.description` = `With project, work-item, and page templates in Plane…`
+
+**tour.json** — `Pages in Plane let you capture…`; `A Plane-only feature…`; `…summarize chats directly in Plane AI.`;
+`…kickstart your journey with Plane.`; `Try Plane AI chat`; `Discover why teams switch to Plane`;
+`Compare Plane with the tools you use today…`
+
+**wiki.json** — `wiki.upgrade_flow.description` = `Unlock … with Plane Pro.`
+
+**work-item-type.json** — `Plane's Work Item will become the default work item type…`
+
+**workflow.json** — `Set rules for where your work moves… with Workflows in Plane.`
+
+**workspace-settings.json** — ~13 strings: `Copy and save this secret key in Plane Pages…`,
+`…no longer have the access to Plane data`, `Work with your Plane data in available apps…`,
+`Project States is a Plane-only feature…`, multiple OAuth "app" strings referencing `Plane workspace`/`Plane data`,
+`plane-intelligence.heading` = `Plane AI`, `Plane APIs can be used to integrate your data in Plane…`
+
+**workspace.json** — `To start using Plane, you need to create or join a workspace.`;
+`Welcome to Plane, we are excited to have you here. …`; `Everything starts with a project in Plane` (×3);
+page empty states `Get Galileo, Plane's AI assistant…` / `…invoke Galileo, Plane's AI…`.
+
+## 1I. Legal / copyright (NOT user-facing, entity rebrand only)
+
+- Block comment in ~2,400 files: `Copyright (c) 2023-present Plane Software, Inc. and contributors` /
+  `SPDX-License-Identifier: AGPL-3.0-only`.
+  Counts: `apps/web` ~2,027 · `packages/editor/src` 223 · `packages/ui/src` 124 · `packages/constants/src` 60.
+- Root `LICENSE.txt`, `COPYRIGHT.txt`, `SECURITY.md`, `README.md` at repo root also carry the entity name (repo-level, not frontend runtime).
+
+---
+---
+
+# 2. Favicons & brand icons
+
+## 2.1 Favicon / app-icon FILES
+
+**Bundled (imported via Vite `?url` in `root.tsx` / `layout.tsx`):**
+| Path | Purpose |
+|------|---------|
+| `apps/web/app/assets/favicon/favicon.ico` | classic favicon / `shortcut icon` |
+| `apps/web/app/assets/favicon/favicon-16x16.png` | 16×16 icon |
+| `apps/web/app/assets/favicon/favicon-32x32.png` | 32×32 icon |
+| `apps/web/app/assets/favicon/apple-touch-icon.png` | present but **NOT referenced** in head (head uses `icons/` below) |
+| `apps/web/app/assets/icons/icon-180x180.png` | `apple-touch-icon` 180×180 |
+| `apps/web/app/assets/icons/icon-512x512.png` | `apple-touch-icon` (default + 512×512) |
+
+**Static (served from `/`, referenced by manifests):**
+| Path | Purpose |
+|------|---------|
+| `apps/web/public/favicon/android-chrome-192x192.png` | Android Chrome 192 |
+| `apps/web/public/favicon/android-chrome-512x512.png` | Android Chrome 512 |
+| `apps/web/public/icons/icon-192x192.png` | PWA 192, `purpose: any maskable` |
+| `apps/web/public/icons/icon-348x348.png` | PWA 348 |
+| `apps/web/public/icons/icon-512x512.png` | PWA 512 |
+| `apps/web/public/plane-logos/plane-mobile-pwa.png` | PWA 192 & 512 (site.webmanifest.json) |
+
+No `mstile`, `safari-pinned-tab`, or `mask-icon` files exist.
+
+## 2.2 Web manifests (⚠️ four files, inconsistent values)
+
+| File | name | short_name | description | theme_color | linked in head? |
+|------|------|-----------|-------------|-------------|-----------------|
+| `apps/web/manifest.json` | `Plane \| Accelerate software development with peace.` | `Plane` | `Plane accelerated the software development by order of magnitude for agencies and product companies.` | `#3579f6` | (icons point to `/icon-*.png` that don't exist under public → likely stale) |
+| `apps/web/public/manifest.json` | `Plane` | `Plane` | — | `#FFFFFF` | ✅ `/manifest.json` |
+| `apps/web/public/site.webmanifest.json` | `Plane` | `Plane` | `Plane helps you plan your issues, cycles, and product modules.` | `#3f76ff` | ✅ `/site.webmanifest.json` |
+| `apps/web/public/favicon/site.webmanifest` | `""` (empty) | `""` | — | `#ffffff` | ❌ orphan |
+
+## 2.3 `<head>` icon / theme config
+
+**`apps/web/app/root.tsx`** — `links()` fn lines **39-46**: `rel="icon"` 32/16, `shortcut icon`,
+`rel="manifest"` → `/site.webmanifest.json` **and** `/manifest.json`, `apple-touch-icon` (×3).
+Asset imports lines **17-22**. Meta lines **65-72**: `theme-color=#fff`, `application-name=Plane`,
+apple-mobile-web-app-* , mobile-web-app-capable.
+
+**`apps/web/app/layout.tsx`** — duplicate: `<link>` icons lines **64-79**, same asset imports **18-22**.
+
+## 2.4 Logo / brand-icon COMPONENTS (the in-app marks) — `packages/propel/src/icons/brand/`
+
+| Component / file | Renders | Used in web (examples) |
+|------------------|---------|------------------------|
+| `plane-lockup.tsx` → `PlaneLockup` | full logo **lockup** (icon + wordmark, inline SVG paths, `viewBox 0 0 253 53`) | `auth-screens/header.tsx:76`, `onboarding/header.tsx:86`, `ce/onboarding/tour/root.tsx:98`, `instance/not-ready-view.tsx:36` |
+| `plane-logo.tsx` → `PlaneLogo` | icon **mark** only | `create-workspace/page.tsx:68`, `invitations/page.tsx:120`, `product-updates/footer.tsx:72`, `auth-layout/workspace-wrapper.tsx:158` |
+| `plane-wordmark.tsx` → `PlaneWordmark` | **wordmark** only | exported (`brand/index.ts:13`); no direct `apps/web` usage found (used elsewhere/available) |
+| `packages/propel/public/plane-lockup-light.svg` | Storybook brand image | `packages/propel/.storybook/manager.ts:14` |
+
+*(Barrel export: `packages/propel/src/icons/brand/index.ts`.)*
+*(Not brand icons: `apps/web/core/components/workspace/logo.tsx` = user/workspace emoji picker;
+`packages/ui/src/constants|utils/icons.ts` = generic lucide/file-type maps.)*
+
+---
+---
+
+# 3. External links (URLs & emails)
+
+## 3.1 Centralized in constants (best replacement points)
+
+| Constant | File:line | Value | Source |
+|----------|-----------|-------|--------|
+| `WEBSITE_URL` | `packages/constants/src/endpoints.ts:27` | `https://plane.so` | env `VITE_WEBSITE_URL` |
+| `SUPPORT_EMAIL` | `packages/constants/src/endpoints.ts:29` | `support@plane.so` | env `VITE_SUPPORT_EMAIL` |
+| `MARKETING_PRICING_PAGE_LINK` | `endpoints.ts:31` | `https://plane.so/pricing` | hardcoded |
+| `MARKETING_CONTACT_US_PAGE_LINK` | `endpoints.ts:32` | `https://plane.so/contact` | hardcoded |
+| `MARKETING_PLANE_ONE_PAGE_LINK` | `endpoints.ts:33` | `https://plane.so/one` | hardcoded |
+| `SITE_URL` / `SPACE_SITE_URL` | `metadata.ts:13,22` | `https://app.plane.so/` | hardcoded |
+| `SPACE_TWITTER_USER_NAME` | `metadata.ts:23` | `planepowers` | hardcoded |
+| `TALK_TO_SALES_URL` | `payment.ts:120` | `https://plane.so/talk-to-sales` | hardcoded |
+| `SUBSCRIPTION_REDIRECTION_URLS` | `payment.ts:126-147` | `https://app.plane.so/upgrade/{pro,business}/self-hosted?plan=…` | map |
+| `SUBSCRIPTION_WEBPAGE_URLS` | `payment.ts:153-159` | `https://plane.so/{pro,business}` | map |
+
+## 3.2 Hardcoded links (by URL)
+
+| URL | Locations |
+|-----|-----------|
+| `https://plane.so/` | `.../settings/projects/page.tsx:35` (learn-more) |
+| `https://plane.so/talk-to-sales` | duplicate inline at `billing/comparison/plans.tsx:1239` |
+| `https://plane.so/pro` | `ce/.../issue-embed-upgrade-card.tsx:30` |
+| `https://plane.so/changelog` | `common/latest-feature-block.tsx:23` |
+| `https://plane.so/changelog?category=cloud` / `…self-hosted` | `product-updates/fallback.tsx:19,20` |
+| `https://plane.so/pages` | `product-updates/footer.tsx:64` ("powered by Plane Pages") |
+| `https://plane.so/legals/terms-and-conditions` | `account/terms-and-conditions.tsx:17` |
+| `https://plane.so/legals/privacy-policy` | `account/terms-and-conditions.tsx:18` |
+| `https://docs.plane.so/` | `power-k/config/help-commands.ts:40` |
+| `https://docs.plane.so/core-concepts/projects/run-project#estimate` | `estimates/root.tsx:114` |
+| `https://go.plane.so/p-docs` | `product-updates/footer.tsx:21`, `help-section/root.tsx:51` |
+| `https://go.plane.so/p-changelog` | `product-updates/footer.tsx:33` |
+| `https://forum.plane.so` | `workspace-invitations/page.tsx:118`, `product-updates/footer.tsx:55`, `help-commands.ts:53`, `help-section/root.tsx:82` |
+| `https://status.plane.so/` | `app/error/prod.tsx:25` |
+| `https://app.plane.so/` (og:url) | `layout.tsx:45`, `root.tsx:105` |
+| `https://app.plane.so/og-image.png` (og/twitter image) | `layout.tsx:46,52` (root.tsx uses bundled `ogImage`) |
+| `https://github.com/makeplane` | `workspace-invitations/page.tsx:114` |
+| `https://github.com/makeplane/plane` | `star-us-link.tsx:25` |
+| `https://github.com/makeplane/plane/issues/new/choose` | `help-commands.ts:66` |
+| `https://x.com/planepowers` | `app/error/prod.tsx:30` (label `@planepowers` at :29) |
+| `@planepowers` (twitter:site meta) | `layout.tsx:50`, `root.tsx:115` |
+
+## 3.3 Emails
+
+| Email | Locations |
+|-------|-----------|
+| `support@plane.so` | `app/error/prod.tsx:20`, `maintenance-message.tsx:12`, `product-updates/footer.tsx:44`, + const `SUPPORT_EMAIL` (`endpoints.ts:29`, consumed `helpers/authentication.helper.tsx:10,142`) |
+| `sales@plane.so` | `help-section/root.tsx:57` (Contact sales) |
+| `intake@plane.so` | `inbox/sidebar/inbox-list-item.tsx:132` — string compared to detect intake-bot author |
+
+## 3.4 Brand domains inside i18n placeholders (`packages/i18n`, all 19 locales)
+
+| Value | Key / file (en line) |
+|-------|----------------------|
+| `https://glab.plane.town` | `gitlab_enterprise_integration.base_url_placeholder` · integration.json:115 |
+| `https://gh.plane.town` | `github_enterprise_integration…base_url_placeholder` · integration.json:282 (⚠️ `cs` locale has `https://plane.github.com`) |
+| `https://plane.so` | `templates…website.placeholder` · template.json:165 |
+| `help@plane.so` | `templates…contact_email.placeholder` · template.json:181 |
+| `https://planes.so/privacy-policy` | `templates…privacy_policy_url.placeholder` · template.json:189 ⚠️ typo `planes.so` |
+| `https://planes.so/terms-of-use` | `templates…terms_of_service_url.placeholder` · template.json:197 ⚠️ (`de` locale: `…/terms-of-service`) |
+| `plane.so` | `sso…add_domain.form.domain_placeholder` · auth.json:23; example in `domain_invalid` · auth.json:25 |
+
+---
+---
+
+# 4. Images, logos & media assets
+
+## 4A. Brand-identity assets — MUST replace for a rebrand
+
+| Asset | Type | Referenced by |
+|-------|------|---------------|
+| `packages/propel/src/icons/brand/plane-lockup.tsx` (`PlaneLockup`) | inline SVG lockup | see §2.4 |
+| `packages/propel/src/icons/brand/plane-logo.tsx` (`PlaneLogo`) | inline SVG mark | see §2.4 |
+| `packages/propel/src/icons/brand/plane-wordmark.tsx` (`PlaneWordmark`) | inline SVG wordmark | exported |
+| `packages/propel/public/plane-lockup-light.svg` | SVG | Storybook branding |
+| `apps/web/app/assets/images/logo-spinner-dark.gif` | GIF | `common/logo-spinner.tsx:9` (the app-wide loading `LogoSpinner`, used in ~18 places) |
+| `apps/web/app/assets/images/logo-spinner-light.gif` | GIF | `common/logo-spinner.tsx:10` |
+| `apps/web/app/assets/auth/gradient-logo.webp` | WEBP | `instance/not-ready-view.tsx:10` |
+| `apps/web/app/assets/auth/gradient-bg-logo.webp` | WEBP | `instance/not-ready-view.tsx:11` |
+| `apps/web/app/assets/og-image.png` | PNG | OG/Twitter image in `root.tsx:22` (bundled) |
+| `apps/web/public/plane-logos/plane-mobile-pwa.png` | PNG | PWA icon (site.webmanifest.json) |
+| favicon / app-icon set | PNG/ICO | see §2.1 |
+
+## 4B. Customer / third-party showcase logos (likely REMOVE, not rebrand)
+
+Rendered as social proof on the auth screen `apps/web/core/components/auth-screens/footer.tsx:16-28`:
+- `packages/propel/src/icons/brand/zerodha-logo.tsx` (`ZerodhaLogo`)
+- `packages/propel/src/icons/brand/sony-logo.tsx` (`SonyLogo`)
+- `packages/propel/src/icons/brand/dolby-logo.tsx` (`DolbyLogo`)
+- `packages/propel/src/icons/brand/accenture-logo.tsx` (`AccentureLogo`)
+
+## 4C. Orphaned brand PNGs (unreferenced in `apps/web` — replace or delete)
+
+- `apps/web/app/assets/plane-logos/black-horizontal-with-blue-logo.png`
+- `apps/web/app/assets/plane-logos/blue-without-text.png`
+- `apps/web/app/assets/plane-logos/white-horizontal.svg`
+- `apps/web/app/assets/plane-logos/white-horizontal-with-blue-logo.png`
+- `apps/web/app/assets/plane-takeoff.png` *(a copy is used only in `apps/admin`, out of scope)*
+
+## 4D. Generic product art — Plane-authored but NOT brand marks (optional review)
+
+Not carrying the "Plane" identity, so lower priority, but they define the product's look:
+- **Empty-state illustrations:** `apps/web/app/assets/empty-state/**` (~250 webp/svg/png: cycles,
+  modules, intake, analytics, onboarding, wiki, dashboard, search, profile, project-settings, …).
+- **Onboarding screenshots:** `apps/web/app/assets/onboarding/*.webp`, `.../empty-state/onboarding/**`.
+- **Cover images:** `apps/web/app/assets/cover-images/image_1..29.jpg` (default project/profile covers).
+- **Workspace active-cycles CTA art:** `apps/web/app/assets/workspace-active-cycles/*.webp`.
+- **Instance / misc:** `instance/maintenance-mode-*.svg`, `instance-not-ready.webp`,
+  `instance-setup-done.webp`, `404.svg`, `scribble/*.svg`, `mac-command.svg`, default user avatars.
+
+## 4E. Third-party provider logos — KEEP (not Plane brand)
+
+`apps/web/app/assets/logos/{github-*,gitlab-logo,gitea-logo,google-logo}.*`,
+`apps/web/app/assets/services/{github,slack,jira,csv,excel,json}.*`, attachment file-type icons
+(`apps/web/app/assets/attachment/*`), Inter font files (`apps/web/app/assets/fonts/inter/*`).
+
+---
+---
+
+# 5. Functional texts (buttons, labels, plan names, placeholders)
+
+Interactive/UI text that names or embeds the brand.
+
+## 5A. Product / plan tier names — `packages/constants/src/payment.ts`
+
+| Line | Value |
+|------|-------|
+| 37 | `name: "Plane Pro"` |
+| 64 | `name: "Plane Business"` |
+| 91 | `name: "Plane Enterprise"` |
+| (billing/comparison/plans.tsx:1268) | `name: "One"` (the "Plane One" tier) |
+
+Rendered as headings via `license/modal/card/base-paid-plan-card.tsx:70` → `Plane {planeName}`.
+Upsell CTA `ce/.../issue-embed-upgrade-card.tsx:26` → `…upgrade to Plane Pro now.`
+
+## 5B. Feature / sub-brand labels (i18n functional keys)
+
+| Key · file (en line) | Value | UI type |
+|----------------------|-------|---------|
+| `pi_chat` · common.json | `Plane AI` | feature/nav label |
+| `sidebar.pi_chat` · navigation.json | `Plane AI` | sidebar nav |
+| `sidebar.plane_pro` · navigation.json | `Plane Pro` | sidebar nav |
+| `workspace_settings.settings.plane-intelligence.title` · workspace-settings.json | `Plane AI` | settings tab |
+| `workspace_settings.settings.runners.title` · workspace-settings.json | `Plane Runner` | settings tab |
+| `automations.trigger.section_plane_events` · automation.json | `Plane events` | dropdown section |
+| `power_k.help_actions.open_plane_documentation` · power-k.json | `Open Plane documentation` | command-palette action |
+
+## 5C. Integration option/link labels (i18n, integration.json)
+
+`allow_bidirectional_sync` / `allow_unidirectional_sync` (GitHub & GitLab) — *"…both ways between
+GitHub and Plane"* / *"…from GitHub to Plane only"*; `add/edit_pr_state_mapping` — *"…for Plane
+project"*; `link` — *"Link GitHub Repository to a Plane Project"*, *"Link Gitlab repository to Plane
+project"*, `link_plane_project` = *"Link Plane project"*; `slack…project_dropdown.label` = `Plane Project`.
+
+## 5D. Placeholders (i18n) & the `planes.so` typo
+
+| Key · file | Value |
+|------------|-------|
+| `sso…add_domain.form.domain_placeholder` · auth.json | `plane.so` |
+| `templates…website.placeholder` · template.json | `https://plane.so` |
+| `templates…company_name.placeholder` · template.json | `Plane` |
+| `templates…contact_email.placeholder` · template.json | `help@plane.so` |
+| `templates…privacy_policy_url.placeholder` · template.json | `https://planes.so/privacy-policy` ⚠️ typo |
+| `templates…terms_of_service_url.placeholder` · template.json | `https://planes.so/terms-of-use` ⚠️ typo |
+| `gitlab_enterprise…base_url_placeholder` · integration.json | `e.g., "https://glab.plane.town"` |
+| `github_enterprise…base_url_placeholder` · integration.json | `e.g., "https://gh.plane.town"` |
+| `github_enterprise…app_name_placeholder` · integration.json | `e.g., "plane-github-enterprise"` |
+| `sso…saml…mapping_table.table.plane` · auth.json | `Plane` (table column header) |
+
+## 5E. `"Plane"` shown as the system actor / author name (hardcoded fallback)
+
+Displayed as the author for system/archive/intake activity when no user exists:
+- `apps/web/ce/components/issues/issue-details/issue-creator.tsx:30` — `{customUserName || "Plane"}`
+- `apps/web/core/components/common/activity/user.tsx:32` — `{customUserName || "Plane"}`
+- `apps/web/core/components/common/activity/helper.tsx:107` — `"Plane"` when archived
+- `apps/web/core/components/issues/issue-detail/issue-activity/activity/actions/archived-at.tsx:40` — same
+- `apps/web/core/components/issues/peek-overview/properties.tsx:141` — intake author fallback `"Plane"`
+- `apps/web/core/components/inbox/sidebar/inbox-list-item.tsx:133` — `<Avatar name={"Plane"} />`
+- `apps/web/core/components/profile/activity/activity-list.tsx:148` — `<span>Plane</span>`
+
+## 5F. Other functional labels (hardcoded)
+
+| Path:line | Value | Type |
+|-----------|-------|------|
+| `apps/web/core/components/onboarding/steps/profile/consent.tsx:26` | `I agree to Plane marketing communications` | checkbox label |
+| `apps/web/app/error/prod.tsx:29` | `@planepowers` | link label (prod error page) |
+| `apps/web/core/components/global/product-updates/footer.tsx` | `docs` / `Forum` / `Full changelog` / `support` menu labels (links in §3) | footer links |
+| `apps/web/core/components/workspace/sidebar/help-section/root.tsx` | `Documentation` / `Contact sales` / `Forum` help-menu items (links in §3) | help menu |
+| `apps/web/core/components/power-k/config/help-commands.ts` | `Open Plane documentation` / `Join forum` / `Report bug` | command palette |
+
+---
+
+## Appendix — counts at a glance
+
+| Category | Approx. items | Primary locations |
+|----------|---------------|-------------------|
+| 1 Non-functional text | ~110 (28 hardcoded + 82 i18n) + ~2,400 license headers | `metadata.ts`, `root.tsx`/`layout.tsx`, i18n, onboarding, billing |
+| 2 Favicons & brand icons | 12 icon files + 4 manifests + 3 SVG components | `apps/web/app/assets`, `apps/web/public`, `packages/propel` |
+| 3 External links | ~35 distinct URLs + 3 emails | `endpoints.ts`, `metadata.ts`, `payment.ts`, hardcoded across `apps/web` |
+| 4 Images/logos/media | ~15 brand + 4 customer + ~5 orphaned (+ ~300 generic art) | `packages/propel/icons/brand`, `apps/web/app/assets` |
+| 5 Functional text | ~40 (plan names, labels, actor name, placeholders) | `payment.ts`, i18n, `apps/web` components |
+</content>
