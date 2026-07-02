@@ -1,0 +1,3 @@
+goal:
+
+analysis the implementation of the current python implementation of the backend in apps/api, try to use the Nestjs combine with Mastra ai(in case there are ai related logic in the current backend) to replicate a new backend in apps/nestjs-api/, completlely replicate the functions and apis of original one. Design a solution and follow the best nestjs practice, output the design and implementation plan in a structured format to developments/backend/current_design
