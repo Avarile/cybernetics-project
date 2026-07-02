@@ -26,6 +26,7 @@ import {
   workspaceMembers,
   workspaces,
 } from "../src/infra/database/schema";
+import { notifications } from "../src/modules/notification/notification.schema";
 
 const PASSWORD = "password123";
 const SLUG = "acme-e2e";
@@ -44,7 +45,9 @@ let adminSessionKey: string;
 async function truncateAll() {
   await db.execute(
     sql.raw(
-      "TRUNCATE intake_issues, intakes, page_labels, project_pages, pages, " +
+      "TRUNCATE notifications, user_notification_preferences, email_notification_logs, issue_subscribers, " +
+        "issue_activities, webhook_logs, webhooks, " +
+        "intake_issues, intakes, page_labels, project_pages, pages, " +
         "issue_labels, issue_assignees, issue_sequences, issues, cycles, modules, module_members, " +
         "estimate_points, estimates, issue_views, labels, states, project_members, projects, " +
         "workspace_members, workspaces, sessions, api_tokens, users RESTART IDENTITY CASCADE",
@@ -324,5 +327,41 @@ describe("Phase 2 — new domains smoke (real DB CRUD)", () => {
     expect(create.body).toHaveProperty("id");
     const list = await http.get(`${P}/intakes/`).set("Cookie", cookie());
     expect(list.status).toBe(200);
+  });
+});
+
+describe("Phase 3 — Notifications (HTTP)", () => {
+  const cookie = () => `session-id=${adminSessionKey}`;
+  const notifId = randomUUID();
+
+  beforeAll(async () => {
+    await db.insert(notifications).values({
+      id: notifId,
+      workspaceId,
+      projectId,
+      entityIdentifier: randomUUID(),
+      entityName: "issue",
+      title: "updated the name to",
+      sender: "in_app:issue_activities",
+      triggeredById: memberId,
+      receiverId: adminId,
+    });
+  });
+
+  it("lists the receiver's notifications (cursor envelope)", async () => {
+    const res = await http.get(`/api/workspaces/${SLUG}/users/notifications/`).set("Cookie", cookie());
+    expect(res.status).toBe(200);
+    expect(res.body).toHaveProperty("results");
+    expect(res.body.results.map((n: { id: string }) => n.id)).toContain(notifId);
+    expect(res.body.results[0]).toHaveProperty("entity_name", "issue");
+  });
+
+  it("reports unread count then marks read (204) and decrements", async () => {
+    const before = await http.get(`/api/workspaces/${SLUG}/users/notifications/unread/`).set("Cookie", cookie());
+    expect(before.body.count).toBeGreaterThanOrEqual(1);
+    const mark = await http.post(`/api/workspaces/${SLUG}/users/notifications/${notifId}/read/`).set("Cookie", cookie());
+    expect(mark.status).toBe(204);
+    const after = await http.get(`/api/workspaces/${SLUG}/users/notifications/unread/`).set("Cookie", cookie());
+    expect(after.body.count).toBe(before.body.count - 1);
   });
 });

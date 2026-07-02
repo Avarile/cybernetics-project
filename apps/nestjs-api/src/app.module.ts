@@ -18,6 +18,7 @@ import { EstimateModule } from "./modules/estimate/estimate.module";
 import { IntakeModule } from "./modules/intake/intake.module";
 import { IssueModule } from "./modules/issue/issue.module";
 import { LabelModule } from "./modules/label/label.module";
+import { NotificationModule } from "./modules/notification/notification.module";
 import { PageModule } from "./modules/page/page.module";
 import { ProjectModuleModule } from "./modules/project-module/module.module";
 import { StateModule } from "./modules/state/state.module";
@@ -51,6 +52,7 @@ import { WebhookModule } from "./modules/webhook/webhook.module";
     PageModule,
     ActivityModule,
     WebhookModule,
+    NotificationModule,
   ],
   controllers: [HealthController],
   providers: [
