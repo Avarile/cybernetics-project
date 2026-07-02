@@ -227,7 +227,7 @@
     "empty_state": {
       "upgrade": {
         "title": "Șabloane",
-        "description": "Cu șabloane de proiect, element de lucru și pagină în Plane, nu trebuie să creezi un proiect de la zero sau să setezi manual proprietățile elementelor de lucru.",
+        "description": "Cu șabloane de proiect, element de lucru și pagină în Cybernetics, nu trebuie să creezi un proiect de la zero sau să setezi manual proprietățile elementelor de lucru.",
         "sub_description": "Recuperează 80% din timpul tău administrativ când folosești Șabloane."
       },
       "no_templates": {

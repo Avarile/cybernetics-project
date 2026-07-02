@@ -42,15 +42,15 @@ serializer=JSONSerializer, compress=True)`: JSON → optional zlib (prefix `.`) 
 `:base62(ts)` → `:urlsafe-b64(HMAC-SHA256)` with key `sha256(b"django.contrib.sessions.SessionBasesigner" + SECRET_KEY)`.
 `expire_date` = now + `SESSION_COOKIE_AGE` (604800s) or `ADMIN_SESSION_COOKIE_AGE` (3600s) for admin.
 
-### Consequence
+### Consequence (`SECRET_KEY` is shared — decided)
+**Decision: NestJS runs with Django's identical `SECRET_KEY`** (also required for Fernet config parity — see
+[`06`](./06-ai-mastra.md) §2). Therefore:
 - **Read** existing Django sessions: trivial (denormalized `user_id`, no crypto).
-- **Write** new sessions bidirectionally: replicate Django signing exactly → **NestJS must run with the
-  identical `SECRET_KEY`**. Since `session_data` is NOT NULL we must write a valid blob anyway; writing the
-  Django-exact blob costs nothing extra and lets Django read NestJS-created sessions (safe rollback / mixed deploy).
-- **Fallback if `SECRET_KEY` cannot be shared** (flagged): NestJS still *reads* existing sessions and *writes*
-  functional ones in its own format, but Django can no longer decode NestJS-created sessions and
-  `_auth_user_hash` password-invalidation parity breaks. This is a *soft* degradation, **not** a re-login.
-  **Primary recommendation: share `SECRET_KEY`.**
+- **Write** new sessions bidirectionally: replicate Django signing exactly with the shared key. Since
+  `session_data` is NOT NULL we write a valid blob anyway; writing the Django-exact blob lets Django read
+  NestJS-created sessions (safe rollback / mixed deploy) and preserves `_auth_user_hash` password-invalidation.
+- **Startup assertion:** the app must fail fast if `SECRET_KEY` is missing (hard deployment dependency). No
+  fallback session format is implemented.
 
 ## 1. Session auth — `SessionService` + `SessionGuard`
 

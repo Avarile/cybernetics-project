@@ -4,14 +4,14 @@ Ranked risks with mitigations, plus decisions that need product/ops input before
 
 ## 1. Ranked risks
 
-### R1 — Session write parity requires the shared `SECRET_KEY` (High impact, Low likelihood)
-For bidirectional compatibility (Django able to read NestJS-created sessions, and `_auth_user_hash`
-password-invalidation parity), NestJS must sign `session_data` exactly like Django, which needs the identical
-`SECRET_KEY`. **Reads never need it** (denormalized `user_id`).
-- **Mitigation:** deploy NestJS with the same `SECRET_KEY` (it must match for Fernet config decryption too —
-  R5 — so this is a single shared secret). If it truly cannot be shared, fall back to NestJS reading Django
-  sessions and writing its own format (soft degradation, **no re-login**; Django can't read NestJS sessions).
-- **Verify:** the session round-trip golden test.
+### R1 — Session write parity requires the shared `SECRET_KEY` — ✅ RESOLVED (decision: share it)
+**Decision (Q2): NestJS runs with Django's identical `SECRET_KEY`.** This gives full bidirectional session
+compatibility (Django can read NestJS-created sessions, `_auth_user_hash` password-invalidation parity holds)
+**and** Fernet config parity (R5) from a single shared secret. Reads never needed it anyway (denormalized
+`user_id`). The soft-degradation fallback is **no longer required**.
+- **Operational note:** `SECRET_KEY` is now a hard deployment dependency — the NestJS app must fail fast on
+  boot if it is missing or differs from Django's (add a startup assertion).
+- **Verify:** the session round-trip golden test (Django cookie ↔ NestJS, both directions).
 
 ### R2 — Celery message-format drift breaks task coexistence (High impact, Medium likelihood)
 If the NestJS producer's body/headers or kwargs shapes differ from Django's, a Django worker silently fails
@@ -35,18 +35,20 @@ Django remains the DDL owner; a new migration can silently diverge from the Driz
   divergence; a **boot-time `django_migrations` version assertion**; a tracked `EXPECTED_MIGRATION` marker.
 - **Verify:** drift gate runs on every PR.
 
-### R5 — Fernet config parity (Medium impact, Low likelihood)
-Shared encrypted `InstanceConfiguration` (LLM/SMTP/OAuth/Unsplash) must decrypt identically.
+### R5 — Fernet config parity (Low, given R1 resolved)
+Shared encrypted `InstanceConfiguration` (LLM/SMTP/OAuth/Unsplash) must decrypt identically. With the shared
+`SECRET_KEY` decision (R1/Q2) confirmed, this reduces to implementation correctness.
 - **Mitigation:** `CryptoService` replicates PBKDF2-HMAC-SHA256(SECRET_KEY, "salt", 100000, 32) → urlsafe-b64
   → Fernet; a test decrypting a Django-written value.
 - **Verify:** the Fernet parity test.
 
-### R6 — AI provider mode ambiguity (Low impact, Medium likelihood)
-Django routes all providers through the OpenAI SDK with a `gemini/` prefix — this only works behind a
-LiteLLM/OpenAI-compatible gateway. Whether one is deployed determines Mode A vs Mode B.
-- **Mitigation:** default to **Mode A** (gateway, byte-faithful) when `LLM_GATEWAY_URL` is set; **Mode B**
-  (native Vercel-AI providers) otherwise. Document both ([`06`](./06-ai-mastra.md) §4/§7).
-- **Open question:** see Q1.
+### R6 — AI provider mode — ✅ RESOLVED (decision: Mode A, gateway)
+**Decision (Q1): the current Django backend does have AI, so we replicate its actual behavior — Mode A**
+(single key routed through a LiteLLM/OpenAI-compatible gateway with the `gemini/` model prefix). This is a
+byte-faithful match of `get_llm_response`. Mode B (native Vercel-AI providers) remains documented as an
+opt-in for future native-key deployments ([`06`](./06-ai-mastra.md) §4/§7), selected by the presence/absence
+of `LLM_GATEWAY_URL`.
+- **Verify:** AI contract golden test (request → response shape) against the gateway.
 
 ### R7 — Grouped/sub-grouped issue pagination complexity (Medium impact, Medium likelihood)
 The window-function grouping + `FIELD_MAPPER` + nested `{results, total_results}` is the most intricate wire
@@ -75,19 +77,24 @@ Python-side defaults, `post_save` signals, per-model `save()` logic, manager def
 - **Mitigation:** the phased, independently-shippable roadmap ([`08`](./08-implementation-roadmap.md)); reuse
   of two base repositories and shared interceptors keeps per-domain work mechanical after Phases 0–3.
 
-## 2. Open questions (need input)
+## 2. Open questions
 
-**Q1 — Is a LiteLLM / OpenAI-compatible gateway deployed for AI?** Determines Mode A vs Mode B and whether the
-stored `LLM_API_KEY` is a gateway key or a native provider key. (Default assumed: Mode A when
-`LLM_GATEWAY_URL` set.)
+### ✅ Resolved
 
-**Q2 — Can NestJS share `SECRET_KEY` with Django?** Strongly recommended (needed for full session write
-parity **and** Fernet config decryption). If not, confirm the soft-degradation fallback is acceptable.
+**Q1 — LiteLLM / OpenAI-compatible gateway for AI? → YES (Mode A).** The current Django backend has AI, so we
+replicate its actual behavior: single key via a gateway with the `gemini/` prefix. `LLM_API_KEY` is treated
+as the gateway key; `LLM_GATEWAY_URL` selects Mode A. See R6, [`06`](./06-ai-mastra.md) §4/§7.
 
-**Q3 — Bug-for-bug parity or fix-forward?** Two known Django quirks: the Unsplash `${page}` literal-string bug
-([`06`](./06-ai-mastra.md) §5) and the `DynamicBaseSerializer` `fields = self.expand` quirk
-([`04`](./04-api-surface.md) §3). Recommendation: fix the Unsplash bug, preserve the serializer's observable
-behavior. Confirm.
+**Q2 — Share `SECRET_KEY` with Django? → YES.** NestJS runs with Django's identical `SECRET_KEY`, enabling
+full bidirectional session parity + Fernet config parity. Startup asserts the key is present. See R1/R5.
+
+**Q3 — Bug-for-bug or fix-forward? → FIX-FORWARD.** Fix the Unsplash `${page}` bug
+([`06`](./06-ai-mastra.md) §5) and implement clean `fields`/`expand` semantics (fields = independent
+top-level allowlist; expand = relation inflation), **not** the `DynamicBaseSerializer` `fields = self.expand`
+internal quirk ([`04`](./04-api-surface.md) §3). Wire-parity golden tests guard against any frontend that
+depended on the old observable output; surface (don't silently absorb) any divergence.
+
+### Still need input
 
 **Q4 — Instance bootstrap ownership.** Should `register_instance`/`configure_instance` remain Django
 management commands during coexistence, or be reimplemented as Nest CLI commands? (Default: keep in Django

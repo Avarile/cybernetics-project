@@ -3,6 +3,7 @@ packages:
   - packages/*
   - "!apps/api"
   - "!apps/proxy"
+  - "!apps/nestjs-api"
 
 catalog:
   "@atlaskit/pragmatic-drag-and-drop": "1.7.4"

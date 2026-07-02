@@ -134,9 +134,10 @@ labels, issue_cycle, issue_relation, issue_intake, issue_reactions, issue_link, 
 Keep an `EXPANSION` registry matching `base.py`, including the `issue_attachments` special case (query
 `FileAsset` by `issue_id` + entity_type `ISSUE_ATTACHMENT`). This makes wire output identical.
 
-> Fidelity note: in Django's `DynamicBaseSerializer.__init__` there is a quirk where `fields = self.expand`;
-> the observable behavior across the app views is that `?fields` is a top-level allowlist and `?expand` is
-> relation inflation — reproduce the **observable** behavior (verified by golden-response tests).
+> **Decision (Q3): fix-forward.** Django's `DynamicBaseSerializer.__init__` has a quirk (`fields = self.expand`);
+> we implement the **clean, intuitive semantics** instead — `?fields` is an independent top-level allowlist and
+> `?expand` is relation inflation. Golden-response tests compare against Django to catch any client that
+> depended on the old observable output; **surface** (don't silently absorb) any divergence for a decision.
 
 ## 4. Error envelope (exception filter)
 

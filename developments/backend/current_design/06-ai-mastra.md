@@ -87,9 +87,12 @@ const SUPPORTED = {
 
 ## 4. Mastra agent + the two routing modes
 
-Because key/model come per-request from the DB, the model is built per request. Django always calls through
-the **OpenAI SDK** (`OpenAI(api_key=...)`, `gemini/`-prefixed model), implying a **LiteLLM / OpenAI-compatible
-gateway** with one key. Two supported modes:
+> **Decision (Q1): Mode A — gateway.** The current Django backend has AI and always calls through the OpenAI
+> SDK with the `gemini/` model prefix, i.e. a LiteLLM/OpenAI-compatible gateway with one key. NestJS
+> replicates that exactly: `LLM_GATEWAY_URL` is set and `LLM_API_KEY` is the gateway key. Mode B (native
+> providers) stays documented as an opt-in for future native-key deployments.
+
+Because key/model come per-request from the DB, the model is built per request. Two supported modes:
 
 ```ts
 // modules/ai/mastra-ai.service.ts
@@ -169,9 +172,8 @@ async unsplash(@Query('query') query, @Query('page') page = 1, @Query('per_page'
 }
 ```
 
-> Django has a **literal `${page}` bug** in the search URL (`page=$${page}`). Recommendation: **fix it** in
-> NestJS (as above) rather than replicate the bug; if strict bug-for-bug parity is required, reproduce the
-> literal string. Flagged in [`09`](./09-risks-and-open-questions.md).
+> Django has a **literal `${page}` bug** in the search URL (`page=$${page}`). **Decision (Q3): fix-forward** —
+> use the correct `page=${page}` (as shown above); do not replicate the bug.
 
 ## 6. Why Mastra (given the AI is tiny)
 
