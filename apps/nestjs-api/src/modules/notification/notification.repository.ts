@@ -1,7 +1,7 @@
 import { Inject, Injectable } from "@nestjs/common";
 import { and, desc, eq, inArray, isNull, isNotNull, sql } from "drizzle-orm";
 import { DRIZZLE, type Database } from "../../infra/database/drizzle.module";
-import { projectMembers, projects, workspaces } from "../../infra/database/schema";
+import { projectMembers, projects, users, workspaces } from "../../infra/database/schema";
 import { issueAssignees, issues } from "../issue/issue.schema";
 import { states } from "../state/state.schema";
 import {
@@ -9,6 +9,7 @@ import {
   issueSubscribers,
   notifications,
   userNotificationPreferences,
+  type EmailNotificationLog,
   type Notification,
   type UserNotificationPreference,
 } from "./notification.schema";
@@ -114,6 +115,28 @@ export class NotificationRepository {
 
   async bulkInsertEmailLogs(rows: (typeof emailNotificationLogs.$inferInsert)[]): Promise<void> {
     if (rows.length) await this.db.insert(emailNotificationLogs).values(rows);
+  }
+
+  async listUnprocessedEmailLogs(limit = 1000): Promise<EmailNotificationLog[]> {
+    return this.db
+      .select()
+      .from(emailNotificationLogs)
+      .where(isNull(emailNotificationLogs.processedAt))
+      .limit(limit);
+  }
+
+  async markEmailLogsProcessed(ids: string[]): Promise<void> {
+    if (!ids.length) return;
+    const now = new Date();
+    await this.db
+      .update(emailNotificationLogs)
+      .set({ processedAt: now, sentAt: now })
+      .where(inArray(emailNotificationLogs.id, ids));
+  }
+
+  async getUserEmail(userId: string): Promise<string | null> {
+    const [row] = await this.db.select({ email: users.email }).from(users).where(eq(users.id, userId)).limit(1);
+    return row?.email ?? null;
   }
 
   // ---- HTTP-facing ----

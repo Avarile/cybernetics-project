@@ -29,6 +29,17 @@ export const CELERY_TASKS = {
   pushInstanceMetrics: "plane.license.bgtasks.telemetry_metrics.push_instance_metrics",
   // logging
   processLogs: "plane.bgtasks.logger_task.process_logs",
+  // transactional email
+  magicLink: "plane.bgtasks.magic_link_code_task.magic_link",
+  forgotPassword: "plane.bgtasks.forgot_password_task.forgot_password",
+  workspaceInvitation: "plane.bgtasks.workspace_invitation_task.workspace_invitation",
+  projectInvitation: "plane.bgtasks.project_invitation_task.project_invitation",
+  userActivationEmail: "plane.bgtasks.user_activation_email_task.user_activation_email",
+  userDeactivationEmail: "plane.bgtasks.user_deactivation_email_task.user_deactivation_email",
+  emailUpdateMagicCode: "plane.bgtasks.user_email_update_task.send_email_update_magic_code",
+  emailUpdateConfirmation: "plane.bgtasks.user_email_update_task.send_email_update_confirmation",
+  projectAddUserEmail: "plane.bgtasks.project_add_user_email_task.project_add_user_email",
+  sendWebhookDeactivationEmail: "plane.bgtasks.webhook_task.send_webhook_deactivation_email",
 } as const;
 
 export type CeleryTaskName = (typeof CELERY_TASKS)[keyof typeof CELERY_TASKS];

@@ -8,12 +8,14 @@ import { RequestContextInterceptor } from "./infra/context/request-context.inter
 import { RequestContextMiddleware } from "./infra/context/request-context.middleware";
 import { DrizzleModule } from "./infra/database/drizzle.module";
 import { AllExceptionsFilter } from "./infra/filters/all-exceptions.filter";
+import { MailerModule } from "./infra/mailer/mailer.module";
 import { QueueModule } from "./infra/queue/queue.module";
 import { SchedulerModule } from "./infra/scheduler/scheduler.module";
 import { SecurityModule } from "./infra/security.module";
 import { ActivityModule } from "./modules/activity/activity.module";
 import { AuthModule } from "./modules/auth/auth.module";
 import { CycleModule } from "./modules/cycle/cycle.module";
+import { EmailModule } from "./modules/email/email.module";
 import { EstimateModule } from "./modules/estimate/estimate.module";
 import { IntakeModule } from "./modules/intake/intake.module";
 import { IssueModule } from "./modules/issue/issue.module";
@@ -38,6 +40,7 @@ import { WebhookModule } from "./modules/webhook/webhook.module";
     RedisModule,
     QueueModule,
     SchedulerModule,
+    MailerModule,
     SecurityModule,
     AuthModule,
     UserModule,
@@ -53,6 +56,7 @@ import { WebhookModule } from "./modules/webhook/webhook.module";
     ActivityModule,
     WebhookModule,
     NotificationModule,
+    EmailModule,
   ],
   controllers: [HealthController],
   providers: [
