@@ -1,5 +1,5 @@
 import { Injectable, OnModuleInit } from "@nestjs/common";
-import { ConfigService } from "@nestjs/config";
+import { ConfigService } from "./config.service";
 import { deriveFernetKey, fernetDecrypt, fernetEncrypt } from "./fernet";
 
 /**

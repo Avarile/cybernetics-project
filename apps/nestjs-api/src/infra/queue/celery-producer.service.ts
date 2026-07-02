@@ -1,31 +1,61 @@
 import { Injectable, Logger, type OnModuleDestroy, OnModuleInit } from "@nestjs/common";
-import { ConfigService } from "@nestjs/config";
-import amqp, { type AmqpConnectionManager, type ChannelWrapper } from "amqp-connection-manager";
-import type { ConfirmChannel } from "amqplib";
+import { ConfigService } from "../config/config.service";
+import * as amqp from "amqplib";
 import { buildCeleryMessage, type CeleryKwargs, type CeleryMessageOptions } from "./celery-message";
+
+type AmqpConnection = Awaited<ReturnType<typeof amqp.connect>>;
 
 /**
  * Publishes Celery-protocol-v2 messages so Django Celery workers can execute NestJS-enqueued tasks.
- * Mirror of Django's `<task>.delay(**kwargs)` / `apply_async`.
+ * Mirror of Django's `<task>.delay(**kwargs)` / `apply_async`. Lazy connect with reset-on-error so
+ * the app boots without a live broker.
  */
 @Injectable()
 export class CeleryProducer implements OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger(CeleryProducer.name);
-  private connection?: AmqpConnectionManager;
-  private channel?: ChannelWrapper;
   private readonly defaultQueue = "celery";
+  private connection?: AmqpConnection;
+  private channel?: amqp.Channel;
+  private channelPromise?: Promise<amqp.Channel>;
 
   constructor(private readonly config: ConfigService) {}
 
   onModuleInit(): void {
-    const url = this.config.get<string>("AMQP_URL", "amqp://guest:guest@localhost:5672/");
-    this.connection = amqp.connect([url]);
-    this.connection.on("connect", () => this.logger.log("Connected to RabbitMQ (producer)"));
-    this.connection.on("disconnect", (e) => this.logger.warn(`RabbitMQ disconnected: ${e?.err?.message}`));
-    this.channel = this.connection.createChannel({
-      json: false, // we control the bytes (raw JSON body)
-      setup: (ch: ConfirmChannel) => ch.assertQueue(this.defaultQueue, { durable: true }),
-    });
+    // Best-effort warm connect; never crash boot if the broker is down.
+    void this.ensureChannel().catch((e) => this.logger.warn(`RabbitMQ not ready (producer): ${(e as Error).message}`));
+  }
+
+  private url(): string {
+    return this.config.get<string>("AMQP_URL", "amqp://guest:guest@localhost:5672/");
+  }
+
+  private reset(): void {
+    this.channel = undefined;
+    this.channelPromise = undefined;
+  }
+
+  private ensureChannel(): Promise<amqp.Channel> {
+    if (this.channel) return Promise.resolve(this.channel);
+    if (!this.channelPromise) {
+      this.channelPromise = (async () => {
+        const conn = await amqp.connect(this.url());
+        conn.on("error", (e: Error) => {
+          this.logger.warn(`AMQP connection error: ${e.message}`);
+          this.reset();
+        });
+        conn.on("close", () => this.reset());
+        const ch = await conn.createChannel();
+        await ch.assertQueue(this.defaultQueue, { durable: true });
+        this.connection = conn;
+        this.channel = ch;
+        this.logger.log("Connected to RabbitMQ (producer)");
+        return ch;
+      })().catch((e) => {
+        this.channelPromise = undefined;
+        throw e;
+      });
+    }
+    return this.channelPromise;
   }
 
   /** Enqueue a Celery task by dotted name with kwargs (empty positional args, like Plane). */
@@ -34,14 +64,17 @@ export class CeleryProducer implements OnModuleInit, OnModuleDestroy {
     kwargs: CeleryKwargs = {},
     opts: CeleryMessageOptions & { queue?: string } = {},
   ): Promise<void> {
-    if (!this.channel) throw new Error("CeleryProducer not initialised");
+    const ch = await this.ensureChannel();
     const { body, properties } = buildCeleryMessage(taskName, kwargs, opts);
-    const queue = opts.queue ?? this.defaultQueue;
-    await this.channel.sendToQueue(queue, body, properties);
+    ch.sendToQueue(opts.queue ?? this.defaultQueue, body, properties);
   }
 
   async onModuleDestroy(): Promise<void> {
-    await this.channel?.close();
-    await this.connection?.close();
+    try {
+      await this.channel?.close();
+      await this.connection?.close();
+    } catch {
+      /* ignore shutdown errors */
+    }
   }
 }

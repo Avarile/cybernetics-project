@@ -1,5 +1,5 @@
 import { Body, Controller, HttpCode, Post, Req, Res, UnauthorizedException } from "@nestjs/common";
-import { ConfigService } from "@nestjs/config";
+import { ConfigService } from "../../infra/config/config.service";
 import type { Request, Response } from "express";
 import { SessionService } from "../../infra/auth/session.service";
 import { serializeUser } from "../user/user.serializer";

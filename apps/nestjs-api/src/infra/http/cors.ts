@@ -1,4 +1,4 @@
-import type { ConfigService } from "@nestjs/config";
+import type { ConfigService } from "../config/config.service";
 import type { CorsOptions } from "@nestjs/common/interfaces/external/cors-options.interface";
 
 /**

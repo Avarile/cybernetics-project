@@ -1,7 +1,6 @@
 import { and, eq, isNull, type SQL } from "drizzle-orm";
 import type { PgColumn, PgTable } from "drizzle-orm/pg-core";
-import type { ClsService } from "nestjs-cls";
-import { CLS_USER_ID } from "../context/cls.constants";
+import type { RequestContextService } from "../context/request-context";
 import type { Database } from "./drizzle.module";
 
 /** Tables built from `baseColumns` expose these columns; the base repository requires them. */
@@ -15,7 +14,7 @@ export type BaseColumnsShape = {
 /**
  * Centralises Django's implicit base-model behaviours (plane/db/mixins.py) that Drizzle has no
  * hooks for: soft-delete default scope, `all_objects` escape hatch, and audit stamping from the
- * request-scoped current user (crum.get_current_user() -> nestjs-cls).
+ * request-scoped current user (crum.get_current_user() -> AsyncLocalStorage).
  *
  * Drizzle's insert/update builders are hard to type generically, so writes cast at the call
  * boundary while the public API stays typed via T['$inferInsert'] / T['$inferSelect'].
@@ -24,7 +23,7 @@ export abstract class BaseRepository<T extends PgTable & BaseColumnsShape> {
   protected constructor(
     protected readonly db: Database,
     protected readonly table: T,
-    protected readonly cls: ClsService,
+    protected readonly ctx: RequestContextService,
   ) {}
 
   /** Override to add manager-level default filters (IssueManager, StateManager, ...). */
@@ -33,7 +32,7 @@ export abstract class BaseRepository<T extends PgTable & BaseColumnsShape> {
   }
 
   protected currentUserId(): string | null {
-    return this.cls.get(CLS_USER_ID) ?? null;
+    return this.ctx.userId ?? null;
   }
 
   /** BaseModel.save() on create: set created_by, leave updated_by null. */
@@ -57,27 +56,27 @@ export abstract class BaseRepository<T extends PgTable & BaseColumnsShape> {
   }
 
   async findById(id: string, opts?: { includeDeleted?: boolean }): Promise<T["$inferSelect"] | null> {
-    const rows = await this.find(eq(this.table.id, id), opts).limit(1);
-    return (rows[0] as T["$inferSelect"]) ?? null;
+    const rows = (await this.find(eq(this.table.id, id), opts).limit(1)) as unknown as Array<T["$inferSelect"]>;
+    return rows[0] ?? null;
   }
 
   async create(values: T["$inferInsert"]): Promise<T["$inferSelect"]> {
     const stamped = this.stampInsert(values as Record<string, unknown>);
-    const rows = await this.db
+    const rows = (await this.db
       .insert(this.table)
       .values(stamped as T["$inferInsert"])
-      .returning();
-    return rows[0] as T["$inferSelect"];
+      .returning()) as unknown as Array<T["$inferSelect"]>;
+    return rows[0];
   }
 
   async update(id: string, values: Partial<T["$inferInsert"]>): Promise<T["$inferSelect"] | null> {
     const stamped = this.stampUpdate(values as Record<string, unknown>);
-    const rows = await this.db
+    const rows = (await this.db
       .update(this.table)
       .set(stamped)
       .where(eq(this.table.id, id))
-      .returning();
-    return (rows[0] as T["$inferSelect"]) ?? null;
+      .returning()) as unknown as Array<T["$inferSelect"]>;
+    return rows[0] ?? null;
   }
 
   /** SoftDeleteModel.delete(): set deleted_at + updated_by (cascade is enqueued by subclasses). */

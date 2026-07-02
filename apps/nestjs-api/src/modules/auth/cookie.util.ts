@@ -1,4 +1,4 @@
-import type { ConfigService } from "@nestjs/config";
+import type { ConfigService } from "../../infra/config/config.service";
 import type { Request, Response } from "express";
 
 /** Cookie name selection matches the Django SessionMiddleware: admin cookie on /instances paths. */

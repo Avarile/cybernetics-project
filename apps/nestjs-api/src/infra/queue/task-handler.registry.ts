@@ -1,4 +1,6 @@
-import { Inject, Injectable, Optional } from "@nestjs/common";
+import { Injectable, type OnModuleInit } from "@nestjs/common";
+import { DiscoveryService } from "@nestjs/core";
+import { CELERY_HANDLER } from "./celery-task.decorator";
 import type { CeleryKwargs } from "./celery-message";
 
 /** A NestJS-side implementation of a Celery task. Handlers accept kwargs first (Plane uses kwargs). */
@@ -7,15 +9,22 @@ export interface TaskHandler {
   run(kwargs: CeleryKwargs, args?: unknown[]): Promise<void>;
 }
 
-/** Multi-provider token: each processor registers with { provide: TASK_HANDLERS, useClass, multi: true }. */
-export const TASK_HANDLERS = Symbol("TASK_HANDLERS");
-
 @Injectable()
-export class TaskHandlerRegistry {
+export class TaskHandlerRegistry implements OnModuleInit {
   private readonly byName = new Map<string, TaskHandler>();
 
-  constructor(@Optional() @Inject(TASK_HANDLERS) handlers: TaskHandler[] = []) {
-    for (const h of handlers ?? []) this.byName.set(h.name, h);
+  constructor(private readonly discovery: DiscoveryService) {}
+
+  onModuleInit(): void {
+    for (const wrapper of this.discovery.getProviders()) {
+      const { instance, metatype } = wrapper;
+      if (!instance || !metatype) continue;
+      const isHandler = Reflect.getMetadata(CELERY_HANDLER, metatype) === true;
+      const candidate = instance as Partial<TaskHandler>;
+      if (isHandler && typeof candidate.run === "function" && typeof candidate.name === "string") {
+        this.byName.set(candidate.name, candidate as TaskHandler);
+      }
+    }
   }
 
   get(name: string): TaskHandler | undefined {

@@ -170,11 +170,23 @@ export class IssueActivityHandler implements TaskHandler {
    backoff, so a NestJS-side re-publish-with-delay suffices; fully faithful `eta` would need the
    `rabbitmq-delayed-message` plugin (flag, not needed initially).
 
-## 2. Beat / periodic scheduler
+## 2. Beat / periodic scheduler — RabbitMQ-based (replaces `@nestjs/schedule`)
 
-Replicate `celery beat` with **`@nestjs/schedule` `@Cron` in `scheduler.ts`** whose handlers do nothing but
-**enqueue** the corresponding Celery task (never run work inline) — mirroring beat→broker→worker decoupling.
-Run a **single replica** (or Redis lock, since Redis is present) to avoid double-firing.
+**Decision:** RabbitMQ is already the broker, so let it hold the timer instead of an in-process cron
+(`@nestjs/schedule`) that requires a single replica. A `RabbitMqScheduler` uses the broker's
+**`x-delayed-message`** exchange with a **self-rescheduling tick loop**:
+
+1. For each schedule, compute the delay to the next occurrence (a dependency-free UTC cron calculator,
+   `infra/scheduler/cron.ts`, or a fixed `intervalMs`).
+2. Publish a "tick" message to the delayed exchange with header `x-delay = msUntilNext`.
+3. On delivery, the consumer (a) **enqueues** the corresponding Celery task and (b) **re-arms** the next
+   tick. Because each delayed message is delivered to exactly one consumer, the tick chain stays single.
+4. **Initial arming is leader-guarded** (Redis `SET NX`) so multiple scheduler replicas don't each seed
+   the chain — no single-replica requirement, unlike in-process cron.
+
+Requires the broker's `rabbitmq_delayed_message_exchange` plugin. `@nestjs/schedule` is **not used** and
+can be dropped from dependencies. Implemented in `src/infra/scheduler/{cron.ts, scheduler.service.ts,
+beat-schedule.ts}` and driven by `scheduler.ts`.
 
 The 12 entries (all UTC):
 
@@ -194,21 +206,21 @@ The 12 entries (all UTC):
 | `45 3 * * *` | `exporter_expired_task.delete_old_s3_link` (duplicate) |
 
 ```ts
-@Injectable()
-export class BeatScheduler {
-  constructor(private q: CeleryProducer) {}
-  @Cron('*/5 * * * *', { timeZone: 'UTC' })
-  emailNotifications() { return this.q.enqueue(CELERY_TASKS.stackEmailNotification, {}); }
-  @Cron('0 0 * * *', { timeZone: 'UTC' })
-  hardDelete() { return this.q.enqueue(CELERY_TASKS.hardDelete, {}); }
-  @Interval(Number(process.env.METRICS_PUSH_INTERVAL_MINUTES ?? 360) * 60_000)
-  pushMetrics() { return this.q.enqueue(CELERY_TASKS.pushInstanceMetrics, {}); }
-  // …remaining entries
+// Schedules are plain data (infra/scheduler/beat-schedule.ts): each has a cron OR an intervalMs.
+export interface ScheduleEntry { name: string; task: string; kwargs?: Record<string, unknown>; cron?: string; intervalMs?: number; }
+
+// RabbitMqScheduler.start(entries): connect → assert x-delayed-message exchange → consume ticks →
+// leader-guarded initial arm. On each tick: enqueue the Celery task, then re-arm the next occurrence.
+private arm(entry: ScheduleEntry): void {
+  const delay = entry.intervalMs ?? Math.max(1000, cronNext(entry.cron!, new Date()).getTime() - Date.now());
+  this.channel.publish("plane.scheduler", "tick", Buffer.from(JSON.stringify({ name: entry.name })),
+    { headers: { "x-delay": delay }, deliveryMode: 2 });
 }
 ```
 
 **Migration note:** run **either** Django beat **or** the NestJS scheduler, never both, or every daily job
 fires twice. Cut beat over as a single atomic switch (it only enqueues; whichever worker owns the task runs it).
+TODO(phase4): dedupe re-seeding across broker/scheduler restarts (a last-fire guard in Redis).
 
 ## 3. Task inventory → NestJS processors (47 tasks)
 

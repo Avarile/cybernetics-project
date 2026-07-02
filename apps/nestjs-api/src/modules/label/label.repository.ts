@@ -1,14 +1,14 @@
 import { Inject, Injectable } from "@nestjs/common";
 import { and, asc, eq, isNull, max, ne, sql } from "drizzle-orm";
-import { ClsService } from "nestjs-cls";
+import { RequestContextService } from "../../infra/context/request-context";
 import { DRIZZLE, type Database } from "../../infra/database/drizzle.module";
 import { ProjectScopedRepository } from "../../infra/database/project-scoped.repository";
 import { labels, type Label } from "./label.schema";
 
 @Injectable()
 export class LabelRepository extends ProjectScopedRepository<typeof labels> {
-  constructor(@Inject(DRIZZLE) db: Database, cls: ClsService) {
-    super(db, labels, cls);
+  constructor(@Inject(DRIZZLE) db: Database, ctx: RequestContextService) {
+    super(db, labels, ctx);
   }
 
   listByProject(projectId: string): Promise<Label[]> {

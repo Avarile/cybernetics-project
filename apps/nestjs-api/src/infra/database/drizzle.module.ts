@@ -1,18 +1,18 @@
 import { Global, Module } from "@nestjs/common";
-import { ConfigService } from "@nestjs/config";
-import { drizzle, type PostgresJsDatabase } from "drizzle-orm/postgres-js";
-import postgres from "postgres";
+import { ConfigService } from "../config/config.service";
+import { drizzle, type NodePgDatabase } from "drizzle-orm/node-postgres";
+import { Pool } from "pg";
 import * as schema from "./schema";
 
 export const DRIZZLE = Symbol("DRIZZLE");
 export const DRIZZLE_RO = Symbol("DRIZZLE_RO");
 
-export type Database = PostgresJsDatabase<typeof schema>;
+export type Database = NodePgDatabase<typeof schema>;
 
 function makeDb(url: string, max: number): Database {
-  // postgres-js connects lazily on first query, so the module initialises without a live DB.
-  const client = postgres(url, { max, prepare: false });
-  return drizzle(client, { schema });
+  // pg Pool connects lazily on first query, so the module initialises without a live DB.
+  const pool = new Pool({ connectionString: url, max });
+  return drizzle(pool, { schema });
 }
 
 @Global()

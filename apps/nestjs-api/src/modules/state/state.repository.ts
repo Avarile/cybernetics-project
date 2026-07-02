@@ -1,14 +1,14 @@
 import { Inject, Injectable } from "@nestjs/common";
 import { and, asc, eq, isNull, max, type SQL } from "drizzle-orm";
-import { ClsService } from "nestjs-cls";
+import { RequestContextService } from "../../infra/context/request-context";
 import { DRIZZLE, type Database } from "../../infra/database/drizzle.module";
 import { ProjectScopedRepository } from "../../infra/database/project-scoped.repository";
 import { states, type State } from "./state.schema";
 
 @Injectable()
 export class StateRepository extends ProjectScopedRepository<typeof states> {
-  constructor(@Inject(DRIZZLE) db: Database, cls: ClsService) {
-    super(db, states, cls);
+  constructor(@Inject(DRIZZLE) db: Database, ctx: RequestContextService) {
+    super(db, states, ctx);
   }
 
   // StateManager: default queryset excludes triage (and soft-deleted).

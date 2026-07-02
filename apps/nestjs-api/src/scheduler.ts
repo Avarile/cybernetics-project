@@ -1,13 +1,17 @@
+import "dotenv/config";
 import "reflect-metadata";
 import { Logger } from "@nestjs/common";
 import { NestFactory } from "@nestjs/core";
 import { AppModule } from "./app.module";
+import { beatSchedule } from "./infra/scheduler/beat-schedule";
+import { RabbitMqScheduler } from "./infra/scheduler/scheduler.service";
 
-// RUN MODE 3 — beat scheduler. The @nestjs/schedule cron jobs (BeatScheduler) are wired in Phase 4;
-// this bootstrap becomes the process that only ENQUEUES the 12 periodic Celery tasks.
+// RUN MODE 3 — beat scheduler (RabbitMQ-backed distributed scheduler; replaces @nestjs/schedule).
 async function bootstrap(): Promise<void> {
-  await NestFactory.createApplicationContext(AppModule);
-  new Logger("scheduler").warn("Beat scheduler runs in Phase 4; no periodic tasks scheduled yet.");
+  const app = await NestFactory.createApplicationContext(AppModule);
+  app.enableShutdownHooks();
+  await app.get(RabbitMqScheduler).start(beatSchedule());
+  new Logger("scheduler").log("nestjs-api RabbitMQ scheduler started");
 }
 
 void bootstrap();

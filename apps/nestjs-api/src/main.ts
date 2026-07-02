@@ -1,6 +1,7 @@
+import "dotenv/config";
 import "reflect-metadata";
 import { Logger } from "@nestjs/common";
-import { ConfigService } from "@nestjs/config";
+import { ConfigService } from "./infra/config/config.service";
 import { NestFactory } from "@nestjs/core";
 import cookieParser from "cookie-parser";
 import { AppModule } from "./app.module";

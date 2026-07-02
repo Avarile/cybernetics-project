@@ -1,5 +1,5 @@
 import { CallHandler, ExecutionContext, HttpException, Inject, Injectable, NestInterceptor } from "@nestjs/common";
-import { ConfigService } from "@nestjs/config";
+import { ConfigService } from "../config/config.service";
 import type { Request, Response } from "express";
 import type Redis from "ioredis";
 import type { Observable } from "rxjs";
