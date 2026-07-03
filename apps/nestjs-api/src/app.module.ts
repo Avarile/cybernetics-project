@@ -1,8 +1,12 @@
 import { MiddlewareConsumer, Module, type NestModule, ValidationPipe } from "@nestjs/common";
-import { APP_FILTER, APP_INTERCEPTOR, APP_PIPE } from "@nestjs/core";
+import { APP_FILTER, APP_GUARD, APP_INTERCEPTOR, APP_PIPE } from "@nestjs/core";
+import { ThrottlerModule } from "@nestjs/throttler";
 import { HealthController } from "./health.controller";
 import { RedisModule } from "./infra/cache/redis.module";
+import { AuthThrottlerGuard } from "./infra/auth/auth-throttle.guard";
+import { parseRateLimit } from "./infra/auth/auth-throttle";
 import { AppConfigModule } from "./infra/config/config.module";
+import { ConfigService } from "./infra/config/config.service";
 import { ContextModule } from "./infra/context/context.module";
 import { RequestContextInterceptor } from "./infra/context/request-context.interceptor";
 import { RequestContextMiddleware } from "./infra/context/request-context.middleware";
@@ -47,6 +51,12 @@ import { WebhookModule } from "./modules/webhook/webhook.module";
   imports: [
     ContextModule,
     AppConfigModule,
+    ThrottlerModule.forRootAsync({
+      inject: [ConfigService],
+      useFactory: (config: ConfigService) => ({
+        throttlers: [parseRateLimit(config.get<string>("AUTHENTICATION_RATE_LIMIT"))],
+      }),
+    }),
     DrizzleModule,
     RedisModule,
     QueueModule,
@@ -86,6 +96,7 @@ import { WebhookModule } from "./modules/webhook/webhook.module";
     { provide: APP_INTERCEPTOR, useExisting: RequestContextInterceptor },
     { provide: APP_FILTER, useClass: AllExceptionsFilter },
     { provide: APP_PIPE, useValue: new ValidationPipe({ transform: true, whitelist: true }) },
+    { provide: APP_GUARD, useClass: AuthThrottlerGuard },
   ],
 })
 export class AppModule implements NestModule {
