@@ -1,8 +1,10 @@
 import { Body, Controller, Inject, Post, Req, Res, UseGuards } from "@nestjs/common";
+import { eq } from "drizzle-orm";
 import type { Request, Response } from "express";
 import { CsrfGuard } from "../../../infra/auth/csrf.guard";
 import { AuthError, AUTHENTICATION_ERROR_CODES } from "../../../infra/auth/error-codes";
 import { DRIZZLE, type Database } from "../../../infra/database/drizzle.module";
+import { profiles } from "../../../infra/database/schema";
 import { ConfigService } from "../../../infra/config/config.service";
 import { AuthService } from "../auth.service";
 import { EmailProvider } from "../email.provider";
@@ -23,12 +25,11 @@ interface MagicCredentialsFormBody {
  * Form-POST + 302-redirect protocol, mirroring credentials.controller.ts exactly -- see that file's
  * header. Mounted at /auth (app only; the space counterpart is a later task).
  *
- * Deliberate ordering deviation from Django: both endpoints here run `verify()` before the
- * user-exists branch, whereas Django runs its `existing_user` check first and only then constructs
- * the MagicCodeProvider. The two agree for every code path exercised by a real client (verify()
- * already discriminates its own error codes by user existence, same as Django's shared
- * set_user_data), and this keeps the code-matching logic in one place instead of duplicating the
- * user lookup ahead of it.
+ * Check order mirrors Django exactly: instance-setup -> required fields -> user-exists branch ->
+ * MagicCodeProvider.__init__ gate (assertEnabled) -> set_user_data (verify) -> login. The
+ * user-exists branch runs BEFORE the code is even looked at, so e.g. an existing email posted to
+ * magic-sign-up with a wrong code still gets USER_ALREADY_EXIST, not an INVALID_MAGIC_CODE_* --
+ * and a request that fails the existence check never touches (or burns) the Redis code at all.
  */
 @Controller("auth")
 export class MagicCredentialsController {
@@ -50,7 +51,6 @@ export class MagicCredentialsController {
       const code = (body?.code ?? "").trim();
 
       await assertInstanceSetup(this.db);
-      await this.magicCode.assertEnabled(email);
 
       if (!email || !code) {
         throw new AuthError({
@@ -59,8 +59,6 @@ export class MagicCredentialsController {
           payload: { email },
         });
       }
-
-      await this.magicCode.verify(`magic_${email}`, code);
 
       const user = await this.auth.findUserByEmail(email);
       if (!user) {
@@ -71,7 +69,17 @@ export class MagicCredentialsController {
         });
       }
 
-      await completeLogin(this.db, this.sessions, this.config, "app", user, req, res, nextPath);
+      await this.magicCode.assertEnabled(email);
+      await this.magicCode.verify(`magic_${email}`, code);
+
+      // views/app/magic.py L120-128: an autoset-password user who has already onboarded goes home,
+      // ignoring next_path entirely -- everyone else gets the normal next_path/redirection-path
+      // behavior. A missing profile row is treated as not-onboarded (same convention as
+      // redirection-path.ts, which doesn't create one as a side effect of a read).
+      const [profile] = await this.db.select().from(profiles).where(eq(profiles.userId, user.id)).limit(1);
+      const pathOverride = user.isPasswordAutoset && profile?.isOnboarded ? "/" : undefined;
+
+      await completeLogin(this.db, this.sessions, this.config, "app", user, req, res, nextPath, pathOverride);
     } catch (err) {
       failLogin(this.config, "app", err, req, res, nextPath);
     }
@@ -86,7 +94,6 @@ export class MagicCredentialsController {
       const code = (body?.code ?? "").trim();
 
       await assertInstanceSetup(this.db);
-      await this.magicCode.assertEnabled(email);
 
       if (!email || !code) {
         throw new AuthError({
@@ -96,8 +103,6 @@ export class MagicCredentialsController {
         });
       }
 
-      await this.magicCode.verify(`magic_${email}`, code);
-
       const existing = await this.auth.findUserByEmail(email);
       if (existing) {
         throw new AuthError({
@@ -106,6 +111,9 @@ export class MagicCredentialsController {
           payload: { email },
         });
       }
+
+      await this.magicCode.assertEnabled(email);
+      await this.magicCode.verify(`magic_${email}`, code);
 
       const user = await this.emailProvider.createMagicUser(email);
       await completeLogin(this.db, this.sessions, this.config, "app", user, req, res, nextPath);

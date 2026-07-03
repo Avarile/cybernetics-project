@@ -26,11 +26,16 @@ export async function completeLogin(
   req: Request,
   res: Response,
   nextPath: string | undefined,
+  pathOverride?: string,
 ): Promise<void> {
   await recordLogin(db, user.id, req);
   const { key, maxAge } = await sessions.create(user, buildDeviceInfo(req), false);
   setSessionCookie(res, sessionCookieName(req), key, maxAge, config);
-  const path = validateNextPath(nextPath) || (await getRedirectionPath(db, { id: user.id, email: user.email ?? "" }));
+  // views/app/magic.py::MagicSignInEndpoint L123-128: an autoset-password user who has already
+  // onboarded is sent home regardless of next_path -- undefined (every other caller) preserves the
+  // normal next_path-or-redirection-path behavior.
+  const path =
+    pathOverride ?? (validateNextPath(nextPath) || (await getRedirectionPath(db, { id: user.id, email: user.email ?? "" })));
   redirectSuccess(config, res, req, audience, path);
 }
 

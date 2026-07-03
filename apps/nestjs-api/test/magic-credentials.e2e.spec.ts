@@ -18,7 +18,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { AppModule } from "../src/app.module";
 import { AUTHENTICATION_ERROR_CODES } from "../src/infra/auth/error-codes";
 import { DRIZZLE, type Database } from "../src/infra/database/drizzle.module";
-import { users } from "../src/infra/database/schema";
+import { profiles, users } from "../src/infra/database/schema";
 import { MagicCodeService } from "../src/modules/auth/magic/magic-code.service";
 
 // Faithful port of views/app/magic.py (MagicSignInEndpoint L64 / MagicSignUpEndpoint L147):
@@ -130,7 +130,7 @@ describe("Magic credentials — sign-in/up (redirect + CSRF parity)", () => {
     expect(res.headers.location).toContain("error_message=INVALID_MAGIC_CODE_SIGN_IN");
   });
 
-  it("magic-sign-in: missing code -> 302 with error_message=MAGIC_SIGN_IN_EMAIL_CODE_REQUIRED", async () => {
+  it("magic-sign-in: missing code -> 302 with error_code/error_message=MAGIC_SIGN_IN_EMAIL_CODE_REQUIRED", async () => {
     const addr = email("signin-missing");
     const { cookie, token: csrf } = await getCsrf();
     const res = await http
@@ -140,7 +140,30 @@ describe("Magic credentials — sign-in/up (redirect + CSRF parity)", () => {
       .send({ email: addr, csrfmiddlewaretoken: csrf });
 
     expect(res.status).toBe(302);
+    expect(res.headers.location).toContain(
+      `error_code=${AUTHENTICATION_ERROR_CODES.MAGIC_SIGN_IN_EMAIL_CODE_REQUIRED}`,
+    );
     expect(res.headers.location).toContain("error_message=MAGIC_SIGN_IN_EMAIL_CODE_REQUIRED");
+  });
+
+  it("magic-sign-in: is_password_autoset + onboarded profile -> redirects to \"/\", ignoring next_path", async () => {
+    const addr = email("signin-onboarded");
+    const id = randomUUID();
+    userIds.push(id);
+    const now = new Date();
+    await db.insert(users).values({ id, email: addr, isActive: true, isPasswordAutoset: true, createdAt: now, updatedAt: now });
+    await db.insert(profiles).values({ userId: id, isOnboarded: true });
+
+    const { token } = await magicCode.initiate(addr);
+    const { cookie, token: csrf } = await getCsrf();
+    const res = await http
+      .post("/auth/magic-sign-in")
+      .set("Cookie", cookie)
+      .type("form")
+      .send({ email: addr, code: token, next_path: "/some-other-place", csrfmiddlewaretoken: csrf });
+
+    expect(res.status).toBe(302);
+    expect(res.headers.location).toBe("http://localhost:3000/?next_path=%2F");
   });
 
   it("magic-sign-in: POST without a csrf token -> 403", async () => {
@@ -186,6 +209,26 @@ describe("Magic credentials — sign-in/up (redirect + CSRF parity)", () => {
       .set("Cookie", cookie)
       .type("form")
       .send({ email: addr, code: token, csrfmiddlewaretoken: csrf });
+
+    expect(res.status).toBe(302);
+    expect(res.headers.location).toContain(`error_code=${AUTHENTICATION_ERROR_CODES.USER_ALREADY_EXIST}`);
+    expect(res.headers.location).toContain("error_message=USER_ALREADY_EXIST");
+  });
+
+  it("magic-sign-up: existing email + WRONG code -> still 302 USER_ALREADY_EXIST (existence check runs before verify)", async () => {
+    const addr = email("signup-existing-wrongcode");
+    const id = randomUUID();
+    userIds.push(id);
+    const now = new Date();
+    await db.insert(users).values({ id, email: addr, isActive: true, createdAt: now, updatedAt: now });
+    await magicCode.initiate(addr);
+
+    const { cookie, token: csrf } = await getCsrf();
+    const res = await http
+      .post("/auth/magic-sign-up")
+      .set("Cookie", cookie)
+      .type("form")
+      .send({ email: addr, code: "000000", csrfmiddlewaretoken: csrf });
 
     expect(res.status).toBe(302);
     expect(res.headers.location).toContain(`error_code=${AUTHENTICATION_ERROR_CODES.USER_ALREADY_EXIST}`);
