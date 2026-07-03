@@ -1,4 +1,4 @@
-import { CallHandler, ExecutionContext, HttpException, Inject, Injectable, NestInterceptor } from "@nestjs/common";
+import { CallHandler, ExecutionContext, HttpException, Inject, Injectable, Logger, NestInterceptor } from "@nestjs/common";
 import { ConfigService } from "../config/config.service";
 import type { Request, Response } from "express";
 import type Redis from "ioredis";
@@ -14,6 +14,7 @@ const PERIOD_SECONDS: Record<string, number> = { s: 1, sec: 1, m: 60, min: 60, h
  */
 @Injectable()
 export class ApiKeyThrottleInterceptor implements NestInterceptor {
+  private readonly logger = new Logger(ApiKeyThrottleInterceptor.name);
   private readonly num: number;
   private readonly durSec: number;
 
@@ -36,15 +37,27 @@ export class ApiKeyThrottleInterceptor implements NestInterceptor {
     const now = Date.now() / 1000;
     const cutoff = now - this.durSec;
 
-    await this.redis.zremrangebyscore(cacheKey, 0, cutoff);
-    const count = await this.redis.zcard(cacheKey);
+    let count: number;
+    try {
+      await this.redis.zremrangebyscore(cacheKey, 0, cutoff);
+      count = await this.redis.zcard(cacheKey);
+    } catch (err) {
+      // Fail-open if Redis is unavailable — don't take the API down over the rate limiter.
+      this.logger.warn(`throttle store unavailable, allowing request: ${(err as Error).message}`);
+      return next.handle();
+    }
+
     if (count >= this.num) {
       res.setHeader("X-RateLimit-Remaining", 0);
       res.setHeader("X-RateLimit-Reset", Math.floor(now + this.durSec));
       throw new HttpException({ error_code: 5900, error_message: "RATE_LIMIT_EXCEEDED" }, 429);
     }
-    await this.redis.zadd(cacheKey, now, `${now}:${Math.random()}`);
-    await this.redis.expire(cacheKey, this.durSec);
+    try {
+      await this.redis.zadd(cacheKey, now, `${now}:${Math.random()}`);
+      await this.redis.expire(cacheKey, this.durSec);
+    } catch {
+      /* best-effort record; already decided to allow */
+    }
 
     res.setHeader("X-RateLimit-Remaining", Math.max(0, this.num - count - 1));
     res.setHeader("X-RateLimit-Reset", Math.floor(now + this.durSec));

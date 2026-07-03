@@ -365,3 +365,40 @@ describe("Phase 3 — Notifications (HTTP)", () => {
     expect(after.body.count).toBe(before.body.count - 1);
   });
 });
+
+describe("Phase 5 — v1 public API (X-Api-Key)", () => {
+  const API_KEY = "plane_api_e2e_testkey_0001";
+  const V1 = `/api/v1/workspaces/${SLUG}/projects/${projectId}`;
+
+  beforeAll(async () => {
+    await db.insert(apiTokens).values({ token: API_KEY, userId: adminId, workspaceId, isActive: true, label: "e2e" });
+  });
+
+  it("401s a v1 request without X-Api-Key", async () => {
+    const res = await http.get(`${V1}/work-items/`);
+    expect(res.status).toBe(401);
+    expect(res.body).toEqual({ detail: "Given API token is not valid" });
+  });
+
+  it("authenticates with X-Api-Key and returns the paginated envelope + rate-limit headers", async () => {
+    const res = await http.get(`${V1}/work-items/`).set("X-Api-Key", API_KEY);
+    expect(res.status).toBe(200);
+    expect(res.body).toHaveProperty("results");
+    expect(res.headers["x-ratelimit-remaining"]).toBeDefined();
+  });
+
+  it("creates a work-item via the v1 API", async () => {
+    const state = await http.get(`${V1}/states/`).set("X-Api-Key", API_KEY);
+    expect(state.status).toBe(200);
+    const stateId = state.body[0]?.id;
+    const res = await http.post(`${V1}/work-items/`).set("X-Api-Key", API_KEY).send({ name: "Via v1 API", state: stateId });
+    expect(res.status).toBe(201);
+    expect(res.body).toMatchObject({ name: "Via v1 API", project_id: projectId });
+  });
+
+  it("lists workspace projects via the v1 API", async () => {
+    const res = await http.get(`/api/v1/workspaces/${SLUG}/projects/`).set("X-Api-Key", API_KEY);
+    expect(res.status).toBe(200);
+    expect(res.body.map((p: { id: string }) => p.id)).toContain(projectId);
+  });
+});

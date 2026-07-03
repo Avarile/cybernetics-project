@@ -27,6 +27,7 @@ import { MaintenanceModule } from "./modules/maintenance/maintenance.module";
 import { NotificationModule } from "./modules/notification/notification.module";
 import { PageModule } from "./modules/page/page.module";
 import { ProjectModuleModule } from "./modules/project-module/module.module";
+import { PublicApiModule } from "./modules/public-api/public-api.module";
 import { StateModule } from "./modules/state/state.module";
 import { TelemetryModule } from "./modules/telemetry/telemetry.module";
 import { TrackingModule } from "./modules/tracking/tracking.module";
@@ -69,6 +70,7 @@ import { WebhookModule } from "./modules/webhook/webhook.module";
     TelemetryModule,
     AssetModule,
     TrackingModule,
+    PublicApiModule,
   ],
   controllers: [HealthController],
   providers: [
