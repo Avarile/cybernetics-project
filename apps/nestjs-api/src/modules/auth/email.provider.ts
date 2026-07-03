@@ -3,11 +3,12 @@ import { Inject, Injectable } from "@nestjs/common";
 import { and, eq, isNull } from "drizzle-orm";
 import zxcvbn from "zxcvbn";
 import { DRIZZLE, type Database } from "../../infra/database/drizzle.module";
-import { instances, users, profiles, workspaceMemberInvites, type User } from "../../infra/database/schema";
+import { users, profiles, workspaceMemberInvites, type User } from "../../infra/database/schema";
 import { InstanceConfigService } from "../../infra/config/instance-config.service";
 import { makeDjangoPassword, verifyDjangoPassword } from "../../infra/auth/django-password";
 import { AuthError, AUTHENTICATION_ERROR_CODES } from "../../infra/auth/error-codes";
 import { AuthService } from "./auth.service";
+import { assertInstanceSetup } from "./instance-guard";
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -30,7 +31,7 @@ export class EmailProvider {
 
   /** plane/authentication/views/app/check.py::EmailCheckEndpoint.post */
   async emailCheck(email: unknown): Promise<{ existing: boolean; status: "MAGIC_CODE" | "CREDENTIAL" }> {
-    await this.assertInstanceSetup();
+    await assertInstanceSetup(this.db);
     if (!email) {
       throw new AuthError({ code: AUTHENTICATION_ERROR_CODES.EMAIL_REQUIRED, message: "EMAIL_REQUIRED" });
     }
@@ -57,7 +58,7 @@ export class EmailProvider {
 
   /** plane/authentication/views/app/email.py::SignUpAuthEndpoint + the adapter gates it triggers. */
   async signUp(email: string, password: string): Promise<User> {
-    await this.assertInstanceSetup();
+    await assertInstanceSetup(this.db);
     if (!email || !password) {
       throw new AuthError({
         code: AUTHENTICATION_ERROR_CODES.REQUIRED_EMAIL_PASSWORD_SIGN_UP,
@@ -149,7 +150,7 @@ export class EmailProvider {
 
   /** plane/authentication/views/app/email.py::SignInAuthEndpoint + the adapter gates it triggers. */
   async signIn(email: string, password: string): Promise<User> {
-    await this.assertInstanceSetup();
+    await assertInstanceSetup(this.db);
     if (!email || !password) {
       throw new AuthError({
         code: AUTHENTICATION_ERROR_CODES.REQUIRED_EMAIL_PASSWORD_SIGN_IN,
@@ -247,18 +248,6 @@ export class EmailProvider {
       await tx.insert(profiles).values({ userId: user.id });
       return user;
     });
-  }
-
-  /** check.py::EmailCheckEndpoint.post / email.py::SignInAuthEndpoint.post + SignUpAuthEndpoint.post --
-   * `if instance is None or not instance.is_setup_done` is the first check in every auth view. */
-  private async assertInstanceSetup(): Promise<void> {
-    const [instance] = await this.db.select().from(instances).limit(1);
-    if (!instance || !instance.isSetupDone) {
-      throw new AuthError({
-        code: AUTHENTICATION_ERROR_CODES.INSTANCE_NOT_CONFIGURED,
-        message: "INSTANCE_NOT_CONFIGURED",
-      });
-    }
   }
 
   private normalize(email: unknown): string {

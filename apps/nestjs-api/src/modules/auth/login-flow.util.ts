@@ -27,8 +27,9 @@ export async function completeLogin(
   res: Response,
   nextPath: string | undefined,
   pathOverride?: string,
+  medium = "email",
 ): Promise<void> {
-  await recordLogin(db, user.id, req);
+  await recordLogin(db, user.id, req, medium);
   const { key, maxAge } = await sessions.create(user, buildDeviceInfo(req), false);
   setSessionCookie(res, sessionCookieName(req), key, maxAge, config);
   // views/app/magic.py::MagicSignInEndpoint L123-128: an autoset-password user who has already

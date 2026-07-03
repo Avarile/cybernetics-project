@@ -6,9 +6,8 @@ import { AuthError, AUTHENTICATION_ERROR_CODES } from "../../infra/auth/error-co
  * `if instance is None or not instance.is_setup_done` -- the first check in every Django auth view
  * (check.py::EmailCheckEndpoint, email.py::SignInAuthEndpoint/SignUpAuthEndpoint, magic.py's three
  * endpoints). Extracted here so it's one implementation shared across the auth surface instead of
- * copy-pasted per call site -- see EmailProvider.assertInstanceSetup and
- * MagicGenerateController.assertInstanceSetup, which predate this helper and still duplicate it
- * (Task 6 migrates them onto this).
+ * copy-pasted per call site -- every auth entry point (EmailProvider, MagicGenerateController, the
+ * magic credentials controllers) calls this rather than re-implementing it.
  */
 export async function assertInstanceSetup(db: Database): Promise<void> {
   const [instance] = await db.select().from(instances).limit(1);

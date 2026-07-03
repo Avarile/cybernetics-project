@@ -75,7 +75,7 @@ export class MagicCredentialsSpaceController {
       const [profile] = await this.db.select().from(profiles).where(eq(profiles.userId, user.id)).limit(1);
       const pathOverride = user.isPasswordAutoset && profile?.isOnboarded ? "/" : undefined;
 
-      await completeLogin(this.db, this.sessions, this.config, "space", user, req, res, nextPath, pathOverride);
+      await completeLogin(this.db, this.sessions, this.config, "space", user, req, res, nextPath, pathOverride, "magic-code");
     } catch (err) {
       failLogin(this.config, "space", err, req, res, nextPath);
     }
@@ -112,7 +112,7 @@ export class MagicCredentialsSpaceController {
       await this.magicCode.verify(`magic_${email}`, code);
 
       const user = await this.emailProvider.createMagicUser(email);
-      await completeLogin(this.db, this.sessions, this.config, "space", user, req, res, nextPath);
+      await completeLogin(this.db, this.sessions, this.config, "space", user, req, res, nextPath, undefined, "magic-code");
     } catch (err) {
       failLogin(this.config, "space", err, req, res, nextPath);
     }

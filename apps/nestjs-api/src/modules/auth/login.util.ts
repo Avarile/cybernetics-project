@@ -12,8 +12,11 @@ function clientIp(req: Request): string {
  * sign-in AND sign-up, before the session is issued. Reactivates a never-logged-out inactive
  * account (`is_active=true`, matching GHSA-rmmf-rj2q-3rrg's fix); an explicitly deactivated
  * account (last_logout_time set) never reaches here -- EmailProvider rejects it earlier.
+ * `medium` mirrors Django's `user.last_login_medium = self.provider` -- each provider class sets
+ * its own `provider` string (email.py: "email", magic_code.py: "magic-code"); defaults to "email"
+ * so the email/password callers don't need to pass it.
  */
-export async function recordLogin(db: Database, userId: string, req: Request): Promise<void> {
+export async function recordLogin(db: Database, userId: string, req: Request, medium = "email"): Promise<void> {
   const now = new Date();
   await db
     .update(users)
@@ -22,7 +25,7 @@ export async function recordLogin(db: Database, userId: string, req: Request): P
       lastActive: now,
       lastLoginTime: now,
       lastLoginIp: clientIp(req),
-      lastLoginMedium: "email",
+      lastLoginMedium: medium,
       lastLoginUagent: (req.headers["user-agent"] as string) || "",
       tokenUpdatedAt: now,
     })

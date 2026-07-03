@@ -108,6 +108,9 @@ describe("Magic credentials — sign-in/up (redirect + CSRF parity)", () => {
 
     const [after] = await db.select().from(users).where(eq(users.id, id));
     expect(after.lastLoginTime!.getTime()).toBeGreaterThan(before.lastLoginTime?.getTime() ?? 0);
+    // adapter/base.py::Adapter.save_user_data sets last_login_medium = self.provider -- magic_code.py's
+    // provider is "magic-code" (see credentials.e2e.spec.ts for the "email" counterpart).
+    expect(after.lastLoginMedium).toBe("magic-code");
   });
 
   it("magic-sign-in: wrong code -> 302 with error_code/error_message=INVALID_MAGIC_CODE_SIGN_IN", async () => {
