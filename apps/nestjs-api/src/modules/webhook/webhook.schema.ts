@@ -18,6 +18,7 @@ export const webhooks = pgTable("webhooks", {
   version: varchar("version", { length: 50 }).$defaultFn(() => "v1"),
   contentType: varchar("content_type", { length: 255 })
     .notNull()
+    // unverified guess: no reference-DB data
     .$defaultFn(() => "application/json"),
   pqlFilters: jsonb("pql_filters")
     .$type<Record<string, unknown>>()
