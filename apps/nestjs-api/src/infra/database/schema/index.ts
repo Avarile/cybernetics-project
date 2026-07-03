@@ -8,5 +8,6 @@ export * from "./project.schema";
 export * from "./instance.schema";
 export * from "../../../modules/profile/profile.schema";
 export * from "../../../modules/instance/instance-admin.schema";
+export * from "../../../modules/workspace/workspace-member-invite.schema";
 export * from "./_columns";
 export * from "./_types";
