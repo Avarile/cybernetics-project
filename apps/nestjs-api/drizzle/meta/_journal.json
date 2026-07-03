@@ -15,6 +15,13 @@
       "when": 1783084757901,
       "tag": "0001_left_night_thrasher",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1783086774422,
+      "tag": "0002_milky_owl",
+      "breakpoints": true
     }
   ]
 }
