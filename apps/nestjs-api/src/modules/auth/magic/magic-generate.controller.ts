@@ -40,15 +40,15 @@ export class MagicGenerateController {
     await assertInstanceSetup(this.db);
 
     const email = typeof rawEmail === "string" ? rawEmail.trim().toLowerCase() : "";
-    // MagicCodeProvider.__init__ gate (SMTP + magic-enabled) -- initiate()/verify() do not self-gate.
-    await this.magicCode.assertEnabled(email);
-
     if (!email) {
       throw new AuthError({ code: AUTHENTICATION_ERROR_CODES.EMAIL_REQUIRED, message: "EMAIL_REQUIRED" });
     }
     if (!EMAIL_RE.test(email)) {
       throw new AuthError({ code: AUTHENTICATION_ERROR_CODES.INVALID_EMAIL, message: "INVALID_EMAIL" });
     }
+
+    // MagicCodeProvider.__init__ gate (SMTP + magic-enabled) -- initiate()/verify() do not self-gate.
+    await this.magicCode.assertEnabled(email);
 
     const { key, token } = await this.magicCode.initiate(email);
     const rendered = renderMagicCodeEmail(token);

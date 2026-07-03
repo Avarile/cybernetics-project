@@ -238,7 +238,7 @@ export class EmailProvider {
           isActive: true,
           lastActive: now,
           lastLoginTime: now,
-          lastLoginMedium: "email",
+          lastLoginMedium: "magic-code",
           tokenUpdatedAt: now,
           dateJoined: now,
           createdAt: now,

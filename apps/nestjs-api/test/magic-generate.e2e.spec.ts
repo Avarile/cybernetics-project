@@ -110,4 +110,18 @@ describe("ENABLE_MAGIC_LINK_LOGIN gate", () => {
       await setConfig("ENABLE_MAGIC_LINK_LOGIN", "1");
     }
   });
+
+  // Input validation runs ahead of the gate (matching Django, which validates the email before
+  // constructing MagicCodeProvider) -- so a malformed request fails EMAIL_REQUIRED even with the
+  // gate off, instead of leaking MAGIC_LINK_LOGIN_DISABLED first.
+  it("returns 400 EMAIL_REQUIRED (not the gate error) when email is missing and the gate is off", async () => {
+    await setConfig("ENABLE_MAGIC_LINK_LOGIN", "0");
+    try {
+      const res = await request(app.getHttpServer()).post("/auth/magic-generate").send({}).expect(400);
+      expect(res.body.error_message).toBe("EMAIL_REQUIRED");
+      expect(mailerSend).not.toHaveBeenCalled();
+    } finally {
+      await setConfig("ENABLE_MAGIC_LINK_LOGIN", "1");
+    }
+  });
 });
