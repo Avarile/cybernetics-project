@@ -19,7 +19,7 @@ export class AuthThrottlerGuard extends ThrottlerGuard {
   /** JSON error shape matches ApiKeyThrottleInterceptor / AuthenticationThrottle.throttle_failure_view. */
   protected async throwThrottlingException(): Promise<void> {
     throw new HttpException(
-      { error_code: AUTHENTICATION_ERROR_CODES.RATE_LIMIT_EXCEEDED, error_message: "RATE_LIMIT_EXCEEDED" },
+      { error_code: String(AUTHENTICATION_ERROR_CODES.RATE_LIMIT_EXCEEDED), error_message: "RATE_LIMIT_EXCEEDED" },
       429,
     );
   }

@@ -15,7 +15,9 @@ import { AuthError, AUTHENTICATION_ERROR_CODES } from "../src/infra/auth/error-c
 // Faithful port of check.py (EmailCheckEndpoint) + email.py (SignUpAuthEndpoint/SignInAuthEndpoint) +
 // the adapter gates they trigger (adapter/base.py, provider/credentials/email.py). Seeds its own rows
 // against plane_test and cleans them up; instance_configurations rows are upserted per-test to flip
-// gates and always removed in `finally` so later suites see the untouched default.
+// gates and always removed in `finally` so later suites see the untouched default. Same restore
+// discipline applies to instances.is_setup_done (flipped false to exercise the guard, always restored
+// to true) since plane_test's other e2e suites assume a set-up instance.
 describe("EmailProvider", () => {
   const pool = new Pool({ connectionString: process.env.DATABASE_URL });
   const db = drizzle(pool, { schema });
@@ -67,6 +69,30 @@ describe("EmailProvider", () => {
     if (userIds.length) await db.delete(profiles).where(inArray(profiles.userId, userIds));
     if (userIds.length) await db.delete(users).where(inArray(users.id, userIds));
     await pool.end();
+  });
+
+  describe("instance setup guard (assertInstanceSetup)", () => {
+    async function setInstanceSetupDone(value: boolean) {
+      await pool.query(`UPDATE instances SET is_setup_done = $1`, [value]);
+    }
+
+    it("throws INSTANCE_NOT_CONFIGURED from emailCheck/signIn/signUp when the instance is not set up", async () => {
+      await setInstanceSetupDone(false);
+      try {
+        await expect(provider.emailCheck(email("setup-guard-check"))).rejects.toMatchObject({
+          errorCode: String(AUTHENTICATION_ERROR_CODES.INSTANCE_NOT_CONFIGURED),
+        });
+        await expect(provider.signIn(email("setup-guard-signin"), "whatever")).rejects.toMatchObject({
+          errorCode: String(AUTHENTICATION_ERROR_CODES.INSTANCE_NOT_CONFIGURED),
+        });
+        await expect(provider.signUp(email("setup-guard-signup"), "Tr0ub4dor&3xyz")).rejects.toMatchObject({
+          errorCode: String(AUTHENTICATION_ERROR_CODES.INSTANCE_NOT_CONFIGURED),
+        });
+      } finally {
+        // plane_test is shared across e2e files -- always restore so later suites see a set-up instance.
+        await setInstanceSetupDone(true);
+      }
+    });
   });
 
   describe("emailCheck", () => {

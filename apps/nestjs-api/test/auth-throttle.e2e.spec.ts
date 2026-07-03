@@ -50,7 +50,7 @@ describe("auth throttle", () => {
       .send({ email: `throttle-${randomUUID()}@x.io` })
       .expect(429);
     expect(res.body).toEqual({
-      error_code: AUTHENTICATION_ERROR_CODES.RATE_LIMIT_EXCEEDED,
+      error_code: String(AUTHENTICATION_ERROR_CODES.RATE_LIMIT_EXCEEDED),
       error_message: "RATE_LIMIT_EXCEEDED",
     });
   });
