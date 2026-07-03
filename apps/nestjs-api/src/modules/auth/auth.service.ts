@@ -22,6 +22,19 @@ export class AuthService {
     return user ?? null;
   }
 
+  /** Same lookup, but regardless of is_active -- Django's User.objects.filter(email=...) has no
+   * active filter (see check.py/email.py), so callers that need to tell "no such user" apart from
+   * "deactivated user" must look this up unfiltered. */
+  async findUserByEmail(email: string): Promise<User | null> {
+    const normalized = email.trim().toLowerCase();
+    const [user] = await this.db
+      .select()
+      .from(users)
+      .where(sql`lower(${users.email}) = ${normalized}`)
+      .limit(1);
+    return user ?? null;
+  }
+
   async verifyCredentials(email: string, password: string): Promise<User | null> {
     const user = await this.findActiveUserByEmail(email);
     if (!user || !user.password) return null;
