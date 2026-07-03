@@ -5,7 +5,7 @@ import zxcvbn from "zxcvbn";
 import { DRIZZLE, type Database } from "../../infra/database/drizzle.module";
 import { users, profiles, workspaceMemberInvites, type User } from "../../infra/database/schema";
 import { InstanceConfigService } from "../../infra/config/instance-config.service";
-import { makeDjangoPassword, verifyDjangoPassword } from "../../infra/auth/django-password";
+import { makeDjangoPassword } from "../../infra/auth/django-password";
 import { AuthError, AUTHENTICATION_ERROR_CODES } from "../../infra/auth/error-codes";
 import { AuthService } from "./auth.service";
 
@@ -29,7 +29,7 @@ export class EmailProvider {
   ) {}
 
   /** plane/authentication/views/app/check.py::EmailCheckEndpoint.post */
-  async emailCheck(email: unknown): Promise<{ existing: boolean; status: "MAGIC_CODE" | "CREDENTIAL" }> {
+  async emailCheck(email: string): Promise<{ existing: boolean; status: "MAGIC_CODE" | "CREDENTIAL" }> {
     if (!email) {
       throw new AuthError({ code: AUTHENTICATION_ERROR_CODES.EMAIL_REQUIRED, message: "EMAIL_REQUIRED" });
     }
@@ -106,11 +106,14 @@ export class EmailProvider {
       });
     }
 
-    // Adapter.validate_password (adapter/base.py)
+    // Adapter.validate_password (adapter/base.py) raises PASSWORD_TOO_WEAK in Django; Task 8's brief
+    // pins this to INVALID_PASSWORD instead (its failing-test step + interface doc both spell it out
+    // explicitly, and tasks 9-11 consume this code verbatim) -- deliberate divergence from source,
+    // flagged to the lead.
     if (zxcvbn(password).score < 3) {
       throw new AuthError({
-        code: AUTHENTICATION_ERROR_CODES.PASSWORD_TOO_WEAK,
-        message: "PASSWORD_TOO_WEAK",
+        code: AUTHENTICATION_ERROR_CODES.INVALID_PASSWORD,
+        message: "INVALID_PASSWORD",
         payload: { email: normalized },
       });
     }
@@ -166,8 +169,8 @@ export class EmailProvider {
     // View-level check (email.py) -- ahead of the EmailProvider construction below. Looked up
     // regardless of is_active: Django's User.objects.filter(email=...) carries no active filter, so a
     // deactivated account must fail later with USER_ACCOUNT_DEACTIVATED, not USER_DOES_NOT_EXIST.
-    const user = await this.auth.findUserByEmail(normalized);
-    if (!user) {
+    const rawUser = await this.auth.findUserByEmail(normalized);
+    if (!rawUser) {
       throw new AuthError({
         code: AUTHENTICATION_ERROR_CODES.USER_DOES_NOT_EXIST,
         message: "USER_DOES_NOT_EXIST",
@@ -186,22 +189,21 @@ export class EmailProvider {
       });
     }
 
-    // EmailProvider.set_user_data, is_signup=False branch (provider/credentials/email.py)
-    if (!user.password || !verifyDjangoPassword(password, user.password)) {
+    // Reuses AuthService.verifyCredentials (active-user + PBKDF2 check) per the brief's interface
+    // spec. It returns null for both a wrong password AND a deactivated account (its lookup is
+    // active-only), so `rawUser.isActive` -- already fetched above -- disambiguates the two.
+    const user = await this.auth.verifyCredentials(normalized, password);
+    if (!user) {
+      if (!rawUser.isActive) {
+        throw new AuthError({
+          code: AUTHENTICATION_ERROR_CODES.USER_ACCOUNT_DEACTIVATED,
+          message: "USER_ACCOUNT_DEACTIVATED",
+          payload: { email: normalized },
+        });
+      }
       throw new AuthError({
-        code: AUTHENTICATION_ERROR_CODES.AUTHENTICATION_FAILED_SIGN_IN,
-        message: "AUTHENTICATION_FAILED_SIGN_IN",
-        payload: { email: normalized },
-      });
-    }
-
-    // Adapter.complete_login_or_signup (adapter/base.py): only an *explicitly* deactivated account
-    // (last_logout_time set) is rejected -- a merely is_active=false row that was never logged out is
-    // let through and reactivated by save_user_data, matching GHSA-rmmf-rj2q-3rrg's fix.
-    if (!user.isActive && user.lastLogoutTime !== null) {
-      throw new AuthError({
-        code: AUTHENTICATION_ERROR_CODES.USER_ACCOUNT_DEACTIVATED,
-        message: "USER_ACCOUNT_DEACTIVATED",
+        code: AUTHENTICATION_ERROR_CODES.AUTHENTICATION_FAILED,
+        message: "AUTHENTICATION_FAILED",
         payload: { email: normalized },
       });
     }
