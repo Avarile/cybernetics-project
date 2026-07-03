@@ -6,6 +6,7 @@ import { NestFactory } from "@nestjs/core";
 import cookieParser from "cookie-parser";
 import { AppModule } from "./app.module";
 import { buildCorsOptions } from "./infra/http/cors";
+import { InstanceBootstrapService } from "./infra/database/instance-bootstrap.service";
 
 // RUN MODE 1 — HTTP API.
 async function bootstrap(): Promise<void> {
@@ -14,6 +15,12 @@ async function bootstrap(): Promise<void> {
 
   app.use(cookieParser());
   app.enableCors(buildCorsOptions(config));
+
+  if (process.env.SEED_ON_BOOT !== "0") {
+    // Layer 2 only: register + configure the instance. Migrations and the admin seed
+    // are deliberately NOT run on boot — those are `db:init`'s job (see src/db-init.ts).
+    await app.get(InstanceBootstrapService).run();
+  }
 
   const port = Number(config.get("PORT", 8000));
   await app.listen(port);

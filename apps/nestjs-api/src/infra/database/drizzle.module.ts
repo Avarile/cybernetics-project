@@ -1,13 +1,14 @@
 import { Global, Module } from "@nestjs/common";
 import { ConfigService } from "../config/config.service";
-import { drizzle, type NodePgDatabase } from "drizzle-orm/node-postgres";
+import { drizzle } from "drizzle-orm/node-postgres";
 import { Pool } from "pg";
 import * as schema from "./schema";
+import { DRIZZLE, DRIZZLE_RO, type Database } from "./drizzle.tokens";
+import { InstanceBootstrapService } from "./instance-bootstrap.service";
+import { AdminSeedService } from "./admin-seed.service";
 
-export const DRIZZLE = Symbol("DRIZZLE");
-export const DRIZZLE_RO = Symbol("DRIZZLE_RO");
-
-export type Database = NodePgDatabase<typeof schema>;
+// Re-exported for the many call sites that do `import { DRIZZLE, type Database } from ".../drizzle.module"`.
+export { DRIZZLE, DRIZZLE_RO, type Database } from "./drizzle.tokens";
 
 function makeDb(url: string, max: number): Database {
   // pg Pool connects lazily on first query, so the module initialises without a live DB.
@@ -33,7 +34,9 @@ function makeDb(url: string, max: number): Database {
           Number(cfg.get("PG_POOL_MAX", 20)),
         ),
     },
+    InstanceBootstrapService,
+    AdminSeedService,
   ],
-  exports: [DRIZZLE, DRIZZLE_RO],
+  exports: [DRIZZLE, DRIZZLE_RO, InstanceBootstrapService, AdminSeedService],
 })
 export class DrizzleModule {}

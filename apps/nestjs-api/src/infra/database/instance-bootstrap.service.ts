@@ -3,7 +3,7 @@ import { readFileSync } from "fs";
 import { join } from "path";
 import { Inject, Injectable, Logger } from "@nestjs/common";
 import { eq, sql } from "drizzle-orm";
-import { DRIZZLE, type Database } from "./drizzle.module";
+import { DRIZZLE, type Database } from "./drizzle.tokens";
 import { instances, instanceConfigurations } from "./schema";
 import { CryptoService } from "../config/crypto.service";
 import { ConfigService } from "../config/config.service";

@@ -1,7 +1,7 @@
 import { randomUUID } from "crypto";
 import { Inject, Injectable, Logger } from "@nestjs/common";
 import { sql } from "drizzle-orm";
-import { DRIZZLE, type Database } from "./drizzle.module";
+import { DRIZZLE, type Database } from "./drizzle.tokens";
 import { instances, users, profiles, instanceAdmins } from "./schema";
 import { ConfigService } from "../config/config.service";
 import { makeDjangoPassword } from "../auth/django-password";
