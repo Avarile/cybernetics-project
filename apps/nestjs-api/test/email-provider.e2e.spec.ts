@@ -192,9 +192,9 @@ describe("EmailProvider", () => {
       }
     });
 
-    it("throws INVALID_PASSWORD for a weak password", async () => {
+    it("throws PASSWORD_TOO_WEAK for a weak password", async () => {
       await expect(provider.signUp(email("signup-weak"), "password")).rejects.toMatchObject({
-        errorCode: String(AUTHENTICATION_ERROR_CODES.INVALID_PASSWORD),
+        errorCode: String(AUTHENTICATION_ERROR_CODES.PASSWORD_TOO_WEAK),
       });
     });
 
@@ -233,27 +233,38 @@ describe("EmailProvider", () => {
       }
     });
 
-    it("throws AUTHENTICATION_FAILED for a wrong password", async () => {
+    it("throws AUTHENTICATION_FAILED_SIGN_IN for a wrong password", async () => {
       const addr = email("signin-badpw");
       const password = "Tr0ub4dor&3xyz";
       const created = await provider.signUp(addr, password);
       userIds.push(created.id);
 
       await expect(provider.signIn(addr, "wrong-password")).rejects.toMatchObject({
-        errorCode: String(AUTHENTICATION_ERROR_CODES.AUTHENTICATION_FAILED),
+        errorCode: String(AUTHENTICATION_ERROR_CODES.AUTHENTICATION_FAILED_SIGN_IN),
       });
     });
 
-    it("throws USER_ACCOUNT_DEACTIVATED for an inactive account, even with the correct password", async () => {
+    it("throws USER_ACCOUNT_DEACTIVATED for an explicitly deactivated account", async () => {
       const addr = email("signin-deactivated");
+      const password = "Tr0ub4dor&3xyz";
+      const created = await provider.signUp(addr, password);
+      userIds.push(created.id);
+      await db.update(users).set({ isActive: false, lastLogoutTime: new Date() }).where(inArray(users.id, [created.id]));
+
+      await expect(provider.signIn(addr, password)).rejects.toMatchObject({
+        errorCode: String(AUTHENTICATION_ERROR_CODES.USER_ACCOUNT_DEACTIVATED),
+      });
+    });
+
+    it("does NOT treat is_active=false with no last_logout_time as deactivated (never explicitly logged out)", async () => {
+      const addr = email("signin-neverloggedout");
       const password = "Tr0ub4dor&3xyz";
       const created = await provider.signUp(addr, password);
       userIds.push(created.id);
       await db.update(users).set({ isActive: false }).where(inArray(users.id, [created.id]));
 
-      await expect(provider.signIn(addr, password)).rejects.toMatchObject({
-        errorCode: String(AUTHENTICATION_ERROR_CODES.USER_ACCOUNT_DEACTIVATED),
-      });
+      const user = await provider.signIn(addr, password);
+      expect(user.email).toBe(addr);
     });
 
     it("signs in with correct credentials", async () => {
