@@ -9,6 +9,7 @@ import { MagicCodeService } from "./magic/magic-code.service";
 import { MagicCredentialsController } from "./magic/magic-credentials.controller";
 import { MagicGenerateController } from "./magic/magic-generate.controller";
 import { CredentialsSpaceController } from "./spaces/credentials-space.controller";
+import { MagicCredentialsSpaceController } from "./spaces/magic-credentials-space.controller";
 
 @Module({
   controllers: [
@@ -17,6 +18,7 @@ import { CredentialsSpaceController } from "./spaces/credentials-space.controlle
     CsrfController,
     EmailCheckController,
     MagicCredentialsController,
+    MagicCredentialsSpaceController,
     MagicGenerateController,
   ],
   providers: [AuthService, CsrfService, EmailProvider, MagicCodeService],
