@@ -14,8 +14,11 @@ async function main(): Promise<void> {
   const log = new Logger("db-init");
 
   const pool = new Pool({ connectionString: process.env.DATABASE_URL });
-  await new MigrationRunner(pool).run();
-  await pool.end();
+  try {
+    await new MigrationRunner(pool).run();
+  } finally {
+    await pool.end();
+  }
   log.log("migrations applied");
 
   const app = await NestFactory.createApplicationContext(AppModule, { logger: ["log", "warn", "error"] });

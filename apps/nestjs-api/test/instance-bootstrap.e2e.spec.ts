@@ -15,6 +15,8 @@ describe("InstanceBootstrapService", () => {
 
   beforeAll(async () => {
     await pool.query("DELETE FROM instance_configurations");
+    await pool.query("DELETE FROM instance_admins");
+    await pool.query("DELETE FROM profiles");
     await pool.query("DELETE FROM instances");
   });
   afterAll(() => pool.end());
@@ -33,5 +35,8 @@ describe("InstanceBootstrapService", () => {
     // encrypted empty -> "" (Finding 3); no IS_GOOGLE_ENABLED row (Finding 2)
     const g = await pool.query("SELECT count(*)::int n FROM instance_configurations WHERE key='IS_GOOGLE_ENABLED'");
     expect(g.rows[0].n).toBe(0);
+    // Guards against a silent change to INSTANCE_CONFIG_VARIABLES' length.
+    const total = await pool.query("SELECT count(*)::int n FROM instance_configurations");
+    expect(total.rows[0].n).toBe(33);
   });
 });
