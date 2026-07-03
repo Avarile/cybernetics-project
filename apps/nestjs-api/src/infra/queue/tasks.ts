@@ -32,6 +32,8 @@ export const CELERY_TASKS = {
   // logging / analytics
   processLogs: "plane.bgtasks.logger_task.process_logs",
   trackEvent: "plane.bgtasks.event_tracking_task.track_event",
+  recentVisited: "plane.bgtasks.recent_visited_task.recent_visited_task",
+  crawlWorkItemLinkTitle: "plane.bgtasks.work_item_link_task.crawl_work_item_link_title",
   // transactional email
   magicLink: "plane.bgtasks.magic_link_code_task.magic_link",
   forgotPassword: "plane.bgtasks.forgot_password_task.forgot_password",

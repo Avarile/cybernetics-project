@@ -53,6 +53,8 @@ describe("worker task-handler discovery", () => {
     CELERY_TASKS.pushInstanceMetrics,
     CELERY_TASKS.deleteUnuploadedFileAsset,
     CELERY_TASKS.getAssetObjectMetadata,
+    CELERY_TASKS.recentVisited,
+    CELERY_TASKS.crawlWorkItemLinkTitle,
   ];
 
   it("registers every spine + email handler by its Celery task name", () => {
