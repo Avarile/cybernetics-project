@@ -8,11 +8,14 @@ import { RequestContextInterceptor } from "./infra/context/request-context.inter
 import { RequestContextMiddleware } from "./infra/context/request-context.middleware";
 import { DrizzleModule } from "./infra/database/drizzle.module";
 import { AllExceptionsFilter } from "./infra/filters/all-exceptions.filter";
+import { LiveServiceModule } from "./infra/live-service/live-service.module";
 import { MailerModule } from "./infra/mailer/mailer.module";
+import { StorageModule } from "./infra/storage/storage.module";
 import { QueueModule } from "./infra/queue/queue.module";
 import { SchedulerModule } from "./infra/scheduler/scheduler.module";
 import { SecurityModule } from "./infra/security.module";
 import { ActivityModule } from "./modules/activity/activity.module";
+import { AssetModule } from "./modules/asset/asset.module";
 import { AuthModule } from "./modules/auth/auth.module";
 import { CycleModule } from "./modules/cycle/cycle.module";
 import { EmailModule } from "./modules/email/email.module";
@@ -43,6 +46,8 @@ import { WebhookModule } from "./modules/webhook/webhook.module";
     QueueModule,
     SchedulerModule,
     MailerModule,
+    StorageModule,
+    LiveServiceModule,
     SecurityModule,
     AuthModule,
     UserModule,
@@ -61,6 +66,7 @@ import { WebhookModule } from "./modules/webhook/webhook.module";
     EmailModule,
     MaintenanceModule,
     TelemetryModule,
+    AssetModule,
   ],
   controllers: [HealthController],
   providers: [

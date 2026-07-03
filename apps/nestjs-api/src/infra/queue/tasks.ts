@@ -26,6 +26,8 @@ export const CELERY_TASKS = {
   archiveAndCloseOldIssues: "plane.bgtasks.issue_automation_task.archive_and_close_old_issues",
   deleteOldS3Link: "plane.bgtasks.exporter_expired_task.delete_old_s3_link",
   deleteUnuploadedFileAsset: "plane.bgtasks.file_asset_task.delete_unuploaded_file_asset",
+  getAssetObjectMetadata: "plane.bgtasks.storage_metadata_task.get_asset_object_metadata",
+  copyS3Objects: "plane.bgtasks.copy_s3_object.copy_s3_objects_of_description_and_assets",
   pushInstanceMetrics: "plane.license.bgtasks.telemetry_metrics.push_instance_metrics",
   // logging / analytics
   processLogs: "plane.bgtasks.logger_task.process_logs",
