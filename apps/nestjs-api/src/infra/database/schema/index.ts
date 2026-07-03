@@ -6,5 +6,7 @@ export * from "./api.schema";
 export * from "./workspace.schema";
 export * from "./project.schema";
 export * from "./instance.schema";
+export * from "../../../modules/profile/profile.schema";
+export * from "../../../modules/instance/instance-admin.schema";
 export * from "./_columns";
 export * from "./_types";

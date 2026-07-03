@@ -7,7 +7,7 @@ export const instances = pgTable("instances", {
   ...baseColumns,
   instanceName: varchar("instance_name", { length: 255 }).notNull(),
   whitelistEmails: text("whitelist_emails"),
-  instanceId: varchar("instance_id", { length: 255 }).notNull(),
+  instanceId: varchar("instance_id", { length: 255 }).notNull().unique(),
   currentVersion: varchar("current_version", { length: 255 }).notNull(),
   latestVersion: varchar("latest_version", { length: 255 }),
   edition: varchar("edition", { length: 255 }).$defaultFn(() => "PLANE_COMMUNITY"),
@@ -33,7 +33,7 @@ export type Instance = typeof instances.$inferSelect;
 // the reference's `created_by_id` / `updated_by_id` FK columns — the parity check accepts this.
 export const instanceConfigurations = pgTable("instance_configurations", {
   id: uuid("id").primaryKey(),
-  key: varchar("key", { length: 100 }).notNull(),
+  key: varchar("key", { length: 100 }).notNull().unique(),
   value: text("value"),
   category: varchar("category", { length: 100 }),
   isEncrypted: boolean("is_encrypted").notNull().default(false),
