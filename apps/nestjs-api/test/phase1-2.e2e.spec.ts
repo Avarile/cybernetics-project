@@ -17,16 +17,19 @@ import { buildSessionPayload, djangoDumps, newSessionKey } from "../src/infra/au
 import { DRIZZLE, type Database } from "../src/infra/database/drizzle.module";
 import {
   apiTokens,
-  labels,
+  instanceConfigurations,
+  instances,
   projectMembers,
   projects,
   sessions,
-  states,
   users,
   workspaceMembers,
   workspaces,
 } from "../src/infra/database/schema";
+import { labels } from "../src/modules/label/label.schema";
 import { notifications } from "../src/modules/notification/notification.schema";
+import { deployBoards } from "../src/modules/space/space.schema";
+import { states } from "../src/modules/state/state.schema";
 
 const PASSWORD = "password123";
 const SLUG = "acme-e2e";
@@ -45,7 +48,7 @@ let adminSessionKey: string;
 async function truncateAll() {
   await db.execute(
     sql.raw(
-      "TRUNCATE notifications, user_notification_preferences, email_notification_logs, issue_subscribers, " +
+      "TRUNCATE instances, instance_configurations, deploy_boards, notifications, user_notification_preferences, email_notification_logs, issue_subscribers, " +
         "issue_activities, webhook_logs, webhooks, " +
         "intake_issues, intakes, page_labels, project_pages, pages, " +
         "issue_labels, issue_assignees, issue_sequences, issues, cycles, modules, module_members, " +
@@ -400,5 +403,154 @@ describe("Phase 5 — v1 public API (X-Api-Key)", () => {
     const res = await http.get(`/api/v1/workspaces/${SLUG}/projects/`).set("X-Api-Key", API_KEY);
     expect(res.status).toBe(200);
     expect(res.body.map((p: { id: string }) => p.id)).toContain(projectId);
+  });
+});
+
+describe("Phase 6 — Spaces (public/anonymous published boards)", () => {
+  const cookie = () => `session-id=${adminSessionKey}`;
+  const stateId = randomUUID();
+  const labelId = randomUUID();
+  let anchor: string;
+
+  beforeAll(async () => {
+    await db.insert(states).values({
+      id: stateId,
+      workspaceId,
+      projectId,
+      name: "Published Backlog",
+      group: "backlog",
+      sequence: 15000,
+      color: "#abc",
+    });
+    await db.insert(labels).values({ id: labelId, workspaceId, projectId, name: "Public", color: "#def" });
+  });
+
+  it("creates (find-or-create) a project anchor via the authenticated route", async () => {
+    const res = await http.post(`/api/public/workspaces/${SLUG}/projects/${projectId}/anchor`).set("Cookie", cookie());
+    expect(res.status).toBe(201);
+    expect(res.body).toHaveProperty("anchor");
+    expect(res.body).toMatchObject({ entity_name: "project", project: projectId, workspace: workspaceId });
+    anchor = res.body.anchor;
+
+    // find-or-create: a second call returns the same anchor token
+    const again = await http.post(`/api/public/workspaces/${SLUG}/projects/${projectId}/anchor`).set("Cookie", cookie());
+    expect(again.body.anchor).toBe(anchor);
+  });
+
+  it("serves board settings + meta anonymously (no cookie) via the anchor token", async () => {
+    const settings = await http.get(`/api/public/anchor/${anchor}/settings`);
+    expect(settings.status).toBe(200);
+    expect(settings.body).toMatchObject({ anchor, entity_name: "project", project: projectId });
+
+    const meta = await http.get(`/api/public/anchor/${anchor}/meta`);
+    expect(meta.status).toBe(200);
+    expect(meta.body.project_details).toMatchObject({ name: "Website" });
+    expect(meta.body.workspace_details).toMatchObject({ slug: SLUG });
+  });
+
+  it("serves the board's states and labels anonymously", async () => {
+    const st = await http.get(`/api/public/anchor/${anchor}/states`);
+    expect(st.status).toBe(200);
+    expect(st.body.map((s: { id: string }) => s.id)).toContain(stateId);
+
+    const lb = await http.get(`/api/public/anchor/${anchor}/labels`);
+    expect(lb.status).toBe(200);
+    expect(lb.body.map((l: { id: string }) => l.id)).toContain(labelId);
+  });
+
+  it("serves the board's issues (cursor envelope) anonymously", async () => {
+    const res = await http.get(`/api/public/anchor/${anchor}/issues`);
+    expect(res.status).toBe(200);
+    expect(res.body).toHaveProperty("results");
+  });
+
+  it("404s an unknown / disabled anchor", async () => {
+    const res = await http.get(`/api/public/anchor/deadbeefdeadbeefdeadbeefdeadbeef/settings`);
+    expect(res.status).toBe(404);
+  });
+});
+
+describe("Phase 7 — AI assistant + Unsplash (contract parity)", () => {
+  const cookie = () => `session-id=${adminSessionKey}`;
+
+  it("401s the AI endpoint without auth", async () => {
+    const res = await http.post(`/api/workspaces/${SLUG}/projects/${projectId}/ai-assistant`).send({ task: "x" });
+    expect(res.status).toBe(401);
+  });
+
+  it("returns 400 LLM-config error when no LLM is configured (config check precedes task check)", async () => {
+    const res = await http
+      .post(`/api/workspaces/${SLUG}/projects/${projectId}/ai-assistant`)
+      .set("Cookie", cookie())
+      .send({}); // no task either, but config error wins
+    expect(res.status).toBe(400);
+    expect(res.body).toEqual({ error: "LLM provider API key and model are required" });
+  });
+
+  it("workspace-level AI endpoint also 400s when unconfigured", async () => {
+    const res = await http.post(`/api/workspaces/${SLUG}/ai-assistant`).set("Cookie", cookie()).send({ task: "x" });
+    expect(res.status).toBe(400);
+    expect(res.body).toEqual({ error: "LLM provider API key and model are required" });
+  });
+
+  it("returns 400 Task-required once LLM is configured but task is missing", async () => {
+    const now = new Date();
+    await db.insert(instanceConfigurations).values([
+      { id: randomUUID(), key: "LLM_API_KEY", value: "test-key", isEncrypted: false, createdAt: now, updatedAt: now },
+      { id: randomUUID(), key: "LLM_PROVIDER", value: "openai", isEncrypted: false, createdAt: now, updatedAt: now },
+      { id: randomUUID(), key: "LLM_MODEL", value: "gpt-4o-mini", isEncrypted: false, createdAt: now, updatedAt: now },
+    ]);
+    const res = await http
+      .post(`/api/workspaces/${SLUG}/projects/${projectId}/ai-assistant`)
+      .set("Cookie", cookie())
+      .send({}); // task missing
+    expect(res.status).toBe(400);
+    expect(res.body).toEqual({ error: "Task is required" });
+  });
+
+  it("returns [] from /api/unsplash when no access key is configured", async () => {
+    const res = await http.get(`/api/unsplash`).set("Cookie", cookie());
+    expect(res.status).toBe(200);
+    expect(res.body).toEqual([]);
+  });
+});
+
+describe("Phase 7 — Instance bootstrap (GET /api/instances/, AllowAny)", () => {
+  it("returns the unactivated shape when no Instance row exists", async () => {
+    const res = await http.get("/api/instances/");
+    expect(res.status).toBe(200);
+    expect(res.body).toEqual({ is_activated: false, is_setup_done: false });
+  });
+
+  it("returns { config, instance } once an Instance is registered (no auth required)", async () => {
+    const now = new Date();
+    await db.insert(instances).values({
+      instanceName: "Test Plane",
+      instanceId: "inst-e2e-0001",
+      currentVersion: "0.1.0",
+      lastCheckedAt: now,
+      isSetupDone: true,
+      createdAt: now,
+      updatedAt: now,
+    });
+
+    const res = await http.get("/api/instances/");
+    expect(res.status).toBe(200);
+    expect(res.body).toHaveProperty("config");
+    expect(res.body).toHaveProperty("instance");
+    // config flags default correctly (env-derived, string "1"/"0" → boolean)
+    expect(res.body.config).toMatchObject({
+      is_email_password_enabled: true,
+      is_magic_login_enabled: true,
+      is_self_managed: true,
+      has_unsplash_configured: false,
+    });
+    // instance carries __all__ snake_case fields + workspaces_exist
+    expect(res.body.instance).toMatchObject({
+      instance_name: "Test Plane",
+      instance_id: "inst-e2e-0001",
+      is_setup_done: true,
+      workspaces_exist: true,
+    });
   });
 });

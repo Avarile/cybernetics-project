@@ -6,6 +6,31 @@ queue) incrementally. The fire-and-forget, no-result-backend queue design (see [
 makes task cutover safe; the shared unsigned session cookie (see [`03`](./03-auth-and-rbac.md)) makes route
 cutover seamless for users.
 
+## Implementation status (as built in `apps/nestjs-api`)
+
+Verified continuously via `tsc` + `nest build` + vitest unit specs + a real-Postgres/Redis e2e suite
+(`test/*.e2e.spec.ts`). Current green state: **218 unit tests + 45 e2e tests passing.**
+
+| Phase | Status | Notes |
+|---|---|---|
+| 0 — Foundation/infra | ✅ Built | Drizzle + node-pg, ConfigService (dotenv), Crypto/Fernet parity, InstanceConfig, Redis, S3/MinIO, mailer, **RabbitMQ Celery-v2 producer/worker**, RabbitMQ-based scheduler (replaces `@nestjs/schedule`), AsyncLocalStorage request context. |
+| 1 — Auth + RBAC | ✅ Built | Django-drop-in session (raw unsigned cookie), API-key guard + Redis throttle (fail-open), RBAC (`@Roles`/`RbacGuard`/`MemberService`), password/session crypto parity. |
+| 2 — Core domains | ✅ Built | state, label, issue (advisory-lock sequence + pagination), cycle, module, estimate, view, page, intake, user, auth. |
+| 3 — Activity spine | ✅ Built | issue-activity mapper port, notifications (fan-out + mentions + email digest), webhook engine (HMAC + SSRF guard + retry + logs), 10 transactional emails. |
+| 4 — Scheduler + tasks | ✅ Built | beat entries, maintenance/cleanup/version-prune, telemetry stubs, asset s3 + live-service, tracking (recent-visited + link-title crawl). |
+| 5 — v1 public API | ✅ Core built | work-items/states/labels/projects v1 (X-Api-Key + throttle). Remaining v1 sub-resources (cycles/modules/members/estimates/intake/search) follow the same thin-controller pattern. |
+| 6 — Spaces (public/anon) | ✅ Built | DeployBoard anchor: authenticated anchor find-or-create + anonymous board reads (settings/meta/states/labels/issues) gated by `AnchorGuard`. |
+| 7 — Analytics + instance + AI | ◑ Partial | **AI (Mastra) ✅** — both `ai-assistant/` endpoints + Unsplash proxy, exact contract/error parity, `getLlmConfig` validation parity, byte-faithful gateway routing via a Mastra `Agent` + OpenAI-compatible provider. **Instance bootstrap ✅** — `GET /api/instances/` (`{config, instance}`). **Deferred:** the analytics surface (`AnalyticView` CRUD + `AnalyticsEndpoint`/`DefaultAnalyticsEndpoint`/`ProjectStats`/6× advance-analytics), which shares one machinery — `issue_filters` + `build_graph_plot` + `VALID_ANALYTICS_FIELDS` over a richer Issue schema — and the instance-**admin** auth flows (admin sign-in/up/session, configuration `PATCH`, workspace availability). These are a coherent follow-on unit, best built together. |
+
+### AI module — how Mastra is wired (implementation note)
+
+Django's `get_llm_response` calls the OpenAI SDK (`OpenAI(api_key)`), whose base URL comes from the
+environment — i.e. a LiteLLM/OpenAI-compatible gateway with the `gemini/<model>` prefix trick. The NestJS
+build replicates this **byte-faithfully** with a Mastra `Agent` whose model is `createOpenAI({ apiKey,
+baseURL })(modelId)` (`baseURL` = `LLM_GATEWAY_URL || OPENAI_BASE_URL`, else the real OpenAI API — matching
+Django when unset). Mastra 1.49's `Agent` requires a top-level `id` in its config; the model call is
+single-shot (`instructions: ""`, no temperature/streaming), and `response_html = text.replace(/\n/g, "<br/>")`.
+
 ## Sequencing principles
 
 - **Retire the highest risks first** (Phase 0): session drop-in and Celery message parity — if either can't

@@ -1,4 +1,4 @@
-import { boolean, pgTable, smallint, uuid, varchar } from "drizzle-orm/pg-core";
+import { boolean, pgTable, smallint, text, uuid, varchar } from "drizzle-orm/pg-core";
 import { baseColumns } from "./_columns";
 
 // db_table = "workspaces" / "workspace_members" (both extend BaseModel).
@@ -8,6 +8,9 @@ export const workspaces = pgTable("workspaces", {
   name: varchar("name", { length: 255 }).notNull(),
   slug: varchar("slug", { length: 255 }).notNull(),
   ownerId: uuid("owner_id").notNull(),
+  // Lite-serializer fields (WorkspaceLiteSerializer): logo_url is derived from these.
+  logo: text("logo"),
+  logoAssetId: uuid("logo_asset_id"),
 });
 
 export const workspaceMembers = pgTable("workspace_members", {

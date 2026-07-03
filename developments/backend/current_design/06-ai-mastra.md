@@ -196,8 +196,20 @@ per-request model.
 
 ## 8. Fidelity checklist
 
-- [ ] `CryptoService.decrypt` reads a value Django encrypted in `InstanceConfiguration` (Fernet parity).
-- [ ] Same provider/model validation → same 400 on misconfig.
-- [ ] `{task, prompt}` → same prompt string → response shape `{response, response_html}` (+ details on project route).
-- [ ] Missing task → 400 `Task is required`; provider error → 500 `An internal error has occurred.`
-- [ ] Unsplash returns `[]` when unconfigured; passes through status + body when configured.
+- [x] `CryptoService.decrypt` reads a value Django encrypted in `InstanceConfiguration` (Fernet parity). *(fernet.spec.ts)*
+- [x] Same provider/model validation → same 400 on misconfig. *(mastra-ai.service.spec.ts — 6 cases covering unsupported provider / missing key / bad model / default fallback / gemini / anthropic)*
+- [x] `{task, prompt}` → same prompt string (`task\nprompt`) → response shape `{response, response_html}` (+ `project_detail`/`workspace_detail` on the project route, bare on the workspace route).
+- [x] Config-missing → 400 `LLM provider API key and model are required` (checked **before** task, matching Django); missing task → 400 `Task is required`; provider error → 500 `An internal error has occurred.` *(e2e Phase 7 block)*
+- [x] Unsplash returns `[]` when unconfigured; fix-forward on the `$${page}` bug. Passes through body when configured.
+
+### As-built deltas from this design
+
+- **Model construction:** built via `createOpenAI({ apiKey, baseURL })(modelId)` wrapped in a Mastra `Agent`,
+  rather than Mastra's model-router string — this keeps the model string sent to the gateway **byte-identical**
+  to Django (bare for openai, `gemini/<model>` for gemini). `baseURL = LLM_GATEWAY_URL || OPENAI_BASE_URL`
+  (else the real OpenAI API, matching Django when unset). This is Mode A; Mode B (native provider packages)
+  remains the documented opt-in.
+- **Mastra 1.49 API:** `new Agent({...})` requires a top-level `id` (not just `name`); `agent.generate([{role,
+  content}])` returns `{ text }`.
+- **Controller order:** `getLlmConfig()` is resolved in the controller first so the config-missing 400 precedes
+  the task-missing 400 (Django's exact order); the service exposes `getLlmConfig()` + `generate(cfg, task, prompt)`.

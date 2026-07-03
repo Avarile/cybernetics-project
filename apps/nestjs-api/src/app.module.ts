@@ -15,11 +15,13 @@ import { QueueModule } from "./infra/queue/queue.module";
 import { SchedulerModule } from "./infra/scheduler/scheduler.module";
 import { SecurityModule } from "./infra/security.module";
 import { ActivityModule } from "./modules/activity/activity.module";
+import { AiModule } from "./modules/ai/ai.module";
 import { AssetModule } from "./modules/asset/asset.module";
 import { AuthModule } from "./modules/auth/auth.module";
 import { CycleModule } from "./modules/cycle/cycle.module";
 import { EmailModule } from "./modules/email/email.module";
 import { EstimateModule } from "./modules/estimate/estimate.module";
+import { InstanceModule } from "./modules/instance/instance.module";
 import { IntakeModule } from "./modules/intake/intake.module";
 import { IssueModule } from "./modules/issue/issue.module";
 import { LabelModule } from "./modules/label/label.module";
@@ -28,6 +30,7 @@ import { NotificationModule } from "./modules/notification/notification.module";
 import { PageModule } from "./modules/page/page.module";
 import { ProjectModuleModule } from "./modules/project-module/module.module";
 import { PublicApiModule } from "./modules/public-api/public-api.module";
+import { SpaceModule } from "./modules/space/space.module";
 import { StateModule } from "./modules/state/state.module";
 import { TelemetryModule } from "./modules/telemetry/telemetry.module";
 import { TrackingModule } from "./modules/tracking/tracking.module";
@@ -71,6 +74,9 @@ import { WebhookModule } from "./modules/webhook/webhook.module";
     AssetModule,
     TrackingModule,
     PublicApiModule,
+    SpaceModule,
+    AiModule,
+    InstanceModule,
   ],
   controllers: [HealthController],
   providers: [

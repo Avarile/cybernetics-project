@@ -1,4 +1,4 @@
-import { boolean, pgTable, smallint, uuid, varchar } from "drizzle-orm/pg-core";
+import { boolean, jsonb, pgTable, smallint, text, uuid, varchar } from "drizzle-orm/pg-core";
 import { baseColumns } from "./_columns";
 
 // db_table = "projects" / "project_members".
@@ -9,6 +9,10 @@ export const projects = pgTable("projects", {
   name: varchar("name", { length: 255 }).notNull(),
   identifier: varchar("identifier", { length: 12 }),
   description: varchar("description", { length: 1024 }),
+  // Lite-serializer fields (ProjectLiteSerializer): cover image + logo props.
+  coverImage: text("cover_image"),
+  coverImageAssetId: uuid("cover_image_asset_id"),
+  logoProps: jsonb("logo_props").$type<Record<string, unknown>>().$defaultFn(() => ({})),
 });
 
 export const projectMembers = pgTable("project_members", {
