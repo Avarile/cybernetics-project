@@ -20,10 +20,12 @@ import { EstimateModule } from "./modules/estimate/estimate.module";
 import { IntakeModule } from "./modules/intake/intake.module";
 import { IssueModule } from "./modules/issue/issue.module";
 import { LabelModule } from "./modules/label/label.module";
+import { MaintenanceModule } from "./modules/maintenance/maintenance.module";
 import { NotificationModule } from "./modules/notification/notification.module";
 import { PageModule } from "./modules/page/page.module";
 import { ProjectModuleModule } from "./modules/project-module/module.module";
 import { StateModule } from "./modules/state/state.module";
+import { TelemetryModule } from "./modules/telemetry/telemetry.module";
 import { UserModule } from "./modules/user/user.module";
 import { ViewModule } from "./modules/view/view.module";
 import { WebhookModule } from "./modules/webhook/webhook.module";
@@ -57,6 +59,8 @@ import { WebhookModule } from "./modules/webhook/webhook.module";
     WebhookModule,
     NotificationModule,
     EmailModule,
+    MaintenanceModule,
+    TelemetryModule,
   ],
   controllers: [HealthController],
   providers: [

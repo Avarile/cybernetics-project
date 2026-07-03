@@ -27,8 +27,9 @@ export const CELERY_TASKS = {
   deleteOldS3Link: "plane.bgtasks.exporter_expired_task.delete_old_s3_link",
   deleteUnuploadedFileAsset: "plane.bgtasks.file_asset_task.delete_unuploaded_file_asset",
   pushInstanceMetrics: "plane.license.bgtasks.telemetry_metrics.push_instance_metrics",
-  // logging
+  // logging / analytics
   processLogs: "plane.bgtasks.logger_task.process_logs",
+  trackEvent: "plane.bgtasks.event_tracking_task.track_event",
   // transactional email
   magicLink: "plane.bgtasks.magic_link_code_task.magic_link",
   forgotPassword: "plane.bgtasks.forgot_password_task.forgot_password",

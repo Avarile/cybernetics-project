@@ -40,6 +40,17 @@ describe("worker task-handler discovery", () => {
     CELERY_TASKS.projectInvitation,
     CELERY_TASKS.userActivationEmail,
     CELERY_TASKS.sendWebhookDeactivationEmail,
+    // Phase 4 maintenance + telemetry
+    CELERY_TASKS.deleteApiLogs,
+    CELERY_TASKS.deleteEmailNotificationLogs,
+    CELERY_TASKS.deleteWebhookLogs,
+    CELERY_TASKS.deletePageVersions,
+    CELERY_TASKS.deleteIssueDescriptionVersions,
+    CELERY_TASKS.hardDelete,
+    CELERY_TASKS.archiveAndCloseOldIssues,
+    CELERY_TASKS.processLogs,
+    CELERY_TASKS.trackEvent,
+    CELERY_TASKS.pushInstanceMetrics,
   ];
 
   it("registers every spine + email handler by its Celery task name", () => {
