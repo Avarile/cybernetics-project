@@ -212,6 +212,43 @@ export class EmailProvider {
     return user;
   }
 
+  /** provider/credentials/magic_code.py::set_user_data new-user branch (is_password_autoset=True) +
+   * adapter/base.py::complete_login_or_signup's user-creation block -- reused by
+   * MagicCredentialsController's sign-up flow (magic-credentials.controller.ts) so the user+profile
+   * insert isn't duplicated between the email and magic-code sign-up paths. Differs from `signUp`
+   * only in: no password validation, isPasswordAutoset=true, and no password hash is stored at all
+   * (Django instead sets a random unusable one via `user.set_password(uuid.uuid4().hex)`; a null
+   * hash achieves the same "cannot sign in with a password" outcome -- see the `!user.password`
+   * guard in `signIn`). Caller (the controller) already verified the magic code and that no user
+   * exists for this email. */
+  async createMagicUser(email: string): Promise<User> {
+    const now = new Date();
+    const userId = randomUUID();
+    return this.db.transaction(async (tx) => {
+      const [user] = await tx
+        .insert(users)
+        .values({
+          id: userId,
+          email,
+          username: randomUUID().replace(/-/g, ""),
+          firstName: "",
+          lastName: "",
+          isPasswordAutoset: true,
+          isActive: true,
+          lastActive: now,
+          lastLoginTime: now,
+          lastLoginMedium: "email",
+          tokenUpdatedAt: now,
+          dateJoined: now,
+          createdAt: now,
+          updatedAt: now,
+        })
+        .returning();
+      await tx.insert(profiles).values({ userId: user.id });
+      return user;
+    });
+  }
+
   /** check.py::EmailCheckEndpoint.post / email.py::SignInAuthEndpoint.post + SignUpAuthEndpoint.post --
    * `if instance is None or not instance.is_setup_done` is the first check in every auth view. */
   private async assertInstanceSetup(): Promise<void> {

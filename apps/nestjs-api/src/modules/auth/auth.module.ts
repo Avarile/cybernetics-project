@@ -6,6 +6,7 @@ import { CsrfController } from "./csrf.controller";
 import { EmailCheckController } from "./email-check.controller";
 import { EmailProvider } from "./email.provider";
 import { MagicCodeService } from "./magic/magic-code.service";
+import { MagicCredentialsController } from "./magic/magic-credentials.controller";
 import { MagicGenerateController } from "./magic/magic-generate.controller";
 import { CredentialsSpaceController } from "./spaces/credentials-space.controller";
 
@@ -15,6 +16,7 @@ import { CredentialsSpaceController } from "./spaces/credentials-space.controlle
     CredentialsSpaceController,
     CsrfController,
     EmailCheckController,
+    MagicCredentialsController,
     MagicGenerateController,
   ],
   providers: [AuthService, CsrfService, EmailProvider, MagicCodeService],
