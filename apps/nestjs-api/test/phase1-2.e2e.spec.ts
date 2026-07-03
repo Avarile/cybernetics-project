@@ -4,11 +4,14 @@ process.env.DATABASE_URL ??= "postgresql://plane:plane@localhost:5433/plane_test
 process.env.SECRET_KEY ??= "e2e-test-secret-key";
 process.env.REDIS_URL ??= "redis://localhost:6379/0";
 process.env.AMQP_URL ??= "amqp://guest:guest@localhost:5672/";
+process.env.APP_BASE_URL ??= "http://localhost:3000";
+process.env.WEB_URL ??= "http://localhost:3000";
 
 import { INestApplication } from "@nestjs/common";
 import { Test } from "@nestjs/testing";
 import { sql } from "drizzle-orm";
 import cookieParser from "cookie-parser";
+import express from "express";
 import request from "supertest";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { AppModule } from "../src/app.module";
@@ -59,10 +62,23 @@ async function truncateAll() {
   );
 }
 
+// Task 10: /auth/sign-in is now a CSRF-guarded form-POST that 302-redirects (Django parity) rather
+// than returning JSON -- fetch a csrf cookie/token first, then read the session cookie off the redirect.
+async function signIn(email: string, password: string) {
+  const csrf = await http.get("/auth/get-csrf-token");
+  const csrfCookie = (csrf.headers["set-cookie"] as unknown as string[]).find((c) => c.startsWith("csrftoken="))!.split(";")[0];
+  return http
+    .post("/auth/sign-in")
+    .set("Cookie", csrfCookie)
+    .type("form")
+    .send({ email, password, csrfmiddlewaretoken: csrf.body.csrf_token });
+}
+
 beforeAll(async () => {
   const moduleRef = await Test.createTestingModule({ imports: [AppModule] }).compile();
   app = moduleRef.createNestApplication();
   app.use(cookieParser());
+  app.use(express.urlencoded({ extended: true }));
   await app.init();
   db = app.get<Database>(DRIZZLE);
   http = request(app.getHttpServer());
@@ -133,9 +149,9 @@ describe("Phase 1 — auth & sessions (drop-in)", () => {
     expect(res.body).toEqual({ detail: "Authentication credentials were not provided." });
   });
 
-  it("email/password sign-in sets a session cookie usable for /me", async () => {
-    const res = await http.post("/auth/sign-in").send({ email: "admin@example.com", password: PASSWORD });
-    expect(res.status).toBe(200);
+  it("email/password sign-in redirects with a session cookie usable for /me", async () => {
+    const res = await signIn("admin@example.com", PASSWORD);
+    expect(res.status).toBe(302);
     const setCookie = res.headers["set-cookie"] as unknown as string[];
     expect(setCookie.some((c) => c.startsWith("session-id="))).toBe(true);
     const cookie = setCookie.find((c) => c.startsWith("session-id="))!.split(";")[0];
@@ -145,8 +161,9 @@ describe("Phase 1 — auth & sessions (drop-in)", () => {
   });
 
   it("rejects a wrong password", async () => {
-    const res = await http.post("/auth/sign-in").send({ email: "admin@example.com", password: "nope" });
-    expect(res.status).toBe(401);
+    const res = await signIn("admin@example.com", "nope");
+    expect(res.status).toBe(302);
+    expect(res.headers.location).toContain("error_message=AUTHENTICATION_FAILED_SIGN_IN");
   });
 });
 
@@ -192,7 +209,7 @@ describe("Phase 2 — State (interface parity)", () => {
   });
 
   it("forbids a MEMBER from creating a state (403, ADMIN-only)", async () => {
-    const signin = await http.post("/auth/sign-in").send({ email: "member@example.com", password: PASSWORD });
+    const signin = await signIn("member@example.com", PASSWORD);
     const memberCookie = (signin.headers["set-cookie"] as unknown as string[])
       .find((c) => c.startsWith("session-id="))!
       .split(";")[0];

@@ -4,6 +4,7 @@ import { Logger } from "@nestjs/common";
 import { ConfigService } from "./infra/config/config.service";
 import { NestFactory } from "@nestjs/core";
 import cookieParser from "cookie-parser";
+import express from "express";
 import { AppModule } from "./app.module";
 import { buildCorsOptions } from "./infra/http/cors";
 import { InstanceBootstrapService } from "./infra/database/instance-bootstrap.service";
@@ -14,6 +15,8 @@ async function bootstrap(): Promise<void> {
   const config = app.get(ConfigService);
 
   app.use(cookieParser());
+  // Django's sign-in/up/out endpoints are form-POSTs (see modules/auth/credentials.controller.ts).
+  app.use(express.urlencoded({ extended: true }));
   app.enableCors(buildCorsOptions(config));
 
   if (process.env.SEED_ON_BOOT !== "0") {
