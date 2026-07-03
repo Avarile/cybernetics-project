@@ -1,5 +1,5 @@
 {
-  "id": "4b234baf-2262-41b6-a83c-dc89b3daa5b7",
+  "id": "17f02cc8-eed6-4ddf-b60d-db59f05fa3db",
   "prevId": "00000000-0000-0000-0000-000000000000",
   "version": "7",
   "dialect": "postgresql",
@@ -34,18 +34,6 @@
         },
         "updated_by": {
           "name": "updated_by",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "created_by_id": {
-          "name": "created_by_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "updated_by_id": {
-          "name": "updated_by_id",
           "type": "uuid",
           "primaryKey": false,
           "notNull": false
@@ -181,18 +169,6 @@
           "primaryKey": false,
           "notNull": true
         },
-        "created_by_id": {
-          "name": "created_by_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "updated_by_id": {
-          "name": "updated_by_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": false
-        },
         "deleted_at": {
           "name": "deleted_at",
           "type": "timestamp with time zone",
@@ -238,18 +214,6 @@
         },
         "updated_by": {
           "name": "updated_by",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "created_by_id": {
-          "name": "created_by_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "updated_by_id": {
-          "name": "updated_by_id",
           "type": "uuid",
           "primaryKey": false,
           "notNull": false
@@ -406,18 +370,6 @@
           "primaryKey": false,
           "notNull": false
         },
-        "created_by_id": {
-          "name": "created_by_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "updated_by_id": {
-          "name": "updated_by_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": false
-        },
         "deleted_at": {
           "name": "deleted_at",
           "type": "timestamp with time zone",
@@ -531,18 +483,6 @@
         },
         "updated_by": {
           "name": "updated_by",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "created_by_id": {
-          "name": "created_by_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "updated_by_id": {
-          "name": "updated_by_id",
           "type": "uuid",
           "primaryKey": false,
           "notNull": false
@@ -1100,18 +1040,6 @@
           "primaryKey": false,
           "notNull": false
         },
-        "created_by_id": {
-          "name": "created_by_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "updated_by_id": {
-          "name": "updated_by_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": false
-        },
         "deleted_at": {
           "name": "deleted_at",
           "type": "timestamp with time zone",
@@ -1229,18 +1157,6 @@
           "primaryKey": false,
           "notNull": false
         },
-        "created_by_id": {
-          "name": "created_by_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "updated_by_id": {
-          "name": "updated_by_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": false
-        },
         "deleted_at": {
           "name": "deleted_at",
           "type": "timestamp with time zone",
@@ -1334,18 +1250,6 @@
         },
         "updated_by": {
           "name": "updated_by",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "created_by_id": {
-          "name": "created_by_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "updated_by_id": {
-          "name": "updated_by_id",
           "type": "uuid",
           "primaryKey": false,
           "notNull": false
@@ -1495,18 +1399,6 @@
           "primaryKey": false,
           "notNull": false
         },
-        "created_by_id": {
-          "name": "created_by_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "updated_by_id": {
-          "name": "updated_by_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": false
-        },
         "deleted_at": {
           "name": "deleted_at",
           "type": "timestamp with time zone",
@@ -1582,18 +1474,6 @@
         },
         "updated_by": {
           "name": "updated_by",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "created_by_id": {
-          "name": "created_by_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "updated_by_id": {
-          "name": "updated_by_id",
           "type": "uuid",
           "primaryKey": false,
           "notNull": false
@@ -1755,18 +1635,6 @@
           "primaryKey": false,
           "notNull": false
         },
-        "created_by_id": {
-          "name": "created_by_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "updated_by_id": {
-          "name": "updated_by_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": false
-        },
         "deleted_at": {
           "name": "deleted_at",
           "type": "timestamp with time zone",
@@ -1836,18 +1704,6 @@
         },
         "updated_by": {
           "name": "updated_by",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "created_by_id": {
-          "name": "created_by_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "updated_by_id": {
-          "name": "updated_by_id",
           "type": "uuid",
           "primaryKey": false,
           "notNull": false
@@ -1997,18 +1853,6 @@
           "primaryKey": false,
           "notNull": false
         },
-        "created_by_id": {
-          "name": "created_by_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "updated_by_id": {
-          "name": "updated_by_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": false
-        },
         "deleted_at": {
           "name": "deleted_at",
           "type": "timestamp with time zone",
@@ -2116,18 +1960,6 @@
         },
         "updated_by": {
           "name": "updated_by",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "created_by_id": {
-          "name": "created_by_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "updated_by_id": {
-          "name": "updated_by_id",
           "type": "uuid",
           "primaryKey": false,
           "notNull": false
@@ -2248,18 +2080,6 @@
         },
         "updated_by": {
           "name": "updated_by",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "created_by_id": {
-          "name": "created_by_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "updated_by_id": {
-          "name": "updated_by_id",
           "type": "uuid",
           "primaryKey": false,
           "notNull": false
@@ -2391,18 +2211,6 @@
           "primaryKey": false,
           "notNull": false
         },
-        "created_by_id": {
-          "name": "created_by_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "updated_by_id": {
-          "name": "updated_by_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": false
-        },
         "deleted_at": {
           "name": "deleted_at",
           "type": "timestamp with time zone",
@@ -2517,18 +2325,6 @@
           "primaryKey": false,
           "notNull": false
         },
-        "created_by_id": {
-          "name": "created_by_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "updated_by_id": {
-          "name": "updated_by_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": false
-        },
         "deleted_at": {
           "name": "deleted_at",
           "type": "timestamp with time zone",
@@ -2625,18 +2421,6 @@
           "primaryKey": false,
           "notNull": false
         },
-        "created_by_id": {
-          "name": "created_by_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "updated_by_id": {
-          "name": "updated_by_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": false
-        },
         "deleted_at": {
           "name": "deleted_at",
           "type": "timestamp with time zone",
@@ -2706,18 +2490,6 @@
         },
         "updated_by": {
           "name": "updated_by",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "created_by_id": {
-          "name": "created_by_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "updated_by_id": {
-          "name": "updated_by_id",
           "type": "uuid",
           "primaryKey": false,
           "notNull": false
@@ -2812,18 +2584,6 @@
         },
         "updated_by": {
           "name": "updated_by",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "created_by_id": {
-          "name": "created_by_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "updated_by_id": {
-          "name": "updated_by_id",
           "type": "uuid",
           "primaryKey": false,
           "notNull": false
@@ -3029,18 +2789,6 @@
           "primaryKey": false,
           "notNull": false
         },
-        "created_by_id": {
-          "name": "created_by_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "updated_by_id": {
-          "name": "updated_by_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": false
-        },
         "deleted_at": {
           "name": "deleted_at",
           "type": "timestamp with time zone",
@@ -3197,18 +2945,6 @@
           "primaryKey": false,
           "notNull": false
         },
-        "created_by_id": {
-          "name": "created_by_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "updated_by_id": {
-          "name": "updated_by_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": false
-        },
         "deleted_at": {
           "name": "deleted_at",
           "type": "timestamp with time zone",
@@ -3318,18 +3054,6 @@
           "primaryKey": false,
           "notNull": false
         },
-        "created_by_id": {
-          "name": "created_by_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "updated_by_id": {
-          "name": "updated_by_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": false
-        },
         "deleted_at": {
           "name": "deleted_at",
           "type": "timestamp with time zone",
@@ -3429,18 +3153,6 @@
         },
         "updated_by": {
           "name": "updated_by",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "created_by_id": {
-          "name": "created_by_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "updated_by_id": {
-          "name": "updated_by_id",
           "type": "uuid",
           "primaryKey": false,
           "notNull": false
@@ -3554,18 +3266,6 @@
           "primaryKey": false,
           "notNull": false
         },
-        "created_by_id": {
-          "name": "created_by_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "updated_by_id": {
-          "name": "updated_by_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": false
-        },
         "deleted_at": {
           "name": "deleted_at",
           "type": "timestamp with time zone",
@@ -3675,18 +3375,6 @@
           "primaryKey": false,
           "notNull": false
         },
-        "created_by_id": {
-          "name": "created_by_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "updated_by_id": {
-          "name": "updated_by_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": false
-        },
         "deleted_at": {
           "name": "deleted_at",
           "type": "timestamp with time zone",
@@ -3756,18 +3444,6 @@
         },
         "updated_by": {
           "name": "updated_by",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "created_by_id": {
-          "name": "created_by_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "updated_by_id": {
-          "name": "updated_by_id",
           "type": "uuid",
           "primaryKey": false,
           "notNull": false
@@ -3911,18 +3587,6 @@
           "primaryKey": false,
           "notNull": false
         },
-        "created_by_id": {
-          "name": "created_by_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "updated_by_id": {
-          "name": "updated_by_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": false
-        },
         "deleted_at": {
           "name": "deleted_at",
           "type": "timestamp with time zone",
@@ -4020,18 +3684,6 @@
           "primaryKey": false,
           "notNull": false
         },
-        "created_by_id": {
-          "name": "created_by_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "updated_by_id": {
-          "name": "updated_by_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": false
-        },
         "deleted_at": {
           "name": "deleted_at",
           "type": "timestamp with time zone",
@@ -4095,18 +3747,6 @@
         },
         "updated_by": {
           "name": "updated_by",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "created_by_id": {
-          "name": "created_by_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "updated_by_id": {
-          "name": "updated_by_id",
           "type": "uuid",
           "primaryKey": false,
           "notNull": false
@@ -4294,18 +3934,6 @@
           "primaryKey": false,
           "notNull": false
         },
-        "created_by_id": {
-          "name": "created_by_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "updated_by_id": {
-          "name": "updated_by_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": false
-        },
         "deleted_at": {
           "name": "deleted_at",
           "type": "timestamp with time zone",
@@ -4396,18 +4024,6 @@
           "primaryKey": false,
           "notNull": false
         },
-        "created_by_id": {
-          "name": "created_by_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "updated_by_id": {
-          "name": "updated_by_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": false
-        },
         "deleted_at": {
           "name": "deleted_at",
           "type": "timestamp with time zone",
@@ -4477,18 +4093,6 @@
         },
         "updated_by": {
           "name": "updated_by",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "created_by_id": {
-          "name": "created_by_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "updated_by_id": {
-          "name": "updated_by_id",
           "type": "uuid",
           "primaryKey": false,
           "notNull": false
@@ -4599,18 +4203,6 @@
         },
         "updated_by": {
           "name": "updated_by",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "created_by_id": {
-          "name": "created_by_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "updated_by_id": {
-          "name": "updated_by_id",
           "type": "uuid",
           "primaryKey": false,
           "notNull": false
@@ -4783,18 +4375,6 @@
           "primaryKey": false,
           "notNull": false
         },
-        "created_by_id": {
-          "name": "created_by_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "updated_by_id": {
-          "name": "updated_by_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": false
-        },
         "deleted_at": {
           "name": "deleted_at",
           "type": "timestamp with time zone",
@@ -4912,18 +4492,6 @@
         },
         "updated_by": {
           "name": "updated_by",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "created_by_id": {
-          "name": "created_by_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "updated_by_id": {
-          "name": "updated_by_id",
           "type": "uuid",
           "primaryKey": false,
           "notNull": false
@@ -5072,18 +4640,6 @@
           "primaryKey": false,
           "notNull": false
         },
-        "created_by_id": {
-          "name": "created_by_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "updated_by_id": {
-          "name": "updated_by_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": false
-        },
         "deleted_at": {
           "name": "deleted_at",
           "type": "timestamp with time zone",
@@ -5169,18 +4725,6 @@
           "primaryKey": false,
           "notNull": false
         },
-        "created_by_id": {
-          "name": "created_by_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "updated_by_id": {
-          "name": "updated_by_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": false
-        },
         "deleted_at": {
           "name": "deleted_at",
           "type": "timestamp with time zone",
@@ -5262,18 +4806,6 @@
         },
         "updated_by": {
           "name": "updated_by",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "created_by_id": {
-          "name": "created_by_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "updated_by_id": {
-          "name": "updated_by_id",
           "type": "uuid",
           "primaryKey": false,
           "notNull": false
@@ -5429,18 +4961,6 @@
           "primaryKey": false,
           "notNull": false
         },
-        "created_by_id": {
-          "name": "created_by_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "updated_by_id": {
-          "name": "updated_by_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": false
-        },
         "deleted_at": {
           "name": "deleted_at",
           "type": "timestamp with time zone",
@@ -5546,18 +5066,6 @@
         },
         "updated_by": {
           "name": "updated_by",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "created_by_id": {
-          "name": "created_by_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "updated_by_id": {
-          "name": "updated_by_id",
           "type": "uuid",
           "primaryKey": false,
           "notNull": false
