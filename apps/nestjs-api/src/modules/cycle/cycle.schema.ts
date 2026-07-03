@@ -46,5 +46,14 @@ export const cycles = pgTable("cycles", {
     .$defaultFn(() => 1),
 });
 
+// db_table = "cycle_issues" (CycleIssue extends ProjectBaseModel). Reverse relation Issue.issue_cycle.
+export const cycleIssues = pgTable("cycle_issues", {
+  ...baseColumns,
+  ...projectScoped,
+  issueId: uuid("issue_id").notNull(),
+  cycleId: uuid("cycle_id").notNull(),
+});
+
 export type Cycle = typeof cycles.$inferSelect;
 export type NewCycle = typeof cycles.$inferInsert;
+export type CycleIssue = typeof cycleIssues.$inferSelect;

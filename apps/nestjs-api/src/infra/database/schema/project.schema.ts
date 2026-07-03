@@ -1,4 +1,4 @@
-import { boolean, jsonb, pgTable, smallint, text, uuid, varchar } from "drizzle-orm/pg-core";
+import { boolean, jsonb, pgTable, smallint, text, timestamp, uuid, varchar } from "drizzle-orm/pg-core";
 import { baseColumns } from "./_columns";
 
 // db_table = "projects" / "project_members".
@@ -13,6 +13,7 @@ export const projects = pgTable("projects", {
   coverImage: text("cover_image"),
   coverImageAssetId: uuid("cover_image_asset_id"),
   logoProps: jsonb("logo_props").$type<Record<string, unknown>>().$defaultFn(() => ({})),
+  archivedAt: timestamp("archived_at", { withTimezone: true, mode: "date" }),
 });
 
 export const projectMembers = pgTable("project_members", {

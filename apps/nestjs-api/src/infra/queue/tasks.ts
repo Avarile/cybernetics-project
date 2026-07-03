@@ -30,6 +30,7 @@ export const CELERY_TASKS = {
   copyS3Objects: "plane.bgtasks.copy_s3_object.copy_s3_objects_of_description_and_assets",
   pushInstanceMetrics: "plane.license.bgtasks.telemetry_metrics.push_instance_metrics",
   // logging / analytics
+  analyticExport: "plane.bgtasks.analytic_plot_export.analytic_export_task",
   processLogs: "plane.bgtasks.logger_task.process_logs",
   trackEvent: "plane.bgtasks.event_tracking_task.track_event",
   recentVisited: "plane.bgtasks.recent_visited_task.recent_visited_task",

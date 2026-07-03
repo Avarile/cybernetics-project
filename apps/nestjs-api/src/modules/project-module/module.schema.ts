@@ -65,7 +65,16 @@ export const moduleMembers = pgTable(
   ],
 );
 
+// db_table = "module_issues" (ModuleIssue extends ProjectBaseModel). Reverse relation Issue.issue_module.
+export const moduleIssues = pgTable("module_issues", {
+  ...baseColumns,
+  ...projectScoped,
+  moduleId: uuid("module_id").notNull(),
+  issueId: uuid("issue_id").notNull(),
+});
+
 export type Module = typeof modules.$inferSelect;
 export type NewModule = typeof modules.$inferInsert;
 export type ModuleMember = typeof moduleMembers.$inferSelect;
 export type NewModuleMember = typeof moduleMembers.$inferInsert;
+export type ModuleIssue = typeof moduleIssues.$inferSelect;

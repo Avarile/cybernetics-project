@@ -17,6 +17,7 @@ export const users = pgTable("users", {
   lastName: varchar("last_name", { length: 255 }),
   displayName: varchar("display_name", { length: 255 }),
   avatar: varchar("avatar", { length: 800 }),
+  avatarAssetId: uuid("avatar_asset_id"),
   userTimezone: varchar("user_timezone", { length: 255 }),
   lastLogin: timestamp("last_login", { withTimezone: true, mode: "date" }),
   lastLogoutTime: timestamp("last_logout_time", { withTimezone: true, mode: "date" }),

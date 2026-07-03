@@ -26,6 +26,7 @@ import {
   workspaceMembers,
   workspaces,
 } from "../src/infra/database/schema";
+import { issueLabels, issues } from "../src/modules/issue/issue.schema";
 import { labels } from "../src/modules/label/label.schema";
 import { notifications } from "../src/modules/notification/notification.schema";
 import { deployBoards } from "../src/modules/space/space.schema";
@@ -48,7 +49,7 @@ let adminSessionKey: string;
 async function truncateAll() {
   await db.execute(
     sql.raw(
-      "TRUNCATE instances, instance_configurations, deploy_boards, notifications, user_notification_preferences, email_notification_logs, issue_subscribers, " +
+      "TRUNCATE analytic_views, cycle_issues, module_issues, instances, instance_configurations, deploy_boards, notifications, user_notification_preferences, email_notification_logs, issue_subscribers, " +
         "issue_activities, webhook_logs, webhooks, " +
         "intake_issues, intakes, page_labels, project_pages, pages, " +
         "issue_labels, issue_assignees, issue_sequences, issues, cycles, modules, module_members, " +
@@ -552,5 +553,223 @@ describe("Phase 7 — Instance bootstrap (GET /api/instances/, AllowAny)", () =>
       is_setup_done: true,
       workspaces_exist: true,
     });
+  });
+});
+
+describe("Phase 7 — Analytics (isolated workspace, aggregation parity)", () => {
+  const cookie = () => `session-id=${adminSessionKey}`;
+  const A_SLUG = "analytics-e2e";
+  const aWs = randomUUID();
+  const aProj = randomUUID();
+  const sBacklog = randomUUID();
+  const sDone = randomUUID();
+  const label1 = randomUUID();
+  const A = `/api/workspaces/${A_SLUG}`;
+
+  beforeAll(async () => {
+    await db.insert(workspaces).values({ id: aWs, name: "Analytics", slug: A_SLUG, ownerId: adminId });
+    await db.insert(workspaceMembers).values({ workspaceId: aWs, memberId: adminId, role: 20, isActive: true });
+    await db.insert(projects).values({ id: aProj, workspaceId: aWs, name: "AProj", identifier: "ANA" });
+    await db.insert(projectMembers).values({ projectId: aProj, workspaceId: aWs, memberId: adminId, role: 20, isActive: true });
+    await db.insert(states).values([
+      { id: sBacklog, workspaceId: aWs, projectId: aProj, name: "Backlog", group: "backlog", sequence: 1000, color: "#111" },
+      { id: sDone, workspaceId: aWs, projectId: aProj, name: "Done", group: "completed", sequence: 2000, color: "#222" },
+    ]);
+    await db.insert(labels).values({ id: label1, workspaceId: aWs, projectId: aProj, name: "Bug", color: "#f00" });
+    const now = new Date();
+    const base = { workspaceId: aWs, projectId: aProj, createdBy: adminId };
+    await db.insert(issues).values([
+      { id: randomUUID(), name: "i1", stateId: sBacklog, priority: "high", point: 3, ...base },
+      { id: randomUUID(), name: "i2", stateId: sBacklog, priority: "high", point: 2, ...base },
+      { id: randomUUID(), name: "i3", stateId: sDone, priority: "low", point: 5, completedAt: now, ...base },
+      { id: randomUUID(), name: "i4", stateId: sDone, priority: "none", point: null, completedAt: now, ...base },
+    ]);
+    const [firstIssue] = await db.select({ id: issues.id }).from(issues).where(eqName("i1"));
+    if (firstIssue) await db.insert(issueLabels).values({ issueId: firstIssue.id, labelId: label1, workspaceId: aWs, projectId: aProj });
+  });
+
+  function eqName(name: string) {
+    return sql`${issues.name} = ${name} AND ${issues.workspaceId} = ${aWs}`;
+  }
+
+  it("400s analytics without valid x_axis/y_axis", async () => {
+    const res = await http.get(`${A}/analytics/?x_axis=priority`).set("Cookie", cookie());
+    expect(res.status).toBe(400);
+    expect(res.body.error).toContain("x-axis and y-axis");
+  });
+
+  it("groups by priority (issue_count) in priority order", async () => {
+    const res = await http.get(`${A}/analytics/?x_axis=priority&y_axis=issue_count`).set("Cookie", cookie());
+    expect(res.status).toBe(200);
+    expect(res.body.total).toBe(4);
+    expect(res.body.distribution.high[0].count).toBe(2);
+    expect(res.body.distribution.low[0].count).toBe(1);
+    expect(res.body.distribution.none[0].count).toBe(1);
+    // priority sort order: low, high, none (medium/urgent absent)
+    expect(Object.keys(res.body.distribution)).toEqual(["low", "high", "none"]);
+  });
+
+  it("includes state_details extras when x_axis=state_id", async () => {
+    const res = await http.get(`${A}/analytics/?x_axis=state_id&y_axis=issue_count`).set("Cookie", cookie());
+    expect(res.status).toBe(200);
+    expect(Array.isArray(res.body.extras.state_details)).toBe(true);
+    expect(res.body.extras.state_details.length).toBe(2);
+    expect(res.body.extras.state_details[0]).toHaveProperty("state__name");
+  });
+
+  it("default-analytics returns classified totals + estimate sums", async () => {
+    const res = await http.get(`${A}/default-analytics/`).set("Cookie", cookie());
+    expect(res.status).toBe(200);
+    expect(res.body.total_issues).toBe(4);
+    expect(res.body.open_issues).toBe(2);
+    expect(res.body.total_estimate_sum).toBe(10);
+    expect(res.body.open_estimate_sum).toBe(5);
+    const classified = Object.fromEntries(res.body.total_issues_classified.map((r: { state_group: string; state_count: number }) => [r.state_group, r.state_count]));
+    expect(classified.backlog).toBe(2);
+    expect(classified.completed).toBe(2);
+  });
+
+  it("project-stats returns per-project counts", async () => {
+    const res = await http.get(`${A}/project-stats/?fields=total_issues,completed_issues`).set("Cookie", cookie());
+    expect(res.status).toBe(200);
+    const p = res.body.find((x: { id: string }) => x.id === aProj);
+    expect(p).toMatchObject({ total_issues: 4, completed_issues: 2 });
+  });
+
+  it("supports AnalyticView CRUD + saved distribution", async () => {
+    const created = await http
+      .post(`${A}/analytic-view/`)
+      .set("Cookie", cookie())
+      .send({ name: "By priority", query_dict: { x_axis: "priority", y_axis: "issue_count" } });
+    expect(created.status).toBe(201);
+    expect(created.body).toMatchObject({ name: "By priority", workspace: aWs });
+    const id = created.body.id;
+
+    const list = await http.get(`${A}/analytic-view/`).set("Cookie", cookie());
+    expect(list.body.map((v: { id: string }) => v.id)).toContain(id);
+
+    const saved = await http.get(`${A}/saved-analytic-view/${id}/`).set("Cookie", cookie());
+    expect(saved.status).toBe(200);
+    expect(saved.body.total).toBe(4);
+    expect(saved.body.distribution.high[0].count).toBe(2);
+
+    const patched = await http.patch(`${A}/analytic-view/${id}/`).set("Cookie", cookie()).send({ name: "Renamed" });
+    expect(patched.body.name).toBe("Renamed");
+
+    const del = await http.delete(`${A}/analytic-view/${id}/`).set("Cookie", cookie());
+    expect(del.status).toBe(204);
+  });
+
+  it("400s export-analytics with invalid axis (before enqueue)", async () => {
+    const res = await http.post(`${A}/export-analytics/`).set("Cookie", cookie()).send({ x_axis: "priority" });
+    expect(res.status).toBe(400);
+  });
+
+  // ---- advance-analytics (workspace) ----
+
+  it("advance-analytics overview returns member-scoped counts", async () => {
+    const res = await http.get(`${A}/advance-analytics/`).set("Cookie", cookie());
+    expect(res.status).toBe(200);
+    expect(res.body.total_work_items).toEqual({ count: 4 });
+    expect(res.body.total_projects).toEqual({ count: 1 });
+    expect(res.body.total_admins).toEqual({ count: 1 });
+    expect(res.body.total_members).toEqual({ count: 0 });
+    expect(res.body.total_cycles).toEqual({ count: 0 });
+    expect(res.body.total_intake).toEqual({ count: 0 });
+  });
+
+  it("advance-analytics work-items tab classifies by state group", async () => {
+    const res = await http.get(`${A}/advance-analytics/?tab=work-items`).set("Cookie", cookie());
+    expect(res.status).toBe(200);
+    expect(res.body.total_work_items).toEqual({ count: 4 });
+    expect(res.body.backlog_work_items).toEqual({ count: 2 });
+    expect(res.body.completed_work_items).toEqual({ count: 2 });
+    expect(res.body.started_work_items).toEqual({ count: 0 });
+  });
+
+  it("advance-analytics 400s on invalid tab", async () => {
+    const res = await http.get(`${A}/advance-analytics/?tab=bogus`).set("Cookie", cookie());
+    expect(res.status).toBe(400);
+    expect(res.body.message).toBe("Invalid tab");
+  });
+
+  it("advance-analytics-stats returns per-project work-item counts", async () => {
+    const res = await http.get(`${A}/advance-analytics-stats/`).set("Cookie", cookie());
+    expect(res.status).toBe(200);
+    const row = res.body.find((r: { project_id: string }) => r.project_id === aProj);
+    expect(row).toMatchObject({ project__name: "AProj", completed_work_items: 2, backlog_work_items: 2, started_work_items: 0, cancelled_work_items: 0 });
+  });
+
+  it("advance-analytics-charts type=projects returns titled entity counts", async () => {
+    const res = await http.get(`${A}/advance-analytics-charts/`).set("Cookie", cookie());
+    expect(res.status).toBe(200);
+    const byKey = Object.fromEntries(res.body.map((r: { key: string; count: number }) => [r.key, r.count]));
+    expect(byKey.work_items).toBe(4);
+    expect(byKey.members).toBe(1);
+    expect(byKey.cycles).toBe(0);
+    const workItems = res.body.find((r: { key: string }) => r.key === "work_items");
+    expect(workItems.name).toBe("Work Items");
+  });
+
+  it("advance-analytics-charts type=work-items returns monthly completion series", async () => {
+    const res = await http.get(`${A}/advance-analytics-charts/?type=work-items`).set("Cookie", cookie());
+    expect(res.status).toBe(200);
+    expect(res.body.schema).toEqual({ completed_issues: "completed_issues", created_issues: "created_issues" });
+    const totalCreated = res.body.data.reduce((s: number, d: { created_issues: number }) => s + d.created_issues, 0);
+    const totalCompleted = res.body.data.reduce((s: number, d: { completed_issues: number }) => s + d.completed_issues, 0);
+    expect(totalCreated).toBe(4);
+    expect(totalCompleted).toBe(2);
+  });
+
+  it("advance-analytics-charts type=custom-work-items groups by priority", async () => {
+    const res = await http.get(`${A}/advance-analytics-charts/?type=custom-work-items&x_axis=PRIORITY`).set("Cookie", cookie());
+    expect(res.status).toBe(200);
+    const byKey = Object.fromEntries(res.body.data.map((d: { key: string; count: number }) => [d.key, d.count]));
+    expect(byKey).toEqual({ high: 2, low: 1, none: 1 });
+    expect(res.body.schema).toEqual({});
+  });
+
+  it("advance-analytics-charts 400s on invalid x_axis", async () => {
+    const res = await http.get(`${A}/advance-analytics-charts/?type=custom-work-items&x_axis=BOGUS`).set("Cookie", cookie());
+    expect(res.status).toBe(400);
+  });
+
+  // ---- advance-analytics (project-scoped) ----
+
+  it("project advance-analytics returns work-item counts", async () => {
+    const res = await http.get(`${A}/projects/${aProj}/advance-analytics/`).set("Cookie", cookie());
+    expect(res.status).toBe(200);
+    expect(res.body.total_work_items).toEqual({ count: 4 });
+    expect(res.body.backlog_work_items).toEqual({ count: 2 });
+    expect(res.body.completed_work_items).toEqual({ count: 2 });
+  });
+
+  it("project advance-analytics-stats groups by assignee (unassigned bucket)", async () => {
+    const res = await http.get(`${A}/projects/${aProj}/advance-analytics-stats/`).set("Cookie", cookie());
+    expect(res.status).toBe(200);
+    expect(res.body).toHaveLength(1);
+    expect(res.body[0].assignee_id).toBeNull();
+    expect(res.body[0].completed_work_items).toBe(2);
+    expect(res.body[0].backlog_work_items).toBe(2);
+  });
+
+  it("project advance-analytics-charts type=work-items returns monthly series", async () => {
+    const res = await http.get(`${A}/projects/${aProj}/advance-analytics-charts/?type=work-items`).set("Cookie", cookie());
+    expect(res.status).toBe(200);
+    const totalCreated = res.body.data.reduce((s: number, d: { created_issues: number }) => s + d.created_issues, 0);
+    expect(totalCreated).toBe(4);
+  });
+
+  it("project advance-analytics-charts type=custom-work-items groups by priority", async () => {
+    const res = await http.get(`${A}/projects/${aProj}/advance-analytics-charts/?type=custom-work-items&x_axis=PRIORITY`).set("Cookie", cookie());
+    expect(res.status).toBe(200);
+    const byKey = Object.fromEntries(res.body.data.map((d: { key: string; count: number }) => [d.key, d.count]));
+    expect(byKey).toEqual({ high: 2, low: 1, none: 1 });
+  });
+
+  it("project advance-analytics-charts 400s on default type=projects", async () => {
+    const res = await http.get(`${A}/projects/${aProj}/advance-analytics-charts/`).set("Cookie", cookie());
+    expect(res.status).toBe(400);
+    expect(res.body.message).toBe("Invalid type");
   });
 });

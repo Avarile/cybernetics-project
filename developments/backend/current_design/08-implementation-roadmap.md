@@ -9,7 +9,7 @@ cutover seamless for users.
 ## Implementation status (as built in `apps/nestjs-api`)
 
 Verified continuously via `tsc` + `nest build` + vitest unit specs + a real-Postgres/Redis e2e suite
-(`test/*.e2e.spec.ts`). Current green state: **218 unit tests + 45 e2e tests passing.**
+(`test/*.e2e.spec.ts`). Current green state: **239 unit tests + 65 e2e tests passing.**
 
 | Phase | Status | Notes |
 |---|---|---|
@@ -20,7 +20,30 @@ Verified continuously via `tsc` + `nest build` + vitest unit specs + a real-Post
 | 4 — Scheduler + tasks | ✅ Built | beat entries, maintenance/cleanup/version-prune, telemetry stubs, asset s3 + live-service, tracking (recent-visited + link-title crawl). |
 | 5 — v1 public API | ✅ Core built | work-items/states/labels/projects v1 (X-Api-Key + throttle). Remaining v1 sub-resources (cycles/modules/members/estimates/intake/search) follow the same thin-controller pattern. |
 | 6 — Spaces (public/anon) | ✅ Built | DeployBoard anchor: authenticated anchor find-or-create + anonymous board reads (settings/meta/states/labels/issues) gated by `AnchorGuard`. |
-| 7 — Analytics + instance + AI | ◑ Partial | **AI (Mastra) ✅** — both `ai-assistant/` endpoints + Unsplash proxy, exact contract/error parity, `getLlmConfig` validation parity, byte-faithful gateway routing via a Mastra `Agent` + OpenAI-compatible provider. **Instance bootstrap ✅** — `GET /api/instances/` (`{config, instance}`). **Deferred:** the analytics surface (`AnalyticView` CRUD + `AnalyticsEndpoint`/`DefaultAnalyticsEndpoint`/`ProjectStats`/6× advance-analytics), which shares one machinery — `issue_filters` + `build_graph_plot` + `VALID_ANALYTICS_FIELDS` over a richer Issue schema — and the instance-**admin** auth flows (admin sign-in/up/session, configuration `PATCH`, workspace availability). These are a coherent follow-on unit, best built together. |
+| 7 — Analytics + instance + AI | ◑ Partial | **AI (Mastra) ✅** — both `ai-assistant/` endpoints + Unsplash proxy, exact contract/error parity, `getLlmConfig` validation parity, byte-faithful gateway routing via a Mastra `Agent` + OpenAI-compatible provider. **Instance bootstrap ✅** — `GET /api/instances/` (`{config, instance}`). **Classic analytics ✅** — `AnalyticsEndpoint`, `DefaultAnalyticsEndpoint`, `ProjectStatsEndpoint`, `SavedAnalyticEndpoint`, `ExportAnalyticsEndpoint` + `AnalyticView` CRUD, built on a faithful port of `issue_filters` (all filter keys) + `build_graph_plot` + `VALID_ANALYTICS_FIELDS`, with the schema expanded (cycle_issues/module_issues join tables, `avatar_asset_id`, `projects.archived_at`). **Advance analytics ✅** — the full dashboard surface (`AdvanceAnalyticsEndpoint`/`…StatsEndpoint`/`…ChartEndpoint` + the 3 project-scoped variants) built on a faithful port of its own machinery: `get_analytics_filters` member-scoped `base_filters`/`project_filters`, `get_analytics_date_range`/`get_chart_period_range` (current-vs-previous windows), and `build_analytics_chart` (simple + grouped, `COUNT(DISTINCT)`), with cycle/module narrowing and daily/monthly completion series. **Deferred:** the instance-**admin** auth flows (admin sign-in/up/session, configuration `PATCH`, workspace availability). |
+
+### Analytics — classic surface as built
+
+Routes (`plane/app/urls/analytic.py`, mounted at `/api`): `GET workspaces/:slug/analytics/` (main graph:
+`{total, distribution, extras:{state/label/assignee/cycle/module details}}`), `GET default-analytics/`,
+`GET project-stats/`, `GET saved-analytic-view/:id/`, `POST export-analytics/` (enqueues the
+`analytic_export_task` Celery task), and `analytic-view/` CRUD (workspace-admin). `issue_filters` is ported
+as SQL WHERE builders (relational filters via EXISTS to avoid fan-out); `build_graph_plot` as a dynamic
+GROUP BY (monthly `YYYY-M` dimension for date axes, `issue_count`/`estimate` y-axis, optional segment,
+priority-ordered / none-last sorting).
+
+### Analytics — advance surface as built
+
+Routes (`plane/app/urls/analytic.py`): workspace `GET advance-analytics/` (tab `overview`|`work-items`),
+`GET advance-analytics-stats/` (per-project counts), `GET advance-analytics-charts/`
+(`projects`|`custom-work-items`|`work-items`), and the three project-scoped variants under
+`projects/:project_id/`. All results are **member-scoped** — `base_filters` limits to projects the caller
+actively belongs to (`project_id IN (active project_members)` + live-project + workspace). `get_analytics_filters`
+is ported in `analytics-filters.ts` (date-range helpers compute UTC windows; the filter dicts become SQL
+predicate builders); `build_analytics_chart` in `build-chart.ts` (simple + grouped pivots with a group schema,
+`COUNT(DISTINCT i.id)`, Python-falsy key/name → `None`/`none` parity). Project variants add cycle/module
+narrowing (via `cycle_issues`/`module_issues`) and a daily (cycle/module window) or monthly (project) created-vs-
+completed completion series.
 
 ### AI module — how Mastra is wired (implementation note)
 

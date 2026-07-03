@@ -16,6 +16,7 @@ import { SchedulerModule } from "./infra/scheduler/scheduler.module";
 import { SecurityModule } from "./infra/security.module";
 import { ActivityModule } from "./modules/activity/activity.module";
 import { AiModule } from "./modules/ai/ai.module";
+import { AnalyticsModule } from "./modules/analytics/analytics.module";
 import { AssetModule } from "./modules/asset/asset.module";
 import { AuthModule } from "./modules/auth/auth.module";
 import { CycleModule } from "./modules/cycle/cycle.module";
@@ -77,6 +78,7 @@ import { WebhookModule } from "./modules/webhook/webhook.module";
     SpaceModule,
     AiModule,
     InstanceModule,
+    AnalyticsModule,
   ],
   controllers: [HealthController],
   providers: [
