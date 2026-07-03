@@ -29,7 +29,7 @@ export class EmailProvider {
   ) {}
 
   /** plane/authentication/views/app/check.py::EmailCheckEndpoint.post */
-  async emailCheck(email: string): Promise<{ existing: boolean; status: "MAGIC_CODE" | "CREDENTIAL" }> {
+  async emailCheck(email: unknown): Promise<{ existing: boolean; status: "MAGIC_CODE" | "CREDENTIAL" }> {
     if (!email) {
       throw new AuthError({ code: AUTHENTICATION_ERROR_CODES.EMAIL_REQUIRED, message: "EMAIL_REQUIRED" });
     }
