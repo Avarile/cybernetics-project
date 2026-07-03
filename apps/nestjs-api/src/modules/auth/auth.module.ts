@@ -5,11 +5,19 @@ import { CredentialsController } from "./credentials.controller";
 import { CsrfController } from "./csrf.controller";
 import { EmailCheckController } from "./email-check.controller";
 import { EmailProvider } from "./email.provider";
+import { MagicCodeService } from "./magic/magic-code.service";
+import { MagicGenerateController } from "./magic/magic-generate.controller";
 import { CredentialsSpaceController } from "./spaces/credentials-space.controller";
 
 @Module({
-  controllers: [CredentialsController, CredentialsSpaceController, CsrfController, EmailCheckController],
-  providers: [AuthService, CsrfService, EmailProvider],
+  controllers: [
+    CredentialsController,
+    CredentialsSpaceController,
+    CsrfController,
+    EmailCheckController,
+    MagicGenerateController,
+  ],
+  providers: [AuthService, CsrfService, EmailProvider, MagicCodeService],
   exports: [CsrfService],
 })
 export class AuthModule {}
