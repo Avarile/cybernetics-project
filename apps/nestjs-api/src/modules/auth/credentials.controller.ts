@@ -10,7 +10,7 @@ import { DRIZZLE, type Database } from "../../infra/database/drizzle.module";
 import type { User } from "../../infra/database/schema";
 import { ConfigService } from "../../infra/config/config.service";
 import { buildDeviceInfo, clearSessionCookie, sessionCookieName, setSessionCookie } from "./cookie.util";
-import { recordLogin } from "./login.util";
+import { recordLogin, recordLogout } from "./login.util";
 import { EmailProvider } from "./email.provider";
 
 interface CredentialsFormBody {
@@ -64,7 +64,11 @@ export class CredentialsController {
   async signOut(@Req() req: Request, @Res() res: Response): Promise<void> {
     const name = sessionCookieName(req);
     const key = req.cookies?.[name];
-    if (key) await this.sessions.destroy(key);
+    if (key) {
+      const resolved = await this.sessions.resolve(key);
+      if (resolved) await recordLogout(this.db, resolved.user.id, req);
+      await this.sessions.destroy(key);
+    }
     clearSessionCookie(res, name, this.config);
     redirectSuccess(this.config, res, req, "app", "");
   }
@@ -74,7 +78,7 @@ export class CredentialsController {
     await recordLogin(this.db, user.id, req);
     const { key, maxAge } = await this.sessions.create(user, buildDeviceInfo(req), false);
     setSessionCookie(res, sessionCookieName(req), key, maxAge, this.config);
-    const path = nextPath || (await getRedirectionPath(this.db, { id: user.id, email: user.email ?? "" }));
+    const path = validateNextPath(nextPath) || (await getRedirectionPath(this.db, { id: user.id, email: user.email ?? "" }));
     redirectSuccess(this.config, res, req, "app", path);
   }
 

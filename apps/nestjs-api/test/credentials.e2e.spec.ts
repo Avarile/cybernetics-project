@@ -130,7 +130,9 @@ describe("Credentials — sign-in/up/out (redirect + CSRF parity)", () => {
     expect(after.tokenUpdatedAt!.getTime()).toBeGreaterThan(before.tokenUpdatedAt?.getTime() ?? 0);
   });
 
-  it("sign-out: destroys the session, clears the cookie, and redirects to base", async () => {
+  it("sign-out: destroys the session, clears the cookie, redirects to base, and records last_logout_ip/time", async () => {
+    const [before] = await db.select().from(users).where(eq(users.id, userIds[0]));
+
     const signinCsrf = await getCsrf();
     const signin = await http
       .post("/auth/sign-in")
@@ -152,5 +154,12 @@ describe("Credentials — sign-in/up/out (redirect + CSRF parity)", () => {
     expect(res.headers.location).toBe("http://localhost:3000");
     const cleared = (res.headers["set-cookie"] as unknown as string[]).find((c) => c.startsWith("session-id="));
     expect(cleared).toMatch(/Expires=Thu, 01 Jan 1970/);
+
+    const [after] = await db.select().from(users).where(eq(users.id, userIds[0]));
+    expect(after.lastLogoutTime).not.toBeNull();
+    expect(after.lastLogoutTime!.getTime()).toBeGreaterThan(before.lastLogoutTime?.getTime() ?? 0);
+    expect(after.lastLogoutIp).toBeTruthy();
+    // sign-out never deactivates the account.
+    expect(after.isActive).toBe(true);
   });
 });
