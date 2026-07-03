@@ -5,9 +5,10 @@ import { CredentialsController } from "./credentials.controller";
 import { CsrfController } from "./csrf.controller";
 import { EmailCheckController } from "./email-check.controller";
 import { EmailProvider } from "./email.provider";
+import { CredentialsSpaceController } from "./spaces/credentials-space.controller";
 
 @Module({
-  controllers: [CredentialsController, CsrfController, EmailCheckController],
+  controllers: [CredentialsController, CredentialsSpaceController, CsrfController, EmailCheckController],
   providers: [AuthService, CsrfService, EmailProvider],
   exports: [CsrfService],
 })
