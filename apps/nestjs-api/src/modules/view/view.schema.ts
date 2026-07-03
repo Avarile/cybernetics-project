@@ -50,9 +50,18 @@ export const issueViews = pgTable("issue_views", {
   richFilters: jsonb("rich_filters").$type<Record<string, unknown>>().$defaultFn(() => ({})),
   access: smallint("access").$defaultFn(() => VIEW_ACCESS.PUBLIC),
   sortOrder: doublePrecision("sort_order").$defaultFn(() => 65535),
+  pqlFilters: jsonb("pql_filters")
+    .$type<Record<string, unknown>>()
+    .notNull()
+    .$defaultFn(() => ({ json: {}, stripped: "" })),
   logoProps: jsonb("logo_props").$type<Record<string, unknown>>().$defaultFn(() => ({})),
-  ownedBy: uuid("owned_by").notNull(),
+  // Django FK `owned_by` -> DB column `owned_by_id` (matches the reference; the `ownedBy` property
+  // name is unchanged so repositories/serializers are unaffected).
+  ownedBy: uuid("owned_by_id").notNull(),
   isLocked: boolean("is_locked").$defaultFn(() => false),
+  lastUsedFilter: varchar("last_used_filter", { length: 255 })
+    .notNull()
+    .$defaultFn(() => "rich_filters"),
   archivedAt: timestamp("archived_at", { withTimezone: true, mode: "date" }),
 });
 

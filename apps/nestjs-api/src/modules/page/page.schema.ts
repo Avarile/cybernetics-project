@@ -36,7 +36,9 @@ export const pages = pgTable("pages", {
   descriptionBinary: bytea("description_binary"),
   descriptionHtml: text("description_html").$defaultFn(() => "<p></p>"),
   descriptionStripped: text("description_stripped"),
-  ownedBy: uuid("owned_by").notNull(),
+  // Django FK `owned_by` -> DB column `owned_by_id` (matches the reference; the `ownedBy` property
+  // name is unchanged so repositories/serializers are unaffected).
+  ownedBy: uuid("owned_by_id").notNull(),
   access: smallint("access").$type<PageAccess>().notNull().$defaultFn(() => PAGE_ACCESS.PUBLIC),
   color: varchar("color", { length: 255 }).$defaultFn(() => ""),
   parentId: uuid("parent_id").references((): AnyPgColumn => pages.id, { onDelete: "cascade" }),

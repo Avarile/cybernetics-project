@@ -28,6 +28,11 @@ export const pageVersions = pgTable("page_versions", {
   descriptionHtml: text("description_html"),
   descriptionBinary: bytea("description_binary"),
   descriptionStripped: text("description_stripped"),
+  // Django JSONField(default=dict) (plane/db/models/page.py PageVersion.sub_pages_data).
+  subPagesData: jsonb("sub_pages_data")
+    .$type<Record<string, unknown>>()
+    .notNull()
+    .$defaultFn(() => ({})),
 });
 
 // db_table = "issue_description_versions" (snapshots; cleanup keeps the latest 20 per issue).

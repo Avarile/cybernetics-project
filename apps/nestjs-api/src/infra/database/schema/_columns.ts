@@ -20,10 +20,17 @@ export const timeAudit = {
  * UserAuditModel: created_by / updated_by. Plain uuid columns (no .references() here to avoid a
  * _columns <-> user.schema import cycle). SET_NULL on user delete is enforced by the cascade worker,
  * not the DB (Django on_delete is app-level).
+ *
+ * Parity note: the Django-migrated reference DB names these FK columns `created_by_id` / `updated_by_id`
+ * (Django appends `_id` to FK fields). The app's repositories/raw-SQL still read/write the legacy
+ * `created_by` / `updated_by` columns, so we KEEP those and additionally expose the reference-named
+ * columns for full column parity. Both are nullable in the reference (no insert breakage).
  */
 export const userAudit = {
   createdBy: uuid("created_by"),
   updatedBy: uuid("updated_by"),
+  createdById: uuid("created_by_id"),
+  updatedById: uuid("updated_by_id"),
 };
 
 /** SoftDeleteModel: deleted_at (null = live row). */

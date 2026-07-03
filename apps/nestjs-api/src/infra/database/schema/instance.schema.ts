@@ -27,6 +27,9 @@ export type Instance = typeof instances.$inferSelect;
 
 // db_table = "instance_configurations" (plane/license/models/instance.py). Shared encrypted config
 // store backing LLM/SMTP/OAuth/Unsplash keys; is_encrypted values use Fernet (see infra/config).
+// InstanceConfiguration extends BaseModel (created_by_id/updated_by_id/deleted_at present in the
+// reference); the id/created_at/updated_at are hand-authored above. Add the remaining BaseModel
+// columns for full column parity (all nullable in the reference).
 export const instanceConfigurations = pgTable("instance_configurations", {
   id: uuid("id").primaryKey(),
   key: varchar("key", { length: 100 }).notNull(),
@@ -35,6 +38,9 @@ export const instanceConfigurations = pgTable("instance_configurations", {
   isEncrypted: boolean("is_encrypted").notNull().default(false),
   createdAt: timestamp("created_at", { withTimezone: true, mode: "date" }).notNull(),
   updatedAt: timestamp("updated_at", { withTimezone: true, mode: "date" }).notNull(),
+  createdById: uuid("created_by_id"),
+  updatedById: uuid("updated_by_id"),
+  deletedAt: timestamp("deleted_at", { withTimezone: true, mode: "date" }),
 });
 
 export type InstanceConfiguration = typeof instanceConfigurations.$inferSelect;

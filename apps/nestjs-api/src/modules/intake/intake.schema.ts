@@ -55,6 +55,7 @@ export const intakeIssues = pgTable("intake_issues", {
   externalSource: varchar("external_source", { length: 255 }),
   externalId: varchar("external_id", { length: 255 }),
   extra: jsonb("extra").$type<Record<string, unknown>>().$defaultFn(() => ({})),
+  trackableAnchor: varchar("trackable_anchor", { length: 255 }),
 });
 
 export type Intake = typeof intakes.$inferSelect;

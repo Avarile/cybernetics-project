@@ -38,6 +38,8 @@ export const issueActivities = pgTable("issue_activities", {
   newIdentifier: uuid("new_identifier"),
   // FloatField(null=True) -> double precision.
   epoch: doublePrecision("epoch"),
+  externalSource: varchar("external_source", { length: 255 }),
+  externalId: varchar("external_id", { length: 255 }),
 });
 
 export type IssueActivityRow = typeof issueActivities.$inferSelect;

@@ -18,6 +18,8 @@ export const estimates = pgTable(
       .$type<EstimateType>()
       .$defaultFn(() => "categories"),
     lastUsed: boolean("last_used").$defaultFn(() => false),
+    externalSource: varchar("external_source", { length: 255 }),
+    externalId: varchar("external_id", { length: 255 }),
   },
   (t) => [
     uniqueIndex("estimate_unique_name_project_when_deleted_at_null")
@@ -36,6 +38,8 @@ export const estimatePoints = pgTable("estimate_points", {
   key: integer("key").$defaultFn(() => 0),
   description: text("description").$defaultFn(() => ""),
   value: varchar("value", { length: 255 }).notNull(),
+  externalSource: varchar("external_source", { length: 255 }),
+  externalId: varchar("external_id", { length: 255 }),
 });
 
 export type Estimate = typeof estimates.$inferSelect;

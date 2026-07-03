@@ -1,0 +1,941 @@
+CREATE TABLE "api_tokens" (
+	"id" uuid PRIMARY KEY NOT NULL,
+	"created_at" timestamp with time zone NOT NULL,
+	"updated_at" timestamp with time zone NOT NULL,
+	"created_by" uuid,
+	"updated_by" uuid,
+	"created_by_id" uuid,
+	"updated_by_id" uuid,
+	"deleted_at" timestamp with time zone,
+	"token" varchar(255) NOT NULL,
+	"label" varchar(255),
+	"description" varchar(255),
+	"user_id" uuid NOT NULL,
+	"user_type" smallint DEFAULT 0 NOT NULL,
+	"workspace_id" uuid,
+	"is_active" boolean DEFAULT true NOT NULL,
+	"last_used" timestamp with time zone,
+	"expired_at" timestamp with time zone,
+	"is_service" boolean DEFAULT false NOT NULL,
+	"allowed_rate_limit" varchar(255) NOT NULL
+);
+--> statement-breakpoint
+CREATE TABLE "instance_configurations" (
+	"id" uuid PRIMARY KEY NOT NULL,
+	"key" varchar(100) NOT NULL,
+	"value" text,
+	"category" varchar(100),
+	"is_encrypted" boolean DEFAULT false NOT NULL,
+	"created_at" timestamp with time zone NOT NULL,
+	"updated_at" timestamp with time zone NOT NULL,
+	"created_by_id" uuid,
+	"updated_by_id" uuid,
+	"deleted_at" timestamp with time zone
+);
+--> statement-breakpoint
+CREATE TABLE "instances" (
+	"id" uuid PRIMARY KEY NOT NULL,
+	"created_at" timestamp with time zone NOT NULL,
+	"updated_at" timestamp with time zone NOT NULL,
+	"created_by" uuid,
+	"updated_by" uuid,
+	"created_by_id" uuid,
+	"updated_by_id" uuid,
+	"deleted_at" timestamp with time zone,
+	"instance_name" varchar(255) NOT NULL,
+	"whitelist_emails" text,
+	"instance_id" varchar(255) NOT NULL,
+	"current_version" varchar(255) NOT NULL,
+	"latest_version" varchar(255),
+	"edition" varchar(255),
+	"domain" text,
+	"last_checked_at" timestamp with time zone NOT NULL,
+	"namespace" varchar(255),
+	"is_telemetry_enabled" boolean DEFAULT true NOT NULL,
+	"is_support_required" boolean DEFAULT true NOT NULL,
+	"is_setup_done" boolean DEFAULT false NOT NULL,
+	"is_signup_screen_visited" boolean DEFAULT false NOT NULL,
+	"is_verified" boolean DEFAULT false NOT NULL,
+	"is_test" boolean DEFAULT false NOT NULL,
+	"is_current_version_deprecated" boolean DEFAULT false NOT NULL
+);
+--> statement-breakpoint
+CREATE TABLE "project_members" (
+	"id" uuid PRIMARY KEY NOT NULL,
+	"created_at" timestamp with time zone NOT NULL,
+	"updated_at" timestamp with time zone NOT NULL,
+	"created_by" uuid,
+	"updated_by" uuid,
+	"created_by_id" uuid,
+	"updated_by_id" uuid,
+	"deleted_at" timestamp with time zone,
+	"project_id" uuid NOT NULL,
+	"workspace_id" uuid NOT NULL,
+	"member_id" uuid NOT NULL,
+	"comment" text,
+	"role" smallint DEFAULT 15 NOT NULL,
+	"view_props" jsonb NOT NULL,
+	"default_props" jsonb NOT NULL,
+	"preferences" jsonb NOT NULL,
+	"sort_order" double precision NOT NULL,
+	"is_active" boolean DEFAULT true NOT NULL,
+	"source" varchar(20) NOT NULL
+);
+--> statement-breakpoint
+CREATE TABLE "projects" (
+	"id" uuid PRIMARY KEY NOT NULL,
+	"created_at" timestamp with time zone NOT NULL,
+	"updated_at" timestamp with time zone NOT NULL,
+	"created_by" uuid,
+	"updated_by" uuid,
+	"created_by_id" uuid,
+	"updated_by_id" uuid,
+	"deleted_at" timestamp with time zone,
+	"workspace_id" uuid NOT NULL,
+	"name" varchar(255) NOT NULL,
+	"identifier" varchar(12),
+	"description" varchar(1024),
+	"description_text" jsonb,
+	"description_html" jsonb,
+	"network" smallint DEFAULT 2 NOT NULL,
+	"default_assignee_id" uuid,
+	"project_lead_id" uuid,
+	"emoji" varchar(255),
+	"icon_prop" jsonb,
+	"module_view" boolean DEFAULT false NOT NULL,
+	"cycle_view" boolean DEFAULT false NOT NULL,
+	"issue_views_view" boolean DEFAULT false NOT NULL,
+	"page_view" boolean DEFAULT true NOT NULL,
+	"intake_view" boolean DEFAULT false NOT NULL,
+	"is_time_tracking_enabled" boolean DEFAULT false NOT NULL,
+	"is_issue_type_enabled" boolean DEFAULT false NOT NULL,
+	"guest_view_all_features" boolean DEFAULT false NOT NULL,
+	"cover_image" text,
+	"cover_image_asset_id" uuid,
+	"estimate_id" uuid,
+	"archive_in" integer DEFAULT 0 NOT NULL,
+	"close_in" integer DEFAULT 0 NOT NULL,
+	"auto_reminder_days" integer DEFAULT 0 NOT NULL,
+	"logo_props" jsonb,
+	"default_state_id" uuid,
+	"archived_at" timestamp with time zone,
+	"timezone" varchar(255) NOT NULL,
+	"external_source" varchar(255),
+	"external_id" varchar(255)
+);
+--> statement-breakpoint
+CREATE TABLE "sessions" (
+	"session_key" varchar(128) PRIMARY KEY NOT NULL,
+	"session_data" text NOT NULL,
+	"expire_date" timestamp with time zone NOT NULL,
+	"device_info" jsonb,
+	"user_id" varchar(50)
+);
+--> statement-breakpoint
+CREATE TABLE "users" (
+	"id" uuid PRIMARY KEY NOT NULL,
+	"email" varchar(255),
+	"password" varchar(128),
+	"username" varchar(255),
+	"is_active" boolean DEFAULT true NOT NULL,
+	"is_superuser" boolean DEFAULT false NOT NULL,
+	"is_bot" boolean DEFAULT false NOT NULL,
+	"first_name" varchar(255),
+	"last_name" varchar(255),
+	"display_name" varchar(255),
+	"avatar" varchar(800),
+	"avatar_asset_id" uuid,
+	"user_timezone" varchar(255),
+	"last_login" timestamp with time zone,
+	"last_logout_time" timestamp with time zone,
+	"last_logout_ip" varchar(255),
+	"mobile_number" varchar(255),
+	"cover_image" varchar(800),
+	"cover_image_asset_id" uuid,
+	"created_location" varchar(255) NOT NULL,
+	"last_location" varchar(255) NOT NULL,
+	"date_joined" timestamp with time zone NOT NULL,
+	"is_managed" boolean DEFAULT false NOT NULL,
+	"is_password_expired" boolean DEFAULT false NOT NULL,
+	"is_staff" boolean DEFAULT false NOT NULL,
+	"is_email_verified" boolean DEFAULT false NOT NULL,
+	"is_password_autoset" boolean DEFAULT false NOT NULL,
+	"is_password_reset_required" boolean DEFAULT false NOT NULL,
+	"is_email_valid" boolean DEFAULT false NOT NULL,
+	"token" varchar(64) NOT NULL,
+	"token_updated_at" timestamp with time zone,
+	"last_active" timestamp with time zone,
+	"last_login_time" timestamp with time zone,
+	"last_login_ip" varchar(255) NOT NULL,
+	"last_login_medium" varchar(20) NOT NULL,
+	"last_login_uagent" text NOT NULL,
+	"bot_type" varchar(30),
+	"masked_at" timestamp with time zone,
+	"created_at" timestamp with time zone NOT NULL,
+	"updated_at" timestamp with time zone NOT NULL
+);
+--> statement-breakpoint
+CREATE TABLE "workspace_members" (
+	"id" uuid PRIMARY KEY NOT NULL,
+	"created_at" timestamp with time zone NOT NULL,
+	"updated_at" timestamp with time zone NOT NULL,
+	"created_by" uuid,
+	"updated_by" uuid,
+	"created_by_id" uuid,
+	"updated_by_id" uuid,
+	"deleted_at" timestamp with time zone,
+	"workspace_id" uuid NOT NULL,
+	"member_id" uuid NOT NULL,
+	"role" smallint DEFAULT 15 NOT NULL,
+	"company_role" text,
+	"view_props" jsonb NOT NULL,
+	"default_props" jsonb NOT NULL,
+	"issue_props" jsonb NOT NULL,
+	"is_active" boolean DEFAULT true NOT NULL,
+	"getting_started_checklist" jsonb NOT NULL,
+	"tips" jsonb NOT NULL,
+	"explored_features" jsonb NOT NULL
+);
+--> statement-breakpoint
+CREATE TABLE "workspaces" (
+	"id" uuid PRIMARY KEY NOT NULL,
+	"created_at" timestamp with time zone NOT NULL,
+	"updated_at" timestamp with time zone NOT NULL,
+	"created_by" uuid,
+	"updated_by" uuid,
+	"created_by_id" uuid,
+	"updated_by_id" uuid,
+	"deleted_at" timestamp with time zone,
+	"name" varchar(255) NOT NULL,
+	"slug" varchar(255) NOT NULL,
+	"owner_id" uuid NOT NULL,
+	"logo" text,
+	"logo_asset_id" uuid,
+	"organization_size" varchar(20),
+	"timezone" varchar(255) NOT NULL,
+	"background_color" varchar(255) NOT NULL
+);
+--> statement-breakpoint
+CREATE TABLE "issue_activities" (
+	"id" uuid PRIMARY KEY NOT NULL,
+	"created_at" timestamp with time zone NOT NULL,
+	"updated_at" timestamp with time zone NOT NULL,
+	"created_by" uuid,
+	"updated_by" uuid,
+	"created_by_id" uuid,
+	"updated_by_id" uuid,
+	"deleted_at" timestamp with time zone,
+	"project_id" uuid NOT NULL,
+	"workspace_id" uuid NOT NULL,
+	"issue_id" uuid,
+	"verb" varchar(255) NOT NULL,
+	"field" varchar(255),
+	"old_value" text,
+	"new_value" text,
+	"comment" text NOT NULL,
+	"attachments" text[] NOT NULL,
+	"issue_comment_id" uuid,
+	"actor_id" uuid,
+	"old_identifier" uuid,
+	"new_identifier" uuid,
+	"epoch" double precision,
+	"external_source" varchar(255),
+	"external_id" varchar(255)
+);
+--> statement-breakpoint
+CREATE TABLE "analytic_views" (
+	"id" uuid PRIMARY KEY NOT NULL,
+	"created_at" timestamp with time zone NOT NULL,
+	"updated_at" timestamp with time zone NOT NULL,
+	"created_by" uuid,
+	"updated_by" uuid,
+	"created_by_id" uuid,
+	"updated_by_id" uuid,
+	"deleted_at" timestamp with time zone,
+	"workspace_id" uuid NOT NULL,
+	"name" varchar(255) NOT NULL,
+	"description" text,
+	"query" jsonb,
+	"query_dict" jsonb
+);
+--> statement-breakpoint
+CREATE TABLE "file_assets" (
+	"id" uuid PRIMARY KEY NOT NULL,
+	"created_at" timestamp with time zone NOT NULL,
+	"updated_at" timestamp with time zone NOT NULL,
+	"created_by" uuid,
+	"updated_by" uuid,
+	"created_by_id" uuid,
+	"updated_by_id" uuid,
+	"deleted_at" timestamp with time zone,
+	"attributes" jsonb,
+	"asset" varchar(800),
+	"user_id" uuid,
+	"workspace_id" uuid,
+	"draft_issue_id" uuid,
+	"project_id" uuid,
+	"issue_id" uuid,
+	"comment_id" uuid,
+	"page_id" uuid,
+	"entity_type" varchar(255),
+	"entity_identifier" varchar(255),
+	"is_deleted" boolean,
+	"is_archived" boolean,
+	"external_id" varchar(255),
+	"external_source" varchar(255),
+	"size" double precision,
+	"is_uploaded" boolean,
+	"storage_metadata" jsonb
+);
+--> statement-breakpoint
+CREATE TABLE "cycle_issues" (
+	"id" uuid PRIMARY KEY NOT NULL,
+	"created_at" timestamp with time zone NOT NULL,
+	"updated_at" timestamp with time zone NOT NULL,
+	"created_by" uuid,
+	"updated_by" uuid,
+	"created_by_id" uuid,
+	"updated_by_id" uuid,
+	"deleted_at" timestamp with time zone,
+	"project_id" uuid NOT NULL,
+	"workspace_id" uuid NOT NULL,
+	"issue_id" uuid NOT NULL,
+	"cycle_id" uuid NOT NULL
+);
+--> statement-breakpoint
+CREATE TABLE "cycles" (
+	"id" uuid PRIMARY KEY NOT NULL,
+	"created_at" timestamp with time zone NOT NULL,
+	"updated_at" timestamp with time zone NOT NULL,
+	"created_by" uuid,
+	"updated_by" uuid,
+	"created_by_id" uuid,
+	"updated_by_id" uuid,
+	"deleted_at" timestamp with time zone,
+	"project_id" uuid NOT NULL,
+	"workspace_id" uuid NOT NULL,
+	"name" varchar(255) NOT NULL,
+	"description" text NOT NULL,
+	"start_date" timestamp with time zone,
+	"end_date" timestamp with time zone,
+	"owned_by_id" uuid NOT NULL,
+	"view_props" jsonb NOT NULL,
+	"sort_order" double precision NOT NULL,
+	"external_source" varchar(255),
+	"external_id" varchar(255),
+	"progress_snapshot" jsonb NOT NULL,
+	"archived_at" timestamp with time zone,
+	"logo_props" jsonb NOT NULL,
+	"timezone" varchar(255) NOT NULL,
+	"version" integer NOT NULL
+);
+--> statement-breakpoint
+CREATE TABLE "estimate_points" (
+	"id" uuid PRIMARY KEY NOT NULL,
+	"created_at" timestamp with time zone NOT NULL,
+	"updated_at" timestamp with time zone NOT NULL,
+	"created_by" uuid,
+	"updated_by" uuid,
+	"created_by_id" uuid,
+	"updated_by_id" uuid,
+	"deleted_at" timestamp with time zone,
+	"project_id" uuid NOT NULL,
+	"workspace_id" uuid NOT NULL,
+	"estimate_id" uuid NOT NULL,
+	"key" integer,
+	"description" text,
+	"value" varchar(255) NOT NULL,
+	"external_source" varchar(255),
+	"external_id" varchar(255)
+);
+--> statement-breakpoint
+CREATE TABLE "estimates" (
+	"id" uuid PRIMARY KEY NOT NULL,
+	"created_at" timestamp with time zone NOT NULL,
+	"updated_at" timestamp with time zone NOT NULL,
+	"created_by" uuid,
+	"updated_by" uuid,
+	"created_by_id" uuid,
+	"updated_by_id" uuid,
+	"deleted_at" timestamp with time zone,
+	"project_id" uuid NOT NULL,
+	"workspace_id" uuid NOT NULL,
+	"name" varchar(255) NOT NULL,
+	"description" text,
+	"type" varchar(255),
+	"last_used" boolean,
+	"external_source" varchar(255),
+	"external_id" varchar(255)
+);
+--> statement-breakpoint
+CREATE TABLE "intake_issues" (
+	"id" uuid PRIMARY KEY NOT NULL,
+	"created_at" timestamp with time zone NOT NULL,
+	"updated_at" timestamp with time zone NOT NULL,
+	"created_by" uuid,
+	"updated_by" uuid,
+	"created_by_id" uuid,
+	"updated_by_id" uuid,
+	"deleted_at" timestamp with time zone,
+	"project_id" uuid NOT NULL,
+	"workspace_id" uuid NOT NULL,
+	"intake_id" uuid NOT NULL,
+	"issue_id" uuid NOT NULL,
+	"status" integer,
+	"snoozed_till" timestamp with time zone,
+	"duplicate_to_id" uuid,
+	"source" varchar(255),
+	"source_email" text,
+	"external_source" varchar(255),
+	"external_id" varchar(255),
+	"extra" jsonb,
+	"trackable_anchor" varchar(255)
+);
+--> statement-breakpoint
+CREATE TABLE "intakes" (
+	"id" uuid PRIMARY KEY NOT NULL,
+	"created_at" timestamp with time zone NOT NULL,
+	"updated_at" timestamp with time zone NOT NULL,
+	"created_by" uuid,
+	"updated_by" uuid,
+	"created_by_id" uuid,
+	"updated_by_id" uuid,
+	"deleted_at" timestamp with time zone,
+	"project_id" uuid NOT NULL,
+	"workspace_id" uuid NOT NULL,
+	"name" varchar(255) NOT NULL,
+	"description" text,
+	"is_default" boolean,
+	"view_props" jsonb,
+	"logo_props" jsonb
+);
+--> statement-breakpoint
+CREATE TABLE "issue_assignees" (
+	"id" uuid PRIMARY KEY NOT NULL,
+	"created_at" timestamp with time zone NOT NULL,
+	"updated_at" timestamp with time zone NOT NULL,
+	"created_by" uuid,
+	"updated_by" uuid,
+	"created_by_id" uuid,
+	"updated_by_id" uuid,
+	"deleted_at" timestamp with time zone,
+	"project_id" uuid NOT NULL,
+	"workspace_id" uuid NOT NULL,
+	"issue_id" uuid NOT NULL,
+	"assignee_id" uuid NOT NULL
+);
+--> statement-breakpoint
+CREATE TABLE "issue_labels" (
+	"id" uuid PRIMARY KEY NOT NULL,
+	"created_at" timestamp with time zone NOT NULL,
+	"updated_at" timestamp with time zone NOT NULL,
+	"created_by" uuid,
+	"updated_by" uuid,
+	"created_by_id" uuid,
+	"updated_by_id" uuid,
+	"deleted_at" timestamp with time zone,
+	"project_id" uuid NOT NULL,
+	"workspace_id" uuid NOT NULL,
+	"issue_id" uuid NOT NULL,
+	"label_id" uuid NOT NULL
+);
+--> statement-breakpoint
+CREATE TABLE "issue_sequences" (
+	"id" uuid PRIMARY KEY NOT NULL,
+	"created_at" timestamp with time zone NOT NULL,
+	"updated_at" timestamp with time zone NOT NULL,
+	"created_by" uuid,
+	"updated_by" uuid,
+	"created_by_id" uuid,
+	"updated_by_id" uuid,
+	"deleted_at" timestamp with time zone,
+	"project_id" uuid NOT NULL,
+	"workspace_id" uuid NOT NULL,
+	"issue_id" uuid,
+	"sequence" integer NOT NULL,
+	"deleted" boolean DEFAULT false NOT NULL
+);
+--> statement-breakpoint
+CREATE TABLE "issues" (
+	"id" uuid PRIMARY KEY NOT NULL,
+	"created_at" timestamp with time zone NOT NULL,
+	"updated_at" timestamp with time zone NOT NULL,
+	"created_by" uuid,
+	"updated_by" uuid,
+	"created_by_id" uuid,
+	"updated_by_id" uuid,
+	"deleted_at" timestamp with time zone,
+	"project_id" uuid NOT NULL,
+	"workspace_id" uuid NOT NULL,
+	"parent_id" uuid,
+	"state_id" uuid,
+	"estimate_point_id" uuid,
+	"point" integer,
+	"name" varchar(255) NOT NULL,
+	"description_json" jsonb,
+	"description_html" text,
+	"description_stripped" text,
+	"description_binary" "bytea",
+	"priority" varchar(30),
+	"start_date" date,
+	"target_date" date,
+	"sequence_id" integer,
+	"sort_order" double precision,
+	"completed_at" timestamp with time zone,
+	"archived_at" date,
+	"is_draft" boolean,
+	"external_source" varchar(255),
+	"external_id" varchar(255),
+	"type_id" uuid,
+	"last_activity_at" timestamp with time zone
+);
+--> statement-breakpoint
+CREATE TABLE "labels" (
+	"id" uuid PRIMARY KEY NOT NULL,
+	"created_at" timestamp with time zone NOT NULL,
+	"updated_at" timestamp with time zone NOT NULL,
+	"created_by" uuid,
+	"updated_by" uuid,
+	"created_by_id" uuid,
+	"updated_by_id" uuid,
+	"deleted_at" timestamp with time zone,
+	"workspace_id" uuid NOT NULL,
+	"project_id" uuid,
+	"parent_id" uuid,
+	"name" varchar(255) NOT NULL,
+	"description" text,
+	"color" varchar(255),
+	"sort_order" double precision,
+	"external_source" varchar(255),
+	"external_id" varchar(255)
+);
+--> statement-breakpoint
+CREATE TABLE "api_activity_logs" (
+	"id" uuid PRIMARY KEY NOT NULL,
+	"created_at" timestamp with time zone NOT NULL,
+	"updated_at" timestamp with time zone NOT NULL,
+	"created_by" uuid,
+	"updated_by" uuid,
+	"created_by_id" uuid,
+	"updated_by_id" uuid,
+	"deleted_at" timestamp with time zone,
+	"token_identifier" varchar(255),
+	"path" text,
+	"method" varchar(10),
+	"query_params" jsonb,
+	"headers" text,
+	"body" text,
+	"response_code" integer,
+	"response_body" text,
+	"ip_address" varchar(255),
+	"user_agent" text
+);
+--> statement-breakpoint
+CREATE TABLE "issue_description_versions" (
+	"id" uuid PRIMARY KEY NOT NULL,
+	"created_at" timestamp with time zone NOT NULL,
+	"updated_at" timestamp with time zone NOT NULL,
+	"created_by" uuid,
+	"updated_by" uuid,
+	"created_by_id" uuid,
+	"updated_by_id" uuid,
+	"deleted_at" timestamp with time zone,
+	"project_id" uuid NOT NULL,
+	"workspace_id" uuid NOT NULL,
+	"issue_id" uuid NOT NULL,
+	"owned_by_id" uuid,
+	"last_saved_at" timestamp with time zone,
+	"description_json" jsonb,
+	"description_html" text,
+	"description_binary" "bytea",
+	"description_stripped" text
+);
+--> statement-breakpoint
+CREATE TABLE "page_versions" (
+	"id" uuid PRIMARY KEY NOT NULL,
+	"created_at" timestamp with time zone NOT NULL,
+	"updated_at" timestamp with time zone NOT NULL,
+	"created_by" uuid,
+	"updated_by" uuid,
+	"created_by_id" uuid,
+	"updated_by_id" uuid,
+	"deleted_at" timestamp with time zone,
+	"project_id" uuid NOT NULL,
+	"workspace_id" uuid NOT NULL,
+	"page_id" uuid NOT NULL,
+	"owned_by_id" uuid,
+	"last_saved_at" timestamp with time zone,
+	"description_json" jsonb,
+	"description_html" text,
+	"description_binary" "bytea",
+	"description_stripped" text,
+	"sub_pages_data" jsonb NOT NULL
+);
+--> statement-breakpoint
+CREATE TABLE "email_notification_logs" (
+	"id" uuid PRIMARY KEY NOT NULL,
+	"created_at" timestamp with time zone NOT NULL,
+	"updated_at" timestamp with time zone NOT NULL,
+	"created_by" uuid,
+	"updated_by" uuid,
+	"created_by_id" uuid,
+	"updated_by_id" uuid,
+	"deleted_at" timestamp with time zone,
+	"receiver_id" uuid NOT NULL,
+	"triggered_by_id" uuid,
+	"entity_identifier" uuid,
+	"entity_name" varchar(255) NOT NULL,
+	"data" jsonb,
+	"processed_at" timestamp with time zone,
+	"sent_at" timestamp with time zone,
+	"entity" varchar(200) NOT NULL,
+	"old_value" varchar(300),
+	"new_value" varchar(300)
+);
+--> statement-breakpoint
+CREATE TABLE "issue_subscribers" (
+	"id" uuid PRIMARY KEY NOT NULL,
+	"created_at" timestamp with time zone NOT NULL,
+	"updated_at" timestamp with time zone NOT NULL,
+	"created_by" uuid,
+	"updated_by" uuid,
+	"created_by_id" uuid,
+	"updated_by_id" uuid,
+	"deleted_at" timestamp with time zone,
+	"project_id" uuid NOT NULL,
+	"workspace_id" uuid NOT NULL,
+	"issue_id" uuid NOT NULL,
+	"subscriber_id" uuid NOT NULL
+);
+--> statement-breakpoint
+CREATE TABLE "notifications" (
+	"id" uuid PRIMARY KEY NOT NULL,
+	"created_at" timestamp with time zone NOT NULL,
+	"updated_at" timestamp with time zone NOT NULL,
+	"created_by" uuid,
+	"updated_by" uuid,
+	"created_by_id" uuid,
+	"updated_by_id" uuid,
+	"deleted_at" timestamp with time zone,
+	"workspace_id" uuid NOT NULL,
+	"project_id" uuid,
+	"data" jsonb,
+	"entity_identifier" uuid,
+	"entity_name" varchar(255) NOT NULL,
+	"title" text NOT NULL,
+	"message" jsonb,
+	"message_html" text,
+	"message_stripped" text,
+	"sender" varchar(255) NOT NULL,
+	"triggered_by_id" uuid,
+	"receiver_id" uuid NOT NULL,
+	"read_at" timestamp with time zone,
+	"snoozed_till" timestamp with time zone,
+	"archived_at" timestamp with time zone
+);
+--> statement-breakpoint
+CREATE TABLE "user_notification_preferences" (
+	"id" uuid PRIMARY KEY NOT NULL,
+	"created_at" timestamp with time zone NOT NULL,
+	"updated_at" timestamp with time zone NOT NULL,
+	"created_by" uuid,
+	"updated_by" uuid,
+	"created_by_id" uuid,
+	"updated_by_id" uuid,
+	"deleted_at" timestamp with time zone,
+	"user_id" uuid NOT NULL,
+	"workspace_id" uuid,
+	"project_id" uuid,
+	"property_change" boolean NOT NULL,
+	"state_change" boolean NOT NULL,
+	"comment" boolean NOT NULL,
+	"mention" boolean NOT NULL,
+	"issue_completed" boolean NOT NULL
+);
+--> statement-breakpoint
+CREATE TABLE "page_labels" (
+	"id" uuid PRIMARY KEY NOT NULL,
+	"created_at" timestamp with time zone NOT NULL,
+	"updated_at" timestamp with time zone NOT NULL,
+	"created_by" uuid,
+	"updated_by" uuid,
+	"created_by_id" uuid,
+	"updated_by_id" uuid,
+	"deleted_at" timestamp with time zone,
+	"workspace_id" uuid NOT NULL,
+	"page_id" uuid NOT NULL,
+	"label_id" uuid NOT NULL
+);
+--> statement-breakpoint
+CREATE TABLE "pages" (
+	"id" uuid PRIMARY KEY NOT NULL,
+	"created_at" timestamp with time zone NOT NULL,
+	"updated_at" timestamp with time zone NOT NULL,
+	"created_by" uuid,
+	"updated_by" uuid,
+	"created_by_id" uuid,
+	"updated_by_id" uuid,
+	"deleted_at" timestamp with time zone,
+	"workspace_id" uuid NOT NULL,
+	"name" text NOT NULL,
+	"description_json" jsonb,
+	"description_binary" "bytea",
+	"description_html" text,
+	"description_stripped" text,
+	"owned_by_id" uuid NOT NULL,
+	"access" smallint NOT NULL,
+	"color" varchar(255),
+	"parent_id" uuid,
+	"archived_at" date,
+	"is_locked" boolean NOT NULL,
+	"view_props" jsonb,
+	"logo_props" jsonb,
+	"is_global" boolean NOT NULL,
+	"moved_to_page" uuid,
+	"moved_to_project" uuid,
+	"sort_order" double precision,
+	"external_source" varchar(255),
+	"external_id" varchar(255)
+);
+--> statement-breakpoint
+CREATE TABLE "project_pages" (
+	"id" uuid PRIMARY KEY NOT NULL,
+	"created_at" timestamp with time zone NOT NULL,
+	"updated_at" timestamp with time zone NOT NULL,
+	"created_by" uuid,
+	"updated_by" uuid,
+	"created_by_id" uuid,
+	"updated_by_id" uuid,
+	"deleted_at" timestamp with time zone,
+	"workspace_id" uuid NOT NULL,
+	"project_id" uuid NOT NULL,
+	"page_id" uuid NOT NULL
+);
+--> statement-breakpoint
+CREATE TABLE "module_issues" (
+	"id" uuid PRIMARY KEY NOT NULL,
+	"created_at" timestamp with time zone NOT NULL,
+	"updated_at" timestamp with time zone NOT NULL,
+	"created_by" uuid,
+	"updated_by" uuid,
+	"created_by_id" uuid,
+	"updated_by_id" uuid,
+	"deleted_at" timestamp with time zone,
+	"project_id" uuid NOT NULL,
+	"workspace_id" uuid NOT NULL,
+	"module_id" uuid NOT NULL,
+	"issue_id" uuid NOT NULL
+);
+--> statement-breakpoint
+CREATE TABLE "module_members" (
+	"id" uuid PRIMARY KEY NOT NULL,
+	"created_at" timestamp with time zone NOT NULL,
+	"updated_at" timestamp with time zone NOT NULL,
+	"created_by" uuid,
+	"updated_by" uuid,
+	"created_by_id" uuid,
+	"updated_by_id" uuid,
+	"deleted_at" timestamp with time zone,
+	"project_id" uuid NOT NULL,
+	"workspace_id" uuid NOT NULL,
+	"module_id" uuid NOT NULL,
+	"member_id" uuid NOT NULL
+);
+--> statement-breakpoint
+CREATE TABLE "modules" (
+	"id" uuid PRIMARY KEY NOT NULL,
+	"created_at" timestamp with time zone NOT NULL,
+	"updated_at" timestamp with time zone NOT NULL,
+	"created_by" uuid,
+	"updated_by" uuid,
+	"created_by_id" uuid,
+	"updated_by_id" uuid,
+	"deleted_at" timestamp with time zone,
+	"project_id" uuid NOT NULL,
+	"workspace_id" uuid NOT NULL,
+	"name" varchar(255) NOT NULL,
+	"description" text,
+	"description_text" jsonb,
+	"description_html" jsonb,
+	"start_date" date,
+	"target_date" date,
+	"status" varchar(20),
+	"lead_id" uuid,
+	"view_props" jsonb,
+	"sort_order" double precision,
+	"external_source" varchar(255),
+	"external_id" varchar(255),
+	"archived_at" timestamp with time zone,
+	"logo_props" jsonb
+);
+--> statement-breakpoint
+CREATE TABLE "deploy_boards" (
+	"id" uuid PRIMARY KEY NOT NULL,
+	"created_at" timestamp with time zone NOT NULL,
+	"updated_at" timestamp with time zone NOT NULL,
+	"created_by" uuid,
+	"updated_by" uuid,
+	"created_by_id" uuid,
+	"updated_by_id" uuid,
+	"deleted_at" timestamp with time zone,
+	"workspace_id" uuid NOT NULL,
+	"project_id" uuid,
+	"entity_identifier" uuid,
+	"entity_name" varchar(30),
+	"anchor" varchar(255) NOT NULL,
+	"is_comments_enabled" boolean,
+	"is_reactions_enabled" boolean,
+	"intake_id" uuid,
+	"is_votes_enabled" boolean,
+	"view_props" jsonb,
+	"is_activity_enabled" boolean,
+	"is_disabled" boolean
+);
+--> statement-breakpoint
+CREATE TABLE "states" (
+	"id" uuid PRIMARY KEY NOT NULL,
+	"created_at" timestamp with time zone NOT NULL,
+	"updated_at" timestamp with time zone NOT NULL,
+	"created_by" uuid,
+	"updated_by" uuid,
+	"created_by_id" uuid,
+	"updated_by_id" uuid,
+	"deleted_at" timestamp with time zone,
+	"project_id" uuid NOT NULL,
+	"workspace_id" uuid NOT NULL,
+	"name" varchar(255) NOT NULL,
+	"description" text,
+	"color" varchar(255) NOT NULL,
+	"slug" varchar(100),
+	"sequence" double precision,
+	"group" varchar(20),
+	"is_triage" boolean,
+	"default" boolean,
+	"external_source" varchar(255),
+	"external_id" varchar(255)
+);
+--> statement-breakpoint
+CREATE TABLE "issue_links" (
+	"id" uuid PRIMARY KEY NOT NULL,
+	"created_at" timestamp with time zone NOT NULL,
+	"updated_at" timestamp with time zone NOT NULL,
+	"created_by" uuid,
+	"updated_by" uuid,
+	"created_by_id" uuid,
+	"updated_by_id" uuid,
+	"deleted_at" timestamp with time zone,
+	"project_id" uuid NOT NULL,
+	"workspace_id" uuid NOT NULL,
+	"issue_id" uuid NOT NULL,
+	"title" varchar(255),
+	"url" text NOT NULL,
+	"metadata" jsonb
+);
+--> statement-breakpoint
+CREATE TABLE "user_recent_visits" (
+	"id" uuid PRIMARY KEY NOT NULL,
+	"created_at" timestamp with time zone NOT NULL,
+	"updated_at" timestamp with time zone NOT NULL,
+	"created_by" uuid,
+	"updated_by" uuid,
+	"created_by_id" uuid,
+	"updated_by_id" uuid,
+	"deleted_at" timestamp with time zone,
+	"workspace_id" uuid NOT NULL,
+	"project_id" uuid,
+	"entity_identifier" uuid,
+	"entity_name" varchar(30) NOT NULL,
+	"user_id" uuid NOT NULL,
+	"visited_at" timestamp with time zone
+);
+--> statement-breakpoint
+CREATE TABLE "issue_views" (
+	"id" uuid PRIMARY KEY NOT NULL,
+	"created_at" timestamp with time zone NOT NULL,
+	"updated_at" timestamp with time zone NOT NULL,
+	"created_by" uuid,
+	"updated_by" uuid,
+	"created_by_id" uuid,
+	"updated_by_id" uuid,
+	"deleted_at" timestamp with time zone,
+	"workspace_id" uuid NOT NULL,
+	"project_id" uuid,
+	"name" varchar(255) NOT NULL,
+	"description" text,
+	"query" jsonb,
+	"filters" jsonb,
+	"display_filters" jsonb,
+	"display_properties" jsonb,
+	"rich_filters" jsonb,
+	"access" smallint,
+	"sort_order" double precision,
+	"pql_filters" jsonb NOT NULL,
+	"logo_props" jsonb,
+	"owned_by_id" uuid NOT NULL,
+	"is_locked" boolean,
+	"last_used_filter" varchar(255) NOT NULL,
+	"archived_at" timestamp with time zone
+);
+--> statement-breakpoint
+CREATE TABLE "webhook_logs" (
+	"id" uuid PRIMARY KEY NOT NULL,
+	"created_at" timestamp with time zone NOT NULL,
+	"updated_at" timestamp with time zone NOT NULL,
+	"created_by" uuid,
+	"updated_by" uuid,
+	"created_by_id" uuid,
+	"updated_by_id" uuid,
+	"deleted_at" timestamp with time zone,
+	"workspace_id" uuid NOT NULL,
+	"webhook" uuid,
+	"event_type" varchar(255),
+	"request_method" varchar(10),
+	"request_headers" text,
+	"request_body" text,
+	"response_status" text,
+	"response_headers" text,
+	"response_body" text,
+	"retry_count" integer NOT NULL
+);
+--> statement-breakpoint
+CREATE TABLE "webhooks" (
+	"id" uuid PRIMARY KEY NOT NULL,
+	"created_at" timestamp with time zone NOT NULL,
+	"updated_at" timestamp with time zone NOT NULL,
+	"created_by" uuid,
+	"updated_by" uuid,
+	"created_by_id" uuid,
+	"updated_by_id" uuid,
+	"deleted_at" timestamp with time zone,
+	"workspace_id" uuid NOT NULL,
+	"name" varchar(255),
+	"url" varchar(1024) NOT NULL,
+	"is_active" boolean NOT NULL,
+	"secret_key" varchar(255) NOT NULL,
+	"project" boolean NOT NULL,
+	"issue" boolean NOT NULL,
+	"module" boolean NOT NULL,
+	"cycle" boolean NOT NULL,
+	"issue_comment" boolean NOT NULL,
+	"is_internal" boolean NOT NULL,
+	"version" varchar(50),
+	"content_type" varchar(255) NOT NULL,
+	"pql_filters" jsonb NOT NULL,
+	"rich_filters" jsonb NOT NULL
+);
+--> statement-breakpoint
+ALTER TABLE "estimate_points" ADD CONSTRAINT "estimate_points_estimate_id_estimates_id_fk" FOREIGN KEY ("estimate_id") REFERENCES "public"."estimates"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "issue_sequences" ADD CONSTRAINT "issue_sequences_issue_id_issues_id_fk" FOREIGN KEY ("issue_id") REFERENCES "public"."issues"("id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "issues" ADD CONSTRAINT "issues_parent_id_issues_id_fk" FOREIGN KEY ("parent_id") REFERENCES "public"."issues"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "labels" ADD CONSTRAINT "labels_parent_id_labels_id_fk" FOREIGN KEY ("parent_id") REFERENCES "public"."labels"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "pages" ADD CONSTRAINT "pages_parent_id_pages_id_fk" FOREIGN KEY ("parent_id") REFERENCES "public"."pages"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "module_members" ADD CONSTRAINT "module_members_module_id_modules_id_fk" FOREIGN KEY ("module_id") REFERENCES "public"."modules"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
+CREATE UNIQUE INDEX "estimate_unique_name_project_when_deleted_at_null" ON "estimates" USING btree ("name","project_id") WHERE "estimates"."deleted_at" IS NULL;--> statement-breakpoint
+CREATE UNIQUE INDEX "intake_unique_name_project_when_deleted_at_null" ON "intakes" USING btree ("name","project_id") WHERE "intakes"."deleted_at" IS NULL;--> statement-breakpoint
+CREATE UNIQUE INDEX "issue_assignee_unique_issue_assignee_when_deleted_at_null" ON "issue_assignees" USING btree ("issue_id","assignee_id") WHERE "issue_assignees"."deleted_at" IS NULL;--> statement-breakpoint
+CREATE UNIQUE INDEX "unique_name_when_project_null_and_not_deleted" ON "labels" USING btree ("name") WHERE "labels"."project_id" IS NULL AND "labels"."deleted_at" IS NULL;--> statement-breakpoint
+CREATE UNIQUE INDEX "unique_project_name_when_not_deleted" ON "labels" USING btree ("project_id","name") WHERE "labels"."project_id" IS NOT NULL AND "labels"."deleted_at" IS NULL;--> statement-breakpoint
+CREATE UNIQUE INDEX "project_page_unique_project_page_when_deleted_at_null" ON "project_pages" USING btree ("project_id","page_id") WHERE "project_pages"."deleted_at" IS NULL;--> statement-breakpoint
+CREATE UNIQUE INDEX "module_member_unique_module_member_when_deleted_at_null" ON "module_members" USING btree ("module_id","member_id") WHERE "module_members"."deleted_at" IS NULL;--> statement-breakpoint
+CREATE UNIQUE INDEX "module_unique_name_project_when_deleted_at_null" ON "modules" USING btree ("name","project_id") WHERE "modules"."deleted_at" IS NULL;--> statement-breakpoint
+CREATE UNIQUE INDEX "state_unique_name_project_when_deleted_at_null" ON "states" USING btree ("name","project_id") WHERE "states"."deleted_at" IS NULL;

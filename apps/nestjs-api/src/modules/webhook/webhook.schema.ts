@@ -1,10 +1,11 @@
-import { boolean, integer, pgTable, text, uuid, varchar } from "drizzle-orm/pg-core";
+import { boolean, integer, jsonb, pgTable, text, uuid, varchar } from "drizzle-orm/pg-core";
 import { baseColumns } from "../../infra/database/schema/_columns";
 
-// db_table = "webhooks" (Webhook extends BaseModel, workspace-scoped).
+// db_table = "webhooks" (Webhook extends BaseModel, workspace-scoped). Reconciled to full column parity.
 export const webhooks = pgTable("webhooks", {
   ...baseColumns,
   workspaceId: uuid("workspace_id").notNull(),
+  name: varchar("name", { length: 255 }),
   url: varchar("url", { length: 1024 }).notNull(),
   isActive: boolean("is_active").notNull().$defaultFn(() => true),
   secretKey: varchar("secret_key", { length: 255 }).notNull(),
@@ -15,6 +16,17 @@ export const webhooks = pgTable("webhooks", {
   issueComment: boolean("issue_comment").notNull().$defaultFn(() => false),
   isInternal: boolean("is_internal").notNull().$defaultFn(() => false),
   version: varchar("version", { length: 50 }).$defaultFn(() => "v1"),
+  contentType: varchar("content_type", { length: 255 })
+    .notNull()
+    .$defaultFn(() => "application/json"),
+  pqlFilters: jsonb("pql_filters")
+    .$type<Record<string, unknown>>()
+    .notNull()
+    .$defaultFn(() => ({ json: {}, stripped: "" })),
+  richFilters: jsonb("rich_filters")
+    .$type<Record<string, unknown>>()
+    .notNull()
+    .$defaultFn(() => ({})),
 });
 
 // db_table = "webhook_logs".

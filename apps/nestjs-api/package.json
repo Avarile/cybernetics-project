@@ -18,7 +18,10 @@
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
     "db:push": "drizzle-kit push",
-    "db:pull": "drizzle-kit pull"
+    "db:pull": "drizzle-kit pull",
+    "db:generate": "drizzle-kit generate",
+    "db:migrate": "drizzle-kit migrate",
+    "db:init": "node dist/db-init.js"
   },
   "dependencies": {
     "@ai-sdk/openai": "^4.0.7",

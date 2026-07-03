@@ -40,6 +40,7 @@ export const issues = pgTable("issues", {
   externalSource: varchar("external_source", { length: 255 }),
   externalId: varchar("external_id", { length: 255 }),
   typeId: uuid("type_id"),
+  lastActivityAt: timestamp("last_activity_at", { withTimezone: true, mode: "date" }),
 });
 
 // db_table = "issue_sequences" (per-project monotonically increasing sequence).
@@ -48,6 +49,7 @@ export const issueSequences = pgTable("issue_sequences", {
   ...projectScoped,
   issueId: uuid("issue_id").references(() => issues.id, { onDelete: "set null" }),
   sequence: integer("sequence").notNull().$defaultFn(() => 1),
+  deleted: boolean("deleted").notNull().default(false),
 });
 
 // db_table = "issue_assignees" (M2M through Issue<->User).
