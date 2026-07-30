@@ -475,12 +475,12 @@
         }
       },
       "plane-intelligence": {
-        "title": "Plane AI",
-        "heading": "Plane AI",
+        "title": "Cybernetics AI",
+        "heading": "Cybernetics AI",
         "description": "See your work get smarter and faster with AI that is natively connected to your work and knowledge base. "
       },
       "runners": {
-        "title": "Plane Runner",
+        "title": "Cybernetics Runner",
         "heading": "Scripts",
         "new_script": "New Script",
         "description": "Automate your workflows with custom scripts and automation rules."

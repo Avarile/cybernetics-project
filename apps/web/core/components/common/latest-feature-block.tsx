@@ -26,9 +26,7 @@ export function LatestFeatureBlock() {
         </p>
       </div>
       <div
-        className={`mx-auto mt-8 overflow-hidden rounded-md border border-subtle object-cover sm:h-52 sm:w-96 ${
-          resolvedTheme === "dark" ? "bg-surface-1" : "bg-layer-2"
-        }`}
+        className={`mx-auto mt-8 overflow-hidden rounded-md border border-subtle object-cover sm:h-52 sm:w-96 ${resolvedTheme === "dark" ? "bg-surface-1" : "bg-layer-2"}`}
       >
         <div className="h-[90%]">
           <img

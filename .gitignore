@@ -119,3 +119,13 @@ packages/i18n/src/types/keys.generated.ts
 
 # Local security notes (not for version control)
 /security/
+
+# Claude Code / ruflo harness runtime state.
+# Hand-maintained config stays tracked (.claude/helpers/, .claude/skills/, .claude/settings.json);
+# only machine-regenerated state is ignored, since it churns on every session.
+.claude-flow/
+**/.claude-flow/
+.claude/proven-config.json
+.claude/.proven-config-version
+.claude/helpers/.helpers-version
+.claude/helpers/helpers.manifest.json

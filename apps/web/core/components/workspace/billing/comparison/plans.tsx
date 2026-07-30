@@ -749,7 +749,7 @@ export const PLANS_COMPARISON_LIST: TPlansComparisonDetails[] = [
       },
       {
         title: "API-enabled Audit Logs",
-        description: "See a full-workspace audit log and use APIs to flag\nCybernetics activity in compliance systems.",
+        description: "See a full-workspace audit log and use APIs to flag\nPybernetics activity in compliance systems.",
         comingSoon: true,
         cloud: {
           free: false,
@@ -1093,7 +1093,8 @@ export const PLANS_COMPARISON_LIST: TPlansComparisonDetails[] = [
       },
       {
         title: "Two-factor authentication and passkeys",
-        description: "Secure your Cybernetics workspace with device-\ndependent two-factor authentication and passkeys. ",
+        description:
+          "Secure your Cybernetics workspace with device-\ndependent two-factor authentication and passkeys. ",
         cloud: {
           free: false,
           one: false,
@@ -1115,7 +1116,8 @@ export const PLANS_COMPARISON_LIST: TPlansComparisonDetails[] = [
       },
       {
         title: "LDAP",
-        description: "Get our official LDAP implementation and secure\nyour Cybernetics workspace with your LDAP server.",
+        description:
+          "Get our official LDAP implementation and secure\nyour Cybernetics workspace with your LDAP server.",
         comingSoon: true,
         cloud: {
           free: false,
@@ -1145,7 +1147,8 @@ export const PLANS_COMPARISON_LIST: TPlansComparisonDetails[] = [
       },
       {
         title: "One-click Deployment",
-        description: "Install and deploy your self-hosted Cybernetics to any\nprivate cloud with a single-line command.",
+        description:
+          "Install and deploy your self-hosted Cybernetics to any\nprivate cloud with a single-line command.",
         cloud: {
           free: false,
           one: true,

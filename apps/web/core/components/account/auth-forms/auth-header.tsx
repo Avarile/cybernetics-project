@@ -27,29 +27,29 @@ type TAuthHeader = {
 const Titles = {
   [EAuthModes.SIGN_IN]: {
     [EAuthSteps.EMAIL]: {
-      header: "Work in all dimensions.",
+      header: "Supported by AI.",
       subHeader: "Welcome back to Cybernetics.",
     },
     [EAuthSteps.PASSWORD]: {
-      header: "Work in all dimensions.",
+      header: "Supported by AI.",
       subHeader: "Welcome back to Cybernetics.",
     },
     [EAuthSteps.UNIQUE_CODE]: {
-      header: "Work in all dimensions.",
+      header: "Supported by AI.",
       subHeader: "Welcome back to Cybernetics.",
     },
   },
   [EAuthModes.SIGN_UP]: {
     [EAuthSteps.EMAIL]: {
-      header: "Work in all dimensions.",
+      header: "Supported by AI.",
       subHeader: "Create your Cybernetics account.",
     },
     [EAuthSteps.PASSWORD]: {
-      header: "Work in all dimensions.",
+      header: "Supported by AI.",
       subHeader: "Create your Cybernetics account.",
     },
     [EAuthSteps.UNIQUE_CODE]: {
-      header: "Work in all dimensions.",
+      header: "Supported by AI.",
       subHeader: "Create your Cybernetics account.",
     },
   },
@@ -74,16 +74,16 @@ export const AuthHeader = observer(function AuthHeader(props: TAuthHeader) {
   const getHeaderSubHeader = (
     step: EAuthSteps,
     mode: EAuthModes,
-    invitation: IWorkspaceMemberInvitation | undefined,
+    memberInvitation: IWorkspaceMemberInvitation | undefined,
     email: string | undefined
   ) => {
-    if (invitation && email && invitation.email === email && invitation.workspace) {
-      const workspace = invitation.workspace;
+    if (memberInvitation && email && memberInvitation.email === email && memberInvitation.workspace) {
+      const workspace = memberInvitation.workspace;
       return {
         header: (
           <div className="relative inline-flex items-center gap-2">
             {t("common.join")}{" "}
-            <WorkspaceLogo logo={workspace?.logo_url} name={workspace?.name} classNames="size-9 flex-shrink-0" />{" "}
+            <WorkspaceLogo logo={workspace?.logo_url} name={workspace?.name} classNames="size-14 flex-shrink-0" />{" "}
             {workspace.name}
           </div>
         ),

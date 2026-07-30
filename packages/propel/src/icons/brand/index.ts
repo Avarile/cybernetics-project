@@ -11,3 +11,6 @@ export * from "./zerodha-logo";
 export * from "./plane-lockup";
 export * from "./plane-logo";
 export * from "./plane-wordmark";
+export * from "./pybernetics-wordmark";
+export * from "./pybernetics-logo";
+export * from "./pybernetics-lockup";

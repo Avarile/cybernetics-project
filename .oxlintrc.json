@@ -21,6 +21,9 @@
   },
   "ignorePatterns": [
     ".cache/**",
+    ".claude/**",
+    ".claude-flow/**",
+    "**/.claude-flow/**",
     ".next/**",
     ".react-router/**",
     ".storybook/**",

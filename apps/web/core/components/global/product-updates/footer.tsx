@@ -69,7 +69,7 @@ export function ProductUpdatesFooter() {
         )}
         rel="noreferrer"
       >
-        <PlaneLogo className="h-4 w-auto text-primary" />
+        <PlaneLogo className="h-6 w-auto text-primary" />
         {t("powered_by_plane_pages")}
       </a>
     </div>

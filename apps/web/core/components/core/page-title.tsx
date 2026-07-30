@@ -16,7 +16,7 @@ export function PageHead(props: PageHeadTitleProps) {
 
   useEffect(() => {
     if (title) {
-      document.title = title ?? "Cybernetics | Simple, extensible, open-source project management tool.";
+      document.title = title ?? "Cybernetics | AI First, human focusing, next gen of the task management platform.";
     }
   }, [title]);
 

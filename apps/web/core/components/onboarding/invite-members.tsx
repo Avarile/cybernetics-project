@@ -192,17 +192,13 @@ const InviteMemberInput = observer(function InviteMemberInput(props: InviteMembe
                   className="flex w-full items-center justify-between gap-1 rounded-md border-[0.5px] border-strong px-2.5 py-2 text-13"
                 >
                   <span
-                    className={`text-13 ${
-                      !getValues(`emails.${index}.role_active`) ? "text-placeholder" : "text-primary"
-                    } sm:text-13`}
+                    className={`text-13 ${!getValues(`emails.${index}.role_active`) ? "text-placeholder" : "text-primary"} sm:text-13`}
                   >
                     {ROLE[value]}
                   </span>
 
                   <ChevronDownIcon
-                    className={`size-3 ${
-                      !getValues(`emails.${index}.role_active`) ? "stroke-placeholder" : "stroke-primary"
-                    }`}
+                    className={`size-3 ${!getValues(`emails.${index}.role_active`) ? "stroke-placeholder" : "stroke-primary"}`}
                   />
                 </Listbox.Button>
 
@@ -213,22 +209,20 @@ const InviteMemberInput = observer(function InviteMemberInput(props: InviteMembe
                     style={styles.popper}
                     {...attributes.popper}
                   >
-                    {Object.entries(ROLE_DETAILS).map(([key, value]) => (
+                    {Object.entries(ROLE_DETAILS).map(([key, roleDetail]) => (
                       <Listbox.Option
                         as="div"
                         key={key}
                         value={parseInt(key)}
                         className={({ active, selected }) =>
-                          `cursor-pointer truncate rounded-sm px-1 py-1.5 select-none ${
-                            active || selected ? "bg-onboarding-background-400/40" : ""
-                          } ${selected ? "text-primary" : "text-secondary"}`
+                          `cursor-pointer truncate rounded-sm px-1 py-1.5 select-none ${active || selected ? "bg-onboarding-background-400/40" : ""} ${selected ? "text-primary" : "text-secondary"}`
                         }
                       >
                         {({ selected }) => (
                           <div className="flex items-center gap-2 p-1 text-wrap">
                             <div className="flex flex-col">
-                              <div className="text-13 font-medium">{t(value.i18n_title)}</div>
-                              <div className="flex text-11 text-tertiary">{t(value.i18n_description)}</div>
+                              <div className="text-13 font-medium">{t(roleDetail.i18n_title)}</div>
+                              <div className="flex text-11 text-tertiary">{t(roleDetail.i18n_description)}</div>
                             </div>
                             {selected && <CheckIcon className="h-4 w-4 shrink-0" />}
                           </div>
@@ -304,6 +298,7 @@ export function InviteMembers(props: Props) {
           message: "Invitations sent successfully.",
         });
         await nextStep();
+        return;
       })
       .catch((err) => {
         setToast({

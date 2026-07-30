@@ -73,7 +73,7 @@ export function AuthHeaderBase(props: TAuthHeaderBase) {
       <PageHead title={pageTitle + " - Cybernetics"} />
       <div className="sticky top-0 flex w-full flex-shrink-0 items-center justify-between gap-6">
         <Link href="/">
-          <PlaneLockup height={20} width={95} className="text-primary" />
+          <PlaneLockup height={60} width={200} className="text-primary" />
         </Link>
         {additionalAction}
       </div>

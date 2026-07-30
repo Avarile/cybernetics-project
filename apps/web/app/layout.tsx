@@ -7,6 +7,7 @@
 import Script from "next/script";
 
 // styles
+// oxlint-disable-next-line import/no-unassigned-import -- side-effect import: injects the global stylesheet
 import "@/styles/globals.css";
 
 import { SITE_DESCRIPTION, SITE_NAME } from "@plane/constants";
