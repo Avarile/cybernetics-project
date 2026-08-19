@@ -6,9 +6,9 @@
 
 export function AuthFormHeader({ title, description }: { title: string; description: string }) {
   return (
-    <div className="flex flex-col gap-1">
-      <span className="text-20 font-semibold text-primary">{title}</span>
-      <span className="text-20 font-semibold text-placeholder">{description}</span>
+    <div className="flex flex-col items-center gap-1 text-center">
+      <span className="text-h4-semibold text-primary">{title}</span>
+      <span className="text-body-sm-regular text-tertiary">{description}</span>
     </div>
   );
 }

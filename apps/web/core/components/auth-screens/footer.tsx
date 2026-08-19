@@ -32,10 +32,9 @@ const _BRAND_LOGOS: {
 
 export function AuthFooter() {
   return (
-    <div className="flex flex-col items-center gap-6">
-      <span className="text-13 whitespace-nowrap text-tertiary">
-        Open yourself to AI leaded future of building with Cybernetics
-      </span>
+    <footer className="mt-6 border-t border-subtle pt-4 text-center text-11 text-tertiary">
+      <p>&copy; {new Date().getFullYear()} Cybernetics. All rights reserved.</p>
+      <p className="mt-2">By Avarile.</p>
       {/* <div className="flex w-full flex-wrap items-center justify-center gap-x-10 gap-y-4">
         {BRAND_LOGOS.map((brand) => (
           <div className="flex h-7 flex-1 items-center justify-center" key={brand.id}>
@@ -43,6 +42,6 @@ export function AuthFooter() {
           </div>
         ))}
       </div> */}
-    </div>
+    </footer>
   );
 }

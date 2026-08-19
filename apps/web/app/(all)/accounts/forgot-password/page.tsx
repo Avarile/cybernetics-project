@@ -7,9 +7,9 @@
 import { observer } from "mobx-react";
 // components
 import { ForgotPasswordForm } from "@/components/account/auth-forms/forgot-password";
-import { AuthHeader } from "@/components/auth-screens/header";
+import { AuthShell } from "@/components/auth-screens/auth-shell";
 // helpers
-import { EAuthModes, EPageTypes } from "@/helpers/authentication.helper";
+import { EPageTypes } from "@/helpers/authentication.helper";
 // layouts
 import DefaultLayout from "@/layouts/default-layout";
 import { AuthenticationWrapper } from "@/lib/wrappers/authentication-wrapper";
@@ -18,10 +18,9 @@ function ForgotPasswordPage() {
   return (
     <DefaultLayout>
       <AuthenticationWrapper pageType={EPageTypes.NON_AUTHENTICATED}>
-        <div className="relative z-10 flex h-screen w-screen flex-col items-center overflow-hidden overflow-y-auto px-8 pt-6 pb-10">
-          <AuthHeader type={EAuthModes.SIGN_IN} />
+        <AuthShell>
           <ForgotPasswordForm />
-        </div>
+        </AuthShell>
       </AuthenticationWrapper>
     </DefaultLayout>
   );
