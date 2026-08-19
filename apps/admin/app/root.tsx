@@ -10,7 +10,10 @@ import type { LinksFunction } from "react-router";
 import appleTouchIcon from "@/app/assets/favicon/apple-touch-icon.png?url";
 import favicon16 from "@/app/assets/favicon/favicon-16x16.png?url";
 import favicon32 from "@/app/assets/favicon/favicon-32x32.png?url";
+import favicon96 from "@/app/assets/favicon/favicon-96x96.png?url";
+import faviconFlatSvg from "@/app/assets/favicon/favicon-flat.svg?url";
 import faviconIco from "@/app/assets/favicon/favicon.ico?url";
+import faviconSvg from "@/app/assets/favicon/favicon.svg?url";
 import { LogoSpinner } from "@/components/common/logo-spinner";
 import globalStyles from "@/styles/globals.css?url";
 import { AppProviders } from "@/providers";
@@ -21,16 +24,20 @@ import interVariableWoff2 from "@fontsource-variable/inter/files/inter-latin-wgh
 import "@fontsource/material-symbols-rounded";
 import "@fontsource/ibm-plex-mono";
 
-const APP_TITLE = "Plane | Simple, extensible, open-source project management tool.";
-const APP_DESCRIPTION =
-  "Open-source project management tool to manage work items, sprints, and product roadmaps with peace of mind.";
+const APP_TITLE = "Cybernetics Admin | Instance administration";
+const APP_DESCRIPTION = "Instance administration for Cybernetics.";
 
 export const links: LinksFunction = () => [
-  { rel: "apple-touch-icon", sizes: "180x180", href: appleTouchIcon },
+  // Vector first — browsers that support it skip the raster fallbacks entirely.
+  { rel: "icon", type: "image/svg+xml", href: faviconSvg },
+  { rel: "icon", type: "image/png", sizes: "96x96", href: favicon96 },
   { rel: "icon", type: "image/png", sizes: "32x32", href: favicon32 },
   { rel: "icon", type: "image/png", sizes: "16x16", href: favicon16 },
   { rel: "shortcut icon", href: faviconIco },
-  { rel: "manifest", href: `/site.webmanifest.json` },
+  { rel: "apple-touch-icon", sizes: "180x180", href: appleTouchIcon },
+  // Safari pinned tabs need a single-colour vector.
+  { rel: "mask-icon", href: faviconFlatSvg, color: "#B4763A" },
+  { rel: "manifest", href: "/site.webmanifest.json" },
   { rel: "stylesheet", href: globalStyles },
   {
     rel: "preload",
@@ -47,6 +54,9 @@ export function Layout({ children }: { children: ReactNode }) {
       <head>
         <meta charSet="utf-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1" />
+        {/* Brand cream / ink, so the browser chrome matches the app rather than flashing white. */}
+        <meta name="theme-color" media="(prefers-color-scheme: light)" content="#F4F2EC" />
+        <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#0E1116" />
         <Meta />
         <Links />
       </head>

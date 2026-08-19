@@ -113,6 +113,8 @@ scripts/
 !packages/i18n/scripts/
 !apps/nestjs-api/scripts/
 !apps/nestjs-api/scripts/**
+!packages/propel/scripts/
+!packages/propel/scripts/**
 
 # i18n auto-generated types (regenerated on every build)
 packages/i18n/src/types/keys.generated.ts

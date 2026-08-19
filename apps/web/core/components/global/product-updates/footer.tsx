@@ -8,7 +8,7 @@ import { USER_TRACKER_ELEMENTS } from "@plane/constants";
 import { useTranslation } from "@plane/i18n";
 // ui
 import { getButtonStyling } from "@plane/propel/button";
-import { PlaneLogo } from "@plane/propel/icons";
+import { CyberneticsMark } from "@plane/propel/icons";
 // helpers
 import { cn } from "@plane/utils";
 
@@ -69,7 +69,7 @@ export function ProductUpdatesFooter() {
         )}
         rel="noreferrer"
       >
-        <PlaneLogo className="h-6 w-auto text-primary" />
+        <CyberneticsMark className="h-6 w-auto text-brand" />
         {t("powered_by_plane_pages")}
       </a>
     </div>

@@ -7,14 +7,14 @@
 import { addons } from "storybook/manager-api";
 import { create } from "storybook/theming";
 
-const planeTheme = create({
+const cyberneticsTheme = create({
   base: "dark",
-  brandTitle: "Plane UI",
-  brandUrl: "https://plane.so",
-  brandImage: "plane-lockup-light.svg",
+  brandTitle: "Cybernetics UI",
+  brandUrl: "/",
+  brandImage: "cybernetics-lockup-cream.svg",
   brandTarget: "_self",
 });
 
 addons.setConfig({
-  theme: planeTheme,
+  theme: cyberneticsTheme,
 });

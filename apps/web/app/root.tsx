@@ -14,11 +14,13 @@ import { SITE_DESCRIPTION, SITE_NAME } from "@plane/constants";
 import { cn } from "@plane/utils";
 // types
 // assets
+import appleTouchIcon from "@/app/assets/favicon/apple-touch-icon.png?url";
 import favicon16 from "@/app/assets/favicon/favicon-16x16.png?url";
 import favicon32 from "@/app/assets/favicon/favicon-32x32.png?url";
+import favicon96 from "@/app/assets/favicon/favicon-96x96.png?url";
+import faviconFlatSvg from "@/app/assets/favicon/favicon-flat.svg?url";
 import faviconIco from "@/app/assets/favicon/favicon.ico?url";
-import icon180 from "@/app/assets/icons/icon-180x180.png?url";
-import icon512 from "@/app/assets/icons/icon-512x512.png?url";
+import faviconSvg from "@/app/assets/favicon/favicon.svg?url";
 import ogImage from "@/app/assets/og-image.png?url";
 import globalStyles from "@/styles/globals.css?url";
 import type { Route } from "./+types/root";
@@ -38,14 +40,16 @@ import "@fontsource/ibm-plex-mono";
 const APP_TITLE = "Cybernetics | Simple, extensible, open-source project management tool.";
 
 export const links: LinksFunction = () => [
+  // Vector first — browsers that support it skip the raster fallbacks entirely.
+  { rel: "icon", type: "image/svg+xml", href: faviconSvg },
+  { rel: "icon", type: "image/png", sizes: "96x96", href: favicon96 },
   { rel: "icon", type: "image/png", sizes: "32x32", href: favicon32 },
   { rel: "icon", type: "image/png", sizes: "16x16", href: favicon16 },
   { rel: "shortcut icon", href: faviconIco },
+  { rel: "apple-touch-icon", sizes: "180x180", href: appleTouchIcon },
+  // Safari pinned tabs need a single-colour vector.
+  { rel: "mask-icon", href: faviconFlatSvg, color: "#B4763A" },
   { rel: "manifest", href: "/site.webmanifest.json" },
-  { rel: "apple-touch-icon", href: icon512 },
-  { rel: "apple-touch-icon", sizes: "180x180", href: icon180 },
-  { rel: "apple-touch-icon", sizes: "512x512", href: icon512 },
-  { rel: "manifest", href: "/manifest.json" },
   { rel: "stylesheet", href: globalStyles },
   {
     rel: "preload",
@@ -64,7 +68,9 @@ export function Layout({ children }: { children: ReactNode }) {
       <head>
         <meta charSet="utf-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1" />
-        <meta name="theme-color" content="#fff" />
+        {/* Brand cream / ink, so the browser chrome matches the app rather than flashing white. */}
+        <meta name="theme-color" media="(prefers-color-scheme: light)" content="#F4F2EC" />
+        <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#0E1116" />
         {/* Meta info for PWA */}
         <meta name="application-name" content="Cybernetics" />
         <meta name="apple-mobile-web-app-capable" content="yes" />

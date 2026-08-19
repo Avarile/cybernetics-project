@@ -85,4 +85,29 @@
       opacity: 1;
     }
   }
+
+  /* brand loader — the feedback loop rotating around the task-list glyph.
+     1.6s matches the loop length of the reference brand animation. */
+  --animate-brand-loop-spin: brandLoopSpin 1.6s linear infinite;
+  @keyframes brandLoopSpin {
+    from {
+      /* The mark's resting angle, so a paused loader sits on the brand mark. */
+      transform: rotate(-58deg);
+    }
+    to {
+      transform: rotate(302deg);
+    }
+  }
+
+  /* brand loader — rungs filling in, staggered by the consumer via animation-delay */
+  --animate-brand-loop-pulse: brandLoopPulse 1.6s ease-in-out infinite;
+  @keyframes brandLoopPulse {
+    0%,
+    100% {
+      opacity: 0.35;
+    }
+    50% {
+      opacity: 1;
+    }
+  }
 }

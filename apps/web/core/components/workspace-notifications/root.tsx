@@ -94,7 +94,7 @@ export const NotificationsRoot = observer(function NotificationsRoot({ workspace
             <>
               {projectMemberInfoLoader ? (
                 <div className="flex h-full w-full items-center justify-center">
-                  <LogoSpinner />
+                  <LogoSpinner size="md" />
                 </div>
               ) : (
                 <InboxContentRoot

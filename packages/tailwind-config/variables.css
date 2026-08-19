@@ -163,18 +163,27 @@
     --neutral-1200: oklch(0.2378 0.0029 230.83);
     --neutral-black: oklch(0.1472 0.0034 230.83);
     /* Brand colors */
-    --brand-100: oklch(0.9847 0.0083 236.56);
-    --brand-200: oklch(0.9715 0.0167 230.9);
-    --brand-300: oklch(0.9428 0.0341 230.22);
-    --brand-400: oklch(0.9008 0.0587 232);
-    --brand-500: oklch(0.8414 0.0947 233.08);
-    --brand-600: oklch(0.7649 0.1392 236.3);
-    --brand-700: oklch(0.6766 0.1665 243.91);
-    --brand-900: oklch(0.4347 0.104093 242.4823);
-    --brand-1000: oklch(0.3399 0.0783 240.32);
-    --brand-1100: oklch(0.2626 0.0578 237.5);
-    --brand-1200: oklch(0.2093 0.0438 234.02);
-    --brand-default: oklch(0.4799 0.1158 242.91);
+    /* Brand ramp — Cybernetics bronze, hue 62.42.
+       Every step keeps the lightness of the blue ramp it replaced, so contrast
+       against the text and canvas tokens is unchanged; only hue and chroma moved.
+       Chroma is capped at 80% of the sRGB gamut at each lightness, which is what
+       keeps the mid steps reading as bronze rather than amber. */
+    --brand-100: oklch(0.9847 0.0077 62.42);
+    --brand-200: oklch(0.9715 0.0145 62.42);
+    --brand-300: oklch(0.9428 0.0297 62.42);
+    --brand-400: oklch(0.9008 0.0531 62.42);
+    --brand-500: oklch(0.8414 0.0888 62.42);
+    --brand-600: oklch(0.7649 0.1305 62.42);
+    --brand-700: oklch(0.6766 0.1242 62.42);
+    --brand-900: oklch(0.4347 0.0799 62.42);
+    --brand-1000: oklch(0.3399 0.0626 62.42);
+    --brand-1100: oklch(0.2626 0.0486 62.42);
+    --brand-1200: oklch(0.2093 0.039 62.42);
+    --brand-default: oklch(0.4799 0.0881 62.42);
+    /* The literal brand accent, #B4763A. Identical in every theme: it is the
+       logo colour, so it must not shift. Only 3.35:1 against cream, so use it for
+       marks, decorative fills and large text — never for body text on a plate. */
+    --brand-accent: oklch(0.6193 0.1086 62.42);
     /* Green/Success colors */
     --green-100: oklch(0.9819 0.0181 155.83);
     --green-200: oklch(0.9624 0.0434 156.74);
@@ -286,6 +295,8 @@
     --txt-placeholder: var(--neutral-900);
     --txt-disabled: var(--neutral-800);
     --txt-accent-primary: var(--brand-default);
+    /* The logo colour. Fixed across themes, for marks and brand lockups only. */
+    --txt-brand: var(--brand-accent);
     --txt-accent-secondary: var(--brand-700);
     --txt-on-color: var(--neutral-100);
     --txt-on-color-disabled: var(--alpha-black-400);
@@ -414,18 +425,22 @@
       --neutral-1200: oklch(0.9235 0.001733 230.6853);
       --neutral-white: oklch(0.9702 0 0);
       /* Brand colors */
-      --brand-100: oklch(0.2029 0.03 232.24);
-      --brand-200: oklch(0.2513 0.0418 234.6);
-      --brand-300: oklch(0.3208 0.05806 236.44);
-      --brand-400: oklch(0.4088 0.077702 237.13);
-      --brand-500: oklch(0.4511 0.087024 237.37);
-      --brand-700: oklch(0.7408 0.100309 233.89);
-      --brand-800: oklch(0.8318 0.065614 232.07);
-      --brand-900: oklch(0.8969 0.040089 231.35);
-      --brand-1000: oklch(0.9409 0.022883 231.01);
-      --brand-1100: oklch(0.9704 0.011421 230.82);
-      --brand-1200: oklch(0.9856 0.005 228.82);
-      --brand-default: oklch(0.6311 0.126281 238.01);
+      /* Bronze ramp, inverted for dark surfaces. Same rule as the light ramp:
+         lightness preserved from the blue it replaced, hue and chroma moved. */
+      --brand-100: oklch(0.2029 0.0281 62.42);
+      --brand-200: oklch(0.2513 0.0392 62.42);
+      --brand-300: oklch(0.3208 0.0545 62.42);
+      --brand-400: oklch(0.4088 0.0729 62.42);
+      --brand-500: oklch(0.4511 0.0816 62.42);
+      --brand-700: oklch(0.7408 0.0941 62.42);
+      --brand-800: oklch(0.8318 0.0615 62.42);
+      --brand-900: oklch(0.8969 0.0376 62.42);
+      --brand-1000: oklch(0.9409 0.0215 62.42);
+      --brand-1100: oklch(0.9704 0.0107 62.42);
+      --brand-1200: oklch(0.9856 0.0047 62.42);
+      --brand-default: oklch(0.6311 0.1158 62.42);
+      /* Unchanged across themes — see the note on the light ramp. */
+      --brand-accent: oklch(0.6193 0.1086 62.42);
       /* Green colors */
       --green-100: oklch(0.2721 0.067322 152.52);
       --green-200: oklch(0.3935 0.0957 152.28);
@@ -536,6 +551,8 @@
       --txt-placeholder: var(--neutral-900);
       --txt-disabled: var(--neutral-800);
       --txt-accent-primary: var(--brand-default);
+      /* Unchanged from the light theme — the logo must not shift colour. */
+      --txt-brand: var(--brand-accent);
       --txt-accent-secondary: var(--brand-700);
       --txt-on-color: var(--neutral-1200);
       --txt-on-color-disabled: var(--alpha-white-400);
@@ -841,6 +858,7 @@
   --text-color-disabled: var(--txt-disabled);
   --text-color-accent-primary: var(--txt-accent-primary);
   --text-color-accent-secondary: var(--txt-accent-secondary);
+  --text-color-brand: var(--txt-brand);
   --text-color-on-color: var(--txt-on-color);
   --text-color-on-color-disabled: var(--txt-on-color-disabled);
   --text-color-inverse: var(--txt-inverse);

@@ -4,18 +4,22 @@
  * See the LICENSE file for details.
  */
 
-import { useTheme } from "next-themes";
-import LogoSpinnerDark from "@/app/assets/images/logo-spinner-dark.gif?url";
-import LogoSpinnerLight from "@/app/assets/images/logo-spinner-light.gif?url";
+import { CyberneticsLoader, type TCyberneticsLoaderSize } from "@plane/propel/icons";
 
-export function LogoSpinner() {
-  const { resolvedTheme } = useTheme();
+type TLogoSpinnerProps = {
+  /** `lg` for full-page waits (the default), `md` for panels and inline regions. */
+  size?: TCyberneticsLoaderSize;
+  className?: string;
+};
 
-  const logoSrc = resolvedTheme === "dark" ? LogoSpinnerLight : LogoSpinnerDark;
-
+/**
+ * The brand loading state. Drawn rather than played back from a GIF, so it needs
+ * no per-theme asset and follows the accent token into every theme.
+ */
+export function LogoSpinner({ size = "lg", className }: TLogoSpinnerProps) {
   return (
     <div className="flex items-center justify-center">
-      <img src={logoSrc} alt="logo" className="h-6 w-auto sm:h-11" />
+      <CyberneticsLoader size={size} className={className ?? "text-accent-primary"} />
     </div>
   );
 }

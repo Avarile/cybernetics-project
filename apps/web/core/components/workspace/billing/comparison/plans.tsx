@@ -749,7 +749,7 @@ export const PLANS_COMPARISON_LIST: TPlansComparisonDetails[] = [
       },
       {
         title: "API-enabled Audit Logs",
-        description: "See a full-workspace audit log and use APIs to flag\nPybernetics activity in compliance systems.",
+        description: "See a full-workspace audit log and use APIs to flag\nsuspicious activity in compliance systems.",
         comingSoon: true,
         cloud: {
           free: false,

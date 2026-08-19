@@ -1,0 +1,15 @@
+<!--
+  Android adaptive-icon source. Full-bleed bronze with no corner radius (the
+  launcher applies its own mask), and the glyph scaled to 41% of the canvas so it
+  survives the most aggressive circular crop. Derived from app-icon.svg; the
+  0.78125 factor takes that file's 52.5% glyph down to 41%.
+-->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="512" height="512">
+  <rect width="32" height="32" fill="#B4763A"></rect>
+  <g transform="translate(16 16) scale(0.78125) translate(-16 -16)">
+    <rect x="7.6" y="7.6" width="3.4" height="16.8" fill="#F4F2EC"></rect>
+    <rect x="13.4" y="8.6" width="8" height="3.4" fill="#F4F2EC"></rect>
+    <rect x="13.4" y="14.3" width="11" height="3.4" fill="#F4F2EC"></rect>
+    <rect x="13.4" y="20" width="5.6" height="3.4" fill="#F4F2EC"></rect>
+  </g>
+</svg>

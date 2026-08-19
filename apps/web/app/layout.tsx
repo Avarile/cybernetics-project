@@ -16,11 +16,13 @@ import { SITE_DESCRIPTION, SITE_NAME } from "@plane/constants";
 import { cn } from "@plane/utils";
 
 // assets
+import appleTouchIcon from "@/app/assets/favicon/apple-touch-icon.png?url";
 import favicon16 from "@/app/assets/favicon/favicon-16x16.png?url";
 import favicon32 from "@/app/assets/favicon/favicon-32x32.png?url";
+import favicon96 from "@/app/assets/favicon/favicon-96x96.png?url";
+import faviconFlatSvg from "@/app/assets/favicon/favicon-flat.svg?url";
 import faviconIco from "@/app/assets/favicon/favicon.ico?url";
-import icon180 from "@/app/assets/icons/icon-180x180.png?url";
-import icon512 from "@/app/assets/icons/icon-512x512.png?url";
+import faviconSvg from "@/app/assets/favicon/favicon.svg?url";
 
 // local
 import { AppProvider } from "./provider";
@@ -62,11 +64,18 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="en">
       <head>
-        <meta name="theme-color" content="#fff" />
+        {/* Brand cream / ink, so the browser chrome matches the app rather than flashing white. */}
+        <meta name="theme-color" media="(prefers-color-scheme: light)" content="#F4F2EC" />
+        <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#0E1116" />
+        {/* Vector first — browsers that support it skip the raster fallbacks entirely. */}
+        <link rel="icon" type="image/svg+xml" href={faviconSvg} />
+        <link rel="icon" type="image/png" sizes="96x96" href={favicon96} />
         <link rel="icon" type="image/png" sizes="32x32" href={favicon32} />
         <link rel="icon" type="image/png" sizes="16x16" href={favicon16} />
         <link rel="manifest" href="/site.webmanifest.json" />
         <link rel="shortcut icon" href={faviconIco} />
+        {/* Safari pinned tabs need a single-colour vector. */}
+        <link rel="mask-icon" href={faviconFlatSvg} color="#B4763A" />
         {/* Meta info for PWA */}
         <meta name="application-name" content="Cybernetics" />
         <meta name="apple-mobile-web-app-capable" content="yes" />
@@ -74,10 +83,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <meta name="apple-mobile-web-app-title" content={SITE_NAME} />
         <meta name="format-detection" content="telephone=no" />
         <meta name="mobile-web-app-capable" content="yes" />
-        <link rel="apple-touch-icon" href={icon512} />
-        <link rel="apple-touch-icon" sizes="180x180" href={icon180} />
-        <link rel="apple-touch-icon" sizes="512x512" href={icon512} />
-        <link rel="manifest" href="/manifest.json" />
+        <link rel="apple-touch-icon" sizes="180x180" href={appleTouchIcon} />
       </head>
       <body>
         <div id="context-menu-portal" />

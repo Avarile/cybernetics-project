@@ -6,7 +6,7 @@
 
 import React from "react";
 import Link from "next/link";
-import { PlaneLogo } from "@plane/propel/icons";
+import { CyberneticsLockup } from "@plane/propel/icons";
 import { AuthDescContent } from "./desc-content";
 import { AuthFooter } from "./footer";
 
@@ -25,9 +25,8 @@ export function AuthShell({ headerAction, children }: TAuthShellProps) {
   return (
     <div className="relative z-10 h-full w-full overflow-x-hidden overflow-y-auto">
       <div className="flex min-h-full w-full">
-        <Link href="/" className="fixed top-5 left-5 z-20 flex flex-none items-center gap-2">
-          <PlaneLogo height={32} width={32} className="text-primary" />
-          <span className="text-body-md-semibold text-primary">Cybernetics</span>
+        <Link href="/" className="fixed top-5 left-5 z-20 flex flex-none items-center">
+          <CyberneticsLockup height={32} width={162} className="text-brand" />
         </Link>
         <AuthDescContent />
         <div className="relative flex flex-1 shrink-0 flex-col items-center justify-center">
