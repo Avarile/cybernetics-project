@@ -28,4 +28,4 @@ export const WORDMARK_PATH =
 export const LOCKUP_WORDMARK_TRANSFORM = "translate(34 7.68) scale(0.0229)";
 
 /** Total width of the mark + gap + wordmark lockup, at a height of 32. */
-export const LOCKUP_WIDTH = 162;
+export const LOCKUP_WIDTH = 200;
