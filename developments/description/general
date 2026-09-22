@@ -1,0 +1,45 @@
+apps/admin: instance admin panel ("God Mode")
+
+  - A React Router app that builds to static files and runs on port 3001 (VITE_ADMIN_BASE_PATH, usually served at /god-mode).
+  - It's for whoever runs the Plane installation, not for regular workspace users. Its sections are in admin/app/(all)/(dashboard)/:
+    - general: instance name and settings
+    - email: SMTP setup
+    - authentication: sign-in options, including Google, GitHub, GitLab and Gitea OAuth
+    - ai: API keys for AI features
+    - image: Unsplash and other image settings
+    - workspace: listing and creating workspaces
+  - The home route handles first-time instance setup, where the first admin account is created.
+
+  apps/space: public, read-only project views
+
+  - A React Router app with server-side rendering, on port 3002 (VITE_SPACE_BASE_PATH, usually /spaces).
+  - When a project is published in Plane, anyone with the link can view its issue board (list, kanban and so on) here without logging in. Depending on the
+    publish settings, visitors can also comment, react or vote.
+  - There are only a few routes (space/app/routes.ts):
+    - /issues/:anchor is the published board, looked up by its public anchor token.
+    - /:workspaceSlug/:projectId resolves to that anchor.
+
+  apps/live: real-time collaboration server
+
+  - A Node/Express backend with no UI, built on Hocuspocus (a server for Yjs, the shared-editing library). It powers multi-user editing in Plane's rich-text
+    editor, mainly Pages.
+  - Editors connect over a WebSocket (/collaboration), and Yjs keeps everyone's copies in sync.
+  - extensions/database.ts loads each document's content from the main API and saves changes back as binary, HTML and JSON.
+  - extensions/redis.ts uses Redis to keep several live instances in sync, so it can scale horizontally.
+  - It also has two helper endpoints: /convert-document (converts between document formats) and /pdf-export.
+
+  How they fit together
+
+  ┌───────┬───────────────────────────┬──────────────────────────┐
+  │  App  │        Who uses it        │         Talks to         │
+  ├───────┼───────────────────────────┼──────────────────────────┤
+  │ web   │ Workspace members         │ API                      │
+  ├───────┼───────────────────────────┼──────────────────────────┤
+  │ admin │ Instance operator         │ API (instance endpoints) │
+  ├───────┼───────────────────────────┼──────────────────────────┤
+  │ space │ Anonymous public visitors │ API (public endpoints)   │
+  ├───────┼───────────────────────────┼──────────────────────────┤
+  │ live  │ The editor inside web     │ API + Redis              │
+  └───────┴───────────────────────────┴──────────────────────────┘
+
+  All four depend on the Django API in apps/api. admin, space and web are frontends, and live is a separate backend just for collaborative editing.
