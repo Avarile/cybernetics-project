@@ -65,6 +65,84 @@
       "title": "Verbindungen",
       "heading": "Verbindungen",
       "description": "Verwalten Sie Ihre Arbeitsbereich-Verbindungseinstellungen."
+    },
+    "mcp": {
+      "title": "MCP-Server",
+      "description": "Einen KI-Assistenten über das Model Context Protocol mit Cybernetics verbinden.",
+      "copy": "Kopieren",
+      "copied": "In die Zwischenablage kopiert",
+      "endpoint": {
+        "title": "Endpunkt",
+        "transport": "Streamable HTTP",
+        "stateless": "Zustandslos",
+        "hint": "Verfügbar, wenn die API mit MCP_SERVER_ENABLED=1 läuft.",
+        "test": "Verbindung testen",
+        "testing": "Test läuft",
+        "connected": "{count, plural, one {Verbunden, # Tool verfügbar} other {Verbunden, # Tools verfügbar}}",
+        "unauthorized": "Dieses Token wurde abgelehnt. Ein neues erzeugen.",
+        "unreachable": "Der Endpunkt ist nicht erreichbar.",
+        "cross_origin": "Im lokalen Development nicht über den Browser prüfbar.",
+        "needs_token": "Für den Test ein Token hinzufügen."
+      },
+      "token": {
+        "title": "1. Token hinzufügen",
+        "description": "Der Assistent meldet sich mit einem persönlichen Zugriffstoken an und handelt im Namen der Token-Inhaberin oder des Token-Inhabers, mit denselben Berechtigungen. Das Token bleibt nur auf dieser Seite und wird vom Browser nie gespeichert.",
+        "generate": "Token erzeugen",
+        "use_existing": "Vorhandenes Token verwenden",
+        "ready": "Token bereit",
+        "clear": "Löschen",
+        "paste_placeholder": "Ein Token einfügen, das mit plane_api_ beginnt",
+        "revoke_hint": "Ein Token jederzeit widerrufen unter"
+      },
+      "clients": {
+        "title": "2. Assistenten verbinden",
+        "description": "Den Server einmal pro Assistent hinzufügen. Die Konfiguration unten enthält Endpunkt und Token bereits.",
+        "needs_token": "Zuerst ein Token hinzufügen.",
+        "claude-code": {
+          "name": "Claude Code",
+          "help": "Diesen Befehl im Terminal ausführen."
+        },
+        "cursor": {
+          "name": "Cursor",
+          "help": "Mit einem Klick installieren oder die Datei manuell anlegen.",
+          "install": "Zu Cursor hinzufügen"
+        },
+        "vscode": {
+          "name": "VS Code",
+          "help": "Mit einem Klick installieren oder die Datei manuell anlegen.",
+          "install": "Zu VS Code hinzufügen"
+        },
+        "claude-desktop": {
+          "name": "Claude Desktop",
+          "help": "Claude Desktop akzeptiert für eigene Connectors nur eine URL, daher vermittelt diese Konfiguration über mcp-remote."
+        },
+        "other": {
+          "name": "Andere",
+          "help": "Jeden Client mit Streamable HTTP auf diesen Endpunkt richten und das Token im Authorization-Header senden."
+        }
+      },
+      "tools": {
+        "title": "Tools",
+        "description": "Was ein Assistent nach dem Verbinden tun kann. Die Beschreibungen erscheinen auf Englisch, genau so, wie der Assistent sie erhält.",
+        "count": "{count, plural, one {# Tool} other {# Tools}}",
+        "search_placeholder": "Tools durchsuchen",
+        "no_matches": "Keine Tools passen zu dieser Suche.",
+        "footnote": "Mit MCP_READ_ONLY=1 stellt die API nur die Lese-Tools bereit.",
+        "modes": {
+          "read": "Lesen",
+          "write": "Schreiben",
+          "destructive": "Löschen"
+        },
+        "groups": {
+          "context": "Konto",
+          "projects": "Projekte und Metadaten",
+          "work_items": "Arbeitselemente",
+          "work_item_extras": "Kommentare, Links und Verlauf",
+          "cycles": "Zyklen",
+          "modules": "Module",
+          "intake": "Intake"
+        }
+      }
     }
   },
   "profile": {
@@ -103,7 +181,8 @@
       "preferences": "Einstellungen",
       "notifications": "Benachrichtigungen",
       "api-tokens": "Persönliche Zugriffstoken",
-      "connections": "Verbindungen"
+      "connections": "Verbindungen",
+      "mcp": "MCP-Server"
     },
     "tabs": {
       "summary": "Zusammenfassung",

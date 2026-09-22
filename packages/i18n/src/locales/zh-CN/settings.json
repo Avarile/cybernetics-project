@@ -65,6 +65,84 @@
       "title": "连接",
       "heading": "连接",
       "description": "管理您的工作区连接设置。"
+    },
+    "mcp": {
+      "title": "MCP 服务器",
+      "description": "通过 Model Context Protocol 将 AI 助手连接到 Cybernetics。",
+      "copy": "复制",
+      "copied": "已复制到剪贴板",
+      "endpoint": {
+        "title": "端点",
+        "transport": "Streamable HTTP",
+        "stateless": "无状态",
+        "hint": "当 API 以 MCP_SERVER_ENABLED=1 运行时可用。",
+        "test": "测试连接",
+        "testing": "正在测试",
+        "connected": "{count, plural, one {已连接，可用工具 # 个} other {已连接，可用工具 # 个}}",
+        "unauthorized": "该令牌已被拒绝。请生成新的令牌。",
+        "unreachable": "无法访问该端点。",
+        "cross_origin": "在本地开发环境中无法从浏览器验证。",
+        "needs_token": "请添加令牌以测试连接。"
+      },
+      "token": {
+        "title": "1. 添加令牌",
+        "description": "助手使用个人访问令牌登录，并以令牌所有者的身份和相同权限执行操作。令牌仅保留在此页面，浏览器不会保存它。",
+        "generate": "生成令牌",
+        "use_existing": "使用现有令牌",
+        "ready": "令牌已就绪",
+        "clear": "清除",
+        "paste_placeholder": "粘贴以 plane_api_ 开头的令牌",
+        "revoke_hint": "您可以随时在此撤销令牌"
+      },
+      "clients": {
+        "title": "2. 连接您的助手",
+        "description": "每个助手添加一次服务器。下面的配置已包含端点和令牌。",
+        "needs_token": "请先添加令牌。",
+        "claude-code": {
+          "name": "Claude Code",
+          "help": "在终端中运行以下命令。"
+        },
+        "cursor": {
+          "name": "Cursor",
+          "help": "一键安装，或手动添加文件。",
+          "install": "添加到 Cursor"
+        },
+        "vscode": {
+          "name": "VS Code",
+          "help": "一键安装，或手动添加文件。",
+          "install": "添加到 VS Code"
+        },
+        "claude-desktop": {
+          "name": "Claude Desktop",
+          "help": "Claude Desktop 的自有连接器仅接受 URL，因此此配置通过 mcp-remote 转接。"
+        },
+        "other": {
+          "name": "其他",
+          "help": "将任何支持 Streamable HTTP 的客户端指向此端点，并在 Authorization 标头中发送令牌。"
+        }
+      },
+      "tools": {
+        "title": "工具",
+        "description": "连接后助手可以执行的操作。说明以英文显示，与助手收到的内容一致。",
+        "count": "{count, plural, one {# 个工具} other {# 个工具}}",
+        "search_placeholder": "搜索工具",
+        "no_matches": "没有匹配的工具。",
+        "footnote": "当 API 以 MCP_READ_ONLY=1 运行时，仅提供只读工具。",
+        "modes": {
+          "read": "读取",
+          "write": "写入",
+          "destructive": "删除"
+        },
+        "groups": {
+          "context": "账户",
+          "projects": "项目与元数据",
+          "work_items": "工作项",
+          "work_item_extras": "评论、链接与历史",
+          "cycles": "周期",
+          "modules": "模块",
+          "intake": "Intake"
+        }
+      }
     }
   },
   "profile": {
@@ -103,7 +181,8 @@
       "preferences": "偏好设置",
       "notifications": "通知",
       "api-tokens": "个人访问令牌",
-      "connections": "连接"
+      "connections": "连接",
+      "mcp": "MCP 服务器"
     },
     "tabs": {
       "summary": "摘要",

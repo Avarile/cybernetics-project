@@ -65,6 +65,84 @@
       "title": "連接",
       "heading": "連接",
       "description": "管理您的工作區連接設定。"
+    },
+    "mcp": {
+      "title": "MCP 伺服器",
+      "description": "透過 Model Context Protocol 將 AI 助理連接到 Cybernetics。",
+      "copy": "複製",
+      "copied": "已複製到剪貼簿",
+      "endpoint": {
+        "title": "端點",
+        "transport": "Streamable HTTP",
+        "stateless": "無狀態",
+        "hint": "當 API 以 MCP_SERVER_ENABLED=1 執行時可用。",
+        "test": "測試連線",
+        "testing": "正在測試",
+        "connected": "{count, plural, one {已連線，可用工具 # 個} other {已連線，可用工具 # 個}}",
+        "unauthorized": "此權杖已被拒絕。請產生新的權杖。",
+        "unreachable": "無法連線到該端點。",
+        "cross_origin": "在本機開發環境中無法從瀏覽器驗證。",
+        "needs_token": "請新增權杖以測試連線。"
+      },
+      "token": {
+        "title": "1. 新增權杖",
+        "description": "助理使用個人存取權杖登入，並以權杖擁有者的身分和相同權限執行操作。權杖僅保留在此頁面，瀏覽器不會儲存它。",
+        "generate": "產生權杖",
+        "use_existing": "使用現有權杖",
+        "ready": "權杖已就緒",
+        "clear": "清除",
+        "paste_placeholder": "貼上以 plane_api_ 開頭的權杖",
+        "revoke_hint": "您可以隨時在此撤銷權杖"
+      },
+      "clients": {
+        "title": "2. 連接您的助理",
+        "description": "每個助理新增一次伺服器。下方設定已包含端點與權杖。",
+        "needs_token": "請先新增權杖。",
+        "claude-code": {
+          "name": "Claude Code",
+          "help": "在終端機中執行以下指令。"
+        },
+        "cursor": {
+          "name": "Cursor",
+          "help": "一鍵安裝，或手動新增檔案。",
+          "install": "新增至 Cursor"
+        },
+        "vscode": {
+          "name": "VS Code",
+          "help": "一鍵安裝，或手動新增檔案。",
+          "install": "新增至 VS Code"
+        },
+        "claude-desktop": {
+          "name": "Claude Desktop",
+          "help": "Claude Desktop 的自有連接器僅接受 URL，因此此設定透過 mcp-remote 轉接。"
+        },
+        "other": {
+          "name": "其他",
+          "help": "將任何支援 Streamable HTTP 的用戶端指向此端點，並在 Authorization 標頭中傳送權杖。"
+        }
+      },
+      "tools": {
+        "title": "工具",
+        "description": "連線後助理可以執行的操作。說明以英文顯示，與助理收到的內容一致。",
+        "count": "{count, plural, one {# 個工具} other {# 個工具}}",
+        "search_placeholder": "搜尋工具",
+        "no_matches": "沒有符合的工具。",
+        "footnote": "當 API 以 MCP_READ_ONLY=1 執行時，僅提供唯讀工具。",
+        "modes": {
+          "read": "讀取",
+          "write": "寫入",
+          "destructive": "刪除"
+        },
+        "groups": {
+          "context": "帳戶",
+          "projects": "專案與中繼資料",
+          "work_items": "工作事項",
+          "work_item_extras": "留言、連結與歷程",
+          "cycles": "週期",
+          "modules": "模組",
+          "intake": "Intake"
+        }
+      }
     }
   },
   "profile": {
@@ -103,7 +181,8 @@
       "preferences": "偏好設定",
       "notifications": "通知",
       "api-tokens": "個人存取權杖",
-      "connections": "連接"
+      "connections": "連接",
+      "mcp": "MCP 伺服器"
     },
     "tabs": {
       "summary": "摘要",

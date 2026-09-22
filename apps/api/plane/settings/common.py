@@ -153,6 +153,14 @@ REST_FRAMEWORK = {
 # API key throttle rate (DRF SimpleRateThrottle format, e.g. "60/minute")
 API_KEY_RATE_LIMIT = os.environ.get("API_KEY_RATE_LIMIT", "60/minute")
 
+# MCP (Model Context Protocol) server, mounted on the ASGI app (see plane/mcp)
+MCP_SERVER_ENABLED = os.environ.get("MCP_SERVER_ENABLED", "0") == "1"
+MCP_PATH = "/" + os.environ.get("MCP_PATH", "/api/mcp").strip("/")
+MCP_READ_ONLY = os.environ.get("MCP_READ_ONLY", "0") == "1"
+# Comma separated Host header allowlist for DNS-rebinding protection; defaults to ALLOWED_HOSTS
+MCP_ALLOWED_HOSTS = [h.strip() for h in os.environ.get("MCP_ALLOWED_HOSTS", "").split(",") if h.strip()]
+MCP_LOOPBACK_TIMEOUT = float(os.environ.get("MCP_LOOPBACK_TIMEOUT", "30"))
+
 # Django Auth Backend
 AUTHENTICATION_BACKENDS = ("django.contrib.auth.backends.ModelBackend",)  # default
 

@@ -65,6 +65,84 @@
       "title": "Koneksi",
       "heading": "Koneksi",
       "description": "Kelola pengaturan koneksi ruang kerja Anda."
+    },
+    "mcp": {
+      "title": "Server MCP",
+      "description": "Hubungkan asisten AI ke Cybernetics melalui Model Context Protocol.",
+      "copy": "Salin",
+      "copied": "Disalin ke papan klip",
+      "endpoint": {
+        "title": "Endpoint",
+        "transport": "Streamable HTTP",
+        "stateless": "Tanpa status",
+        "hint": "Tersedia saat API berjalan dengan MCP_SERVER_ENABLED=1.",
+        "test": "Uji koneksi",
+        "testing": "Menguji",
+        "connected": "{count, plural, one {Terhubung, # alat tersedia} other {Terhubung, # alat tersedia}}",
+        "unauthorized": "Token tersebut ditolak. Buat token baru.",
+        "unreachable": "Tidak dapat menjangkau endpoint.",
+        "cross_origin": "Tidak dapat diperiksa dari browser saat pengembangan lokal.",
+        "needs_token": "Tambahkan token untuk menguji koneksi."
+      },
+      "token": {
+        "title": "1. Tambahkan token",
+        "description": "Asisten masuk dengan token akses personal dan bertindak atas nama pemilik token, dengan izin yang sama. Token hanya berada di halaman ini dan tidak pernah disimpan oleh browser.",
+        "generate": "Buat token",
+        "use_existing": "Gunakan token yang ada",
+        "ready": "Token siap",
+        "clear": "Hapus",
+        "paste_placeholder": "Tempel token yang dimulai dengan plane_api_",
+        "revoke_hint": "Anda dapat mencabut token kapan saja di"
+      },
+      "clients": {
+        "title": "2. Hubungkan asisten Anda",
+        "description": "Tambahkan server sekali untuk setiap asisten. Konfigurasi di bawah sudah memuat endpoint dan token.",
+        "needs_token": "Tambahkan token terlebih dahulu.",
+        "claude-code": {
+          "name": "Claude Code",
+          "help": "Jalankan ini di terminal."
+        },
+        "cursor": {
+          "name": "Cursor",
+          "help": "Pasang dengan satu klik, atau tambahkan berkas secara manual.",
+          "install": "Tambahkan ke Cursor"
+        },
+        "vscode": {
+          "name": "VS Code",
+          "help": "Pasang dengan satu klik, atau tambahkan berkas secara manual.",
+          "install": "Tambahkan ke VS Code"
+        },
+        "claude-desktop": {
+          "name": "Claude Desktop",
+          "help": "Claude Desktop hanya menerima URL untuk konektornya sendiri, sehingga konfigurasi ini menjembatani dengan mcp-remote."
+        },
+        "other": {
+          "name": "Lainnya",
+          "help": "Arahkan klien apa pun yang mendukung Streamable HTTP ke endpoint ini dan kirim token di header Authorization."
+        }
+      },
+      "tools": {
+        "title": "Alat",
+        "description": "Yang dapat dilakukan asisten setelah terhubung. Deskripsi ditampilkan dalam bahasa Inggris, persis seperti yang diterima asisten.",
+        "count": "{count, plural, one {# alat} other {# alat}}",
+        "search_placeholder": "Cari alat",
+        "no_matches": "Tidak ada alat yang cocok dengan pencarian itu.",
+        "footnote": "Dengan MCP_READ_ONLY=1, API hanya menyediakan alat baca.",
+        "modes": {
+          "read": "Baca",
+          "write": "Tulis",
+          "destructive": "Hapus"
+        },
+        "groups": {
+          "context": "Akun",
+          "projects": "Proyek dan metadata",
+          "work_items": "Item kerja",
+          "work_item_extras": "Komentar, tautan, dan riwayat",
+          "cycles": "Siklus",
+          "modules": "Modul",
+          "intake": "Intake"
+        }
+      }
     }
   },
   "profile": {
@@ -103,7 +181,8 @@
       "preferences": "Preferensi",
       "notifications": "Notifikasi",
       "api-tokens": "Token Akses Personal",
-      "connections": "Koneksi"
+      "connections": "Koneksi",
+      "mcp": "Server MCP"
     },
     "tabs": {
       "summary": "Ringkasan",

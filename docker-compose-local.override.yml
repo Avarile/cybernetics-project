@@ -1,0 +1,29 @@
+# Runs the Django stack against the shared `platform` infra (external `backbone` network,
+# which aliases plane-db/plane-redis/plane-mq/plane-minio) instead of the bundled services.
+# Not auto-loaded: pass it with -f after docker-compose-local.yml.
+services:
+  plane-db:
+    profiles: [bundled-infra]
+  plane-redis:
+    profiles: [bundled-infra]
+  plane-mq:
+    profiles: [bundled-infra]
+  plane-minio:
+    profiles: [bundled-infra]
+
+  api:
+    networks: !override [backbone]
+    depends_on: !reset null
+  worker:
+    networks: !override [backbone]
+    depends_on: !reset null
+  beat-worker:
+    networks: !override [backbone]
+    depends_on: !reset null
+  migrator:
+    networks: !override [backbone]
+    depends_on: !reset null
+
+networks:
+  backbone:
+    external: true

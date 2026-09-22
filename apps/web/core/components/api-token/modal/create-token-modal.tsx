@@ -21,13 +21,15 @@ import { GeneratedTokenDetails } from "./generated-token-details";
 type Props = {
   isOpen: boolean;
   onClose: () => void;
+  /** Called with the new token, whose secret is only available right after creation. */
+  onGenerated?: (token: IApiToken) => void;
 };
 
 // services
 const apiTokenService = new APITokenService();
 
 export function CreateApiTokenModal(props: Props) {
-  const { isOpen, onClose } = props;
+  const { isOpen, onClose, onGenerated } = props;
   // states
   const [neverExpires, setNeverExpires] = useState<boolean>(false);
   const [generatedToken, setGeneratedToken] = useState<IApiToken | null | undefined>(null);
@@ -59,6 +61,7 @@ export function CreateApiTokenModal(props: Props) {
       .then((res) => {
         setGeneratedToken(res);
         downloadSecretKey(res);
+        onGenerated?.(res);
 
         mutate<IApiToken[]>(
           API_TOKENS_LIST,

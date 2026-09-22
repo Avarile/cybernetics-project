@@ -31,11 +31,14 @@ django-storages==1.14.2
 # user management
 django-crum==0.7.9
 # web server
-uvicorn==0.29.0
+uvicorn==0.53.0
 # sockets
 channels==4.1.0
 # ai
 openai==1.63.2
+# mcp (model context protocol) server
+mcp==2.2.0
+httpx==0.28.1
 # slack
 slack-sdk==3.27.1
 # apm

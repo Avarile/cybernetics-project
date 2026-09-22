@@ -65,6 +65,84 @@
       "title": "커넥션",
       "heading": "커넥션",
       "description": "작업 공간 연결 설정을 관리하세요."
+    },
+    "mcp": {
+      "title": "MCP 서버",
+      "description": "Model Context Protocol을 통해 AI 어시스턴트를 Cybernetics에 연결합니다.",
+      "copy": "복사",
+      "copied": "클립보드에 복사했습니다",
+      "endpoint": {
+        "title": "엔드포인트",
+        "transport": "Streamable HTTP",
+        "stateless": "무상태",
+        "hint": "API가 MCP_SERVER_ENABLED=1로 실행될 때 사용할 수 있습니다.",
+        "test": "연결 테스트",
+        "testing": "테스트 중",
+        "connected": "{count, plural, one {연결됨, 도구 #개 사용 가능} other {연결됨, 도구 #개 사용 가능}}",
+        "unauthorized": "이 토큰은 거부되었습니다. 새 토큰을 생성하세요.",
+        "unreachable": "엔드포인트에 연결할 수 없습니다.",
+        "cross_origin": "로컬 개발 환경에서는 브라우저로 확인할 수 없습니다.",
+        "needs_token": "연결을 테스트하려면 토큰을 추가하세요."
+      },
+      "token": {
+        "title": "1. 토큰 추가",
+        "description": "어시스턴트는 퍼스널 액세스 토큰으로 로그인하며, 토큰 소유자와 동일한 권한으로 동작합니다. 토큰은 이 페이지에만 남고 브라우저에 저장되지 않습니다.",
+        "generate": "토큰 생성",
+        "use_existing": "기존 토큰 사용",
+        "ready": "토큰 준비됨",
+        "clear": "지우기",
+        "paste_placeholder": "plane_api_로 시작하는 토큰을 붙여넣으세요",
+        "revoke_hint": "토큰은 언제든지 다음에서 취소할 수 있습니다"
+      },
+      "clients": {
+        "title": "2. 어시스턴트 연결",
+        "description": "어시스턴트마다 서버를 한 번 추가하세요. 아래 설정에는 엔드포인트와 토큰이 이미 포함되어 있습니다.",
+        "needs_token": "먼저 토큰을 추가하세요.",
+        "claude-code": {
+          "name": "Claude Code",
+          "help": "터미널에서 다음을 실행하세요."
+        },
+        "cursor": {
+          "name": "Cursor",
+          "help": "한 번의 클릭으로 설치하거나 파일을 직접 추가하세요.",
+          "install": "Cursor에 추가"
+        },
+        "vscode": {
+          "name": "VS Code",
+          "help": "한 번의 클릭으로 설치하거나 파일을 직접 추가하세요.",
+          "install": "VS Code에 추가"
+        },
+        "claude-desktop": {
+          "name": "Claude Desktop",
+          "help": "Claude Desktop은 자체 커넥터에서 URL만 허용하므로, 이 설정은 mcp-remote로 연결합니다."
+        },
+        "other": {
+          "name": "기타",
+          "help": "Streamable HTTP를 지원하는 클라이언트를 이 엔드포인트로 지정하고 토큰을 Authorization 헤더로 보내세요."
+        }
+      },
+      "tools": {
+        "title": "도구",
+        "description": "연결한 뒤 어시스턴트가 할 수 있는 작업입니다. 설명은 어시스턴트가 받는 그대로 영어로 표시됩니다.",
+        "count": "{count, plural, one {도구 #개} other {도구 #개}}",
+        "search_placeholder": "도구 검색",
+        "no_matches": "검색과 일치하는 도구가 없습니다.",
+        "footnote": "API를 MCP_READ_ONLY=1로 실행하면 읽기 도구만 제공됩니다.",
+        "modes": {
+          "read": "읽기",
+          "write": "쓰기",
+          "destructive": "삭제"
+        },
+        "groups": {
+          "context": "계정",
+          "projects": "프로젝트 및 메타데이터",
+          "work_items": "작업 항목",
+          "work_item_extras": "댓글, 링크, 기록",
+          "cycles": "사이클",
+          "modules": "모듈",
+          "intake": "Intake"
+        }
+      }
     }
   },
   "profile": {
@@ -103,7 +181,8 @@
       "preferences": "환경 설정",
       "notifications": "알림",
       "api-tokens": "퍼스널 액세스 토큰",
-      "connections": "커넥션"
+      "connections": "커넥션",
+      "mcp": "MCP 서버"
     },
     "tabs": {
       "summary": "요약",

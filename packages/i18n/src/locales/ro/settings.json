@@ -65,6 +65,84 @@
       "title": "Conexiuni",
       "heading": "Conexiuni",
       "description": "Gestionează setările conexiunilor spațiului tău de lucru."
+    },
+    "mcp": {
+      "title": "Server MCP",
+      "description": "Conectați un asistent AI la Cybernetics prin Model Context Protocol.",
+      "copy": "Copiați",
+      "copied": "Copiat în clipboard",
+      "endpoint": {
+        "title": "Punct final",
+        "transport": "Streamable HTTP",
+        "stateless": "Fără stare",
+        "hint": "Disponibil când API-ul rulează cu MCP_SERVER_ENABLED=1.",
+        "test": "Testați conexiunea",
+        "testing": "Se testează",
+        "connected": "{count, plural, one {Conectat, # instrument disponibil} few {Conectat, # instrumente disponibile} other {Conectat, # de instrumente disponibile}}",
+        "unauthorized": "Acest token a fost respins. Generați unul nou.",
+        "unreachable": "Punctul final nu poate fi accesat.",
+        "cross_origin": "Nu poate fi verificat din browser în dezvoltarea locală.",
+        "needs_token": "Adăugați un token pentru a testa conexiunea."
+      },
+      "token": {
+        "title": "1. Adăugați un token",
+        "description": "Asistentul se autentifică cu un token de acces personal și acționează în numele proprietarului tokenului, cu aceleași permisiuni. Rămâne doar pe această pagină și nu este salvat niciodată de browser.",
+        "generate": "Generați token",
+        "use_existing": "Folosiți un token existent",
+        "ready": "Token pregătit",
+        "clear": "Ștergeți",
+        "paste_placeholder": "Lipiți un token care începe cu plane_api_",
+        "revoke_hint": "Puteți revoca oricând un token din"
+      },
+      "clients": {
+        "title": "2. Conectați asistentul",
+        "description": "Adăugați serverul o singură dată pentru fiecare asistent. Configurația de mai jos include deja punctul final și tokenul.",
+        "needs_token": "Adăugați mai întâi un token.",
+        "claude-code": {
+          "name": "Claude Code",
+          "help": "Rulați această comandă în terminal."
+        },
+        "cursor": {
+          "name": "Cursor",
+          "help": "Instalați cu un clic sau adăugați fișierul manual.",
+          "install": "Adăugați în Cursor"
+        },
+        "vscode": {
+          "name": "VS Code",
+          "help": "Instalați cu un clic sau adăugați fișierul manual.",
+          "install": "Adăugați în VS Code"
+        },
+        "claude-desktop": {
+          "name": "Claude Desktop",
+          "help": "Claude Desktop acceptă doar un URL pentru propriile conectoare, așa că această configurație face legătura prin mcp-remote."
+        },
+        "other": {
+          "name": "Altele",
+          "help": "Îndreptați orice client compatibil cu Streamable HTTP către acest punct final și trimiteți tokenul în antetul Authorization."
+        }
+      },
+      "tools": {
+        "title": "Instrumente",
+        "description": "Ce poate face un asistent după conectare. Descrierile sunt afișate în engleză, exact cum le primește asistentul.",
+        "count": "{count, plural, one {# instrument} few {# instrumente} other {# de instrumente}}",
+        "search_placeholder": "Căutați instrumente",
+        "no_matches": "Niciun instrument nu corespunde căutării.",
+        "footnote": "Cu MCP_READ_ONLY=1, API-ul oferă doar instrumentele de citire.",
+        "modes": {
+          "read": "Citire",
+          "write": "Scriere",
+          "destructive": "Ștergere"
+        },
+        "groups": {
+          "context": "Cont",
+          "projects": "Proiecte și metadate",
+          "work_items": "Activități",
+          "work_item_extras": "Comentarii, linkuri și istoric",
+          "cycles": "Cicluri",
+          "modules": "Module",
+          "intake": "Intake"
+        }
+      }
     }
   },
   "profile": {
@@ -103,7 +181,8 @@
       "preferences": "Preferințe",
       "notifications": "Notificări",
       "api-tokens": "Tokenuri de acces personale",
-      "connections": "Conexiuni"
+      "connections": "Conexiuni",
+      "mcp": "Server MCP"
     },
     "tabs": {
       "summary": "Sumar",

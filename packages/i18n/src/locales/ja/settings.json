@@ -65,6 +65,84 @@
       "title": "接続",
       "heading": "接続",
       "description": "ワークスペースの接続設定を管理します。"
+    },
+    "mcp": {
+      "title": "MCP サーバー",
+      "description": "Model Context Protocol 経由で AI アシスタントを Cybernetics に接続します。",
+      "copy": "コピー",
+      "copied": "クリップボードにコピーしました",
+      "endpoint": {
+        "title": "エンドポイント",
+        "transport": "Streamable HTTP",
+        "stateless": "ステートレス",
+        "hint": "API を MCP_SERVER_ENABLED=1 で実行しているときに利用できます。",
+        "test": "接続をテスト",
+        "testing": "テスト中",
+        "connected": "{count, plural, one {接続しました。# 件のツールが利用できます} other {接続しました。# 件のツールが利用できます}}",
+        "unauthorized": "このトークンは拒否されました。新しいトークンを生成してください。",
+        "unreachable": "エンドポイントに接続できませんでした。",
+        "cross_origin": "ローカル開発ではブラウザーから確認できません。",
+        "needs_token": "接続をテストするにはトークンを追加してください。"
+      },
+      "token": {
+        "title": "1. トークンを追加する",
+        "description": "アシスタントは個人アクセストークンでサインインし、トークンの所有者として同じ権限で操作します。トークンはこのページ内にのみ保持され、ブラウザーに保存されることはありません。",
+        "generate": "トークンを生成",
+        "use_existing": "既存のトークンを使う",
+        "ready": "トークンの準備ができました",
+        "clear": "クリア",
+        "paste_placeholder": "plane_api_ で始まるトークンを貼り付けてください",
+        "revoke_hint": "トークンはいつでも次の場所で失効できます"
+      },
+      "clients": {
+        "title": "2. アシスタントを接続する",
+        "description": "サーバーはアシスタントごとに一度追加します。以下の設定にはエンドポイントとトークンが含まれています。",
+        "needs_token": "先にトークンを追加してください。",
+        "claude-code": {
+          "name": "Claude Code",
+          "help": "これをターミナルで実行してください。"
+        },
+        "cursor": {
+          "name": "Cursor",
+          "help": "ワンクリックでインストールするか、ファイルを手動で追加します。",
+          "install": "Cursor に追加"
+        },
+        "vscode": {
+          "name": "VS Code",
+          "help": "ワンクリックでインストールするか、ファイルを手動で追加します。",
+          "install": "VS Code に追加"
+        },
+        "claude-desktop": {
+          "name": "Claude Desktop",
+          "help": "Claude Desktop は独自のコネクターで URL のみを受け付けるため、この設定では mcp-remote を経由します。"
+        },
+        "other": {
+          "name": "その他",
+          "help": "Streamable HTTP に対応するクライアントをこのエンドポイントに向け、トークンを Authorization ヘッダーで送信してください。"
+        }
+      },
+      "tools": {
+        "title": "ツール",
+        "description": "接続後にアシスタントができることです。説明はアシスタントが受け取るとおり英語で表示されます。",
+        "count": "{count, plural, one {# 件のツール} other {# 件のツール}}",
+        "search_placeholder": "ツールを検索",
+        "no_matches": "検索に一致するツールはありません。",
+        "footnote": "API を MCP_READ_ONLY=1 で実行すると、読み取り専用のツールのみが提供されます。",
+        "modes": {
+          "read": "読み取り",
+          "write": "書き込み",
+          "destructive": "削除"
+        },
+        "groups": {
+          "context": "アカウント",
+          "projects": "プロジェクトとメタデータ",
+          "work_items": "作業項目",
+          "work_item_extras": "コメント、リンク、履歴",
+          "cycles": "サイクル",
+          "modules": "モジュール",
+          "intake": "Intake"
+        }
+      }
     }
   },
   "profile": {
@@ -103,7 +181,8 @@
       "preferences": "環境設定",
       "notifications": "通知",
       "api-tokens": "個人アクセストークン",
-      "connections": "接続"
+      "connections": "接続",
+      "mcp": "MCP サーバー"
     },
     "tabs": {
       "summary": "サマリー",

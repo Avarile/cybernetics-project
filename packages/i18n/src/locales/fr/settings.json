@@ -65,6 +65,84 @@
       "title": "Connexions",
       "heading": "Connexions",
       "description": "Gérez les paramètres de connexion de votre espace de travail."
+    },
+    "mcp": {
+      "title": "Serveur MCP",
+      "description": "Connectez un assistant IA à Cybernetics via le Model Context Protocol.",
+      "copy": "Copier",
+      "copied": "Copié dans le presse-papiers",
+      "endpoint": {
+        "title": "Point de terminaison",
+        "transport": "Streamable HTTP",
+        "stateless": "Sans état",
+        "hint": "Disponible lorsque l’API tourne avec MCP_SERVER_ENABLED=1.",
+        "test": "Tester la connexion",
+        "testing": "Test en cours",
+        "connected": "{count, plural, one {Connecté, # outil disponible} many {Connecté, # outils disponibles} other {Connecté, # outils disponibles}}",
+        "unauthorized": "Ce jeton a été refusé. Générez-en un nouveau.",
+        "unreachable": "Impossible de joindre le point de terminaison.",
+        "cross_origin": "Vérification impossible depuis le navigateur en développement local.",
+        "needs_token": "Ajoutez un jeton pour tester la connexion."
+      },
+      "token": {
+        "title": "1. Ajoutez un jeton",
+        "description": "L’assistant s’authentifie avec un jeton d’accès personnel et agit au nom du propriétaire du jeton, avec les mêmes permissions. Il reste uniquement sur cette page et n’est jamais enregistré par le navigateur.",
+        "generate": "Générer un jeton",
+        "use_existing": "Utiliser un jeton existant",
+        "ready": "Jeton prêt",
+        "clear": "Effacer",
+        "paste_placeholder": "Collez un jeton commençant par plane_api_",
+        "revoke_hint": "Révoquez un jeton à tout moment depuis"
+      },
+      "clients": {
+        "title": "2. Connectez votre assistant",
+        "description": "Ajoutez le serveur une fois par assistant. La configuration ci-dessous contient déjà le point de terminaison et le jeton.",
+        "needs_token": "Ajoutez d’abord un jeton.",
+        "claude-code": {
+          "name": "Claude Code",
+          "help": "Exécutez cette commande dans le terminal."
+        },
+        "cursor": {
+          "name": "Cursor",
+          "help": "Installez-le en un clic ou ajoutez le fichier manuellement.",
+          "install": "Ajouter à Cursor"
+        },
+        "vscode": {
+          "name": "VS Code",
+          "help": "Installez-le en un clic ou ajoutez le fichier manuellement.",
+          "install": "Ajouter à VS Code"
+        },
+        "claude-desktop": {
+          "name": "Claude Desktop",
+          "help": "Claude Desktop n’accepte qu’une URL pour ses propres connecteurs ; cette configuration fait donc le relais avec mcp-remote."
+        },
+        "other": {
+          "name": "Autre",
+          "help": "Pointez n’importe quel client compatible Streamable HTTP vers ce point de terminaison et envoyez le jeton dans l’en-tête Authorization."
+        }
+      },
+      "tools": {
+        "title": "Outils",
+        "description": "Ce qu’un assistant peut faire une fois connecté. Les descriptions sont affichées en anglais, telles que l’assistant les reçoit.",
+        "count": "{count, plural, one {# outil} many {# outils} other {# outils}}",
+        "search_placeholder": "Rechercher un outil",
+        "no_matches": "Aucun outil ne correspond à cette recherche.",
+        "footnote": "Avec MCP_READ_ONLY=1, l’API ne propose que les outils de lecture.",
+        "modes": {
+          "read": "Lecture",
+          "write": "Écriture",
+          "destructive": "Suppression"
+        },
+        "groups": {
+          "context": "Compte",
+          "projects": "Projets et métadonnées",
+          "work_items": "Éléments de travail",
+          "work_item_extras": "Commentaires, liens et historique",
+          "cycles": "Cycles",
+          "modules": "Modules",
+          "intake": "Intake"
+        }
+      }
     }
   },
   "profile": {
@@ -103,7 +181,8 @@
       "preferences": "Préférences",
       "notifications": "Notifications",
       "api-tokens": "Jetons d’accès personnel",
-      "connections": "Connexions"
+      "connections": "Connexions",
+      "mcp": "Serveur MCP"
     },
     "tabs": {
       "summary": "Résumé",

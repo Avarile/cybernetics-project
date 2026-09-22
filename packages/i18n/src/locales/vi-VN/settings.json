@@ -65,6 +65,84 @@
       "title": "Kết nối",
       "heading": "Kết nối",
       "description": "Quản lý cài đặt kết nối không gian làm việc của bạn."
+    },
+    "mcp": {
+      "title": "Máy chủ MCP",
+      "description": "Kết nối một trợ lý AI với Cybernetics qua Model Context Protocol.",
+      "copy": "Sao chép",
+      "copied": "Đã sao chép vào bộ nhớ tạm",
+      "endpoint": {
+        "title": "Điểm cuối",
+        "transport": "Streamable HTTP",
+        "stateless": "Không trạng thái",
+        "hint": "Khả dụng khi API chạy với MCP_SERVER_ENABLED=1.",
+        "test": "Kiểm tra kết nối",
+        "testing": "Đang kiểm tra",
+        "connected": "{count, plural, one {Đã kết nối, có # công cụ} other {Đã kết nối, có # công cụ}}",
+        "unauthorized": "Mã này đã bị từ chối. Hãy tạo mã mới.",
+        "unreachable": "Không thể kết nối tới điểm cuối.",
+        "cross_origin": "Không thể kiểm tra từ trình duyệt khi phát triển cục bộ.",
+        "needs_token": "Thêm một mã để kiểm tra kết nối."
+      },
+      "token": {
+        "title": "1. Thêm một mã truy cập",
+        "description": "Trợ lý đăng nhập bằng mã truy cập cá nhân và hành động thay cho chủ sở hữu mã, với cùng quyền hạn. Mã chỉ nằm trên trang này và không bao giờ được trình duyệt lưu lại.",
+        "generate": "Tạo mã truy cập",
+        "use_existing": "Dùng mã có sẵn",
+        "ready": "Mã đã sẵn sàng",
+        "clear": "Xóa",
+        "paste_placeholder": "Dán mã bắt đầu bằng plane_api_",
+        "revoke_hint": "Bạn có thể thu hồi mã bất cứ lúc nào tại"
+      },
+      "clients": {
+        "title": "2. Kết nối trợ lý của bạn",
+        "description": "Thêm máy chủ một lần cho mỗi trợ lý. Cấu hình bên dưới đã có điểm cuối và mã truy cập.",
+        "needs_token": "Hãy thêm mã truy cập trước.",
+        "claude-code": {
+          "name": "Claude Code",
+          "help": "Chạy lệnh này trong terminal."
+        },
+        "cursor": {
+          "name": "Cursor",
+          "help": "Cài đặt bằng một cú nhấp hoặc tự thêm tệp.",
+          "install": "Thêm vào Cursor"
+        },
+        "vscode": {
+          "name": "VS Code",
+          "help": "Cài đặt bằng một cú nhấp hoặc tự thêm tệp.",
+          "install": "Thêm vào VS Code"
+        },
+        "claude-desktop": {
+          "name": "Claude Desktop",
+          "help": "Claude Desktop chỉ nhận một URL cho trình kết nối riêng, nên cấu hình này dùng mcp-remote làm cầu nối."
+        },
+        "other": {
+          "name": "Khác",
+          "help": "Trỏ bất kỳ ứng dụng hỗ trợ Streamable HTTP tới điểm cuối này và gửi mã trong tiêu đề Authorization."
+        }
+      },
+      "tools": {
+        "title": "Công cụ",
+        "description": "Những gì trợ lý có thể làm sau khi kết nối. Mô tả được hiển thị bằng tiếng Anh, đúng như trợ lý nhận được.",
+        "count": "{count, plural, one {# công cụ} other {# công cụ}}",
+        "search_placeholder": "Tìm công cụ",
+        "no_matches": "Không có công cụ nào khớp với tìm kiếm.",
+        "footnote": "Khi API chạy với MCP_READ_ONLY=1, chỉ các công cụ chỉ đọc được cung cấp.",
+        "modes": {
+          "read": "Đọc",
+          "write": "Ghi",
+          "destructive": "Xóa"
+        },
+        "groups": {
+          "context": "Tài khoản",
+          "projects": "Dự án và siêu dữ liệu",
+          "work_items": "Mục công việc",
+          "work_item_extras": "Bình luận, liên kết và lịch sử",
+          "cycles": "Chu kỳ",
+          "modules": "Mô-đun",
+          "intake": "Intake"
+        }
+      }
     }
   },
   "profile": {
@@ -103,7 +181,8 @@
       "preferences": "Tùy chọn",
       "notifications": "Thông báo",
       "api-tokens": "Mã truy cập cá nhân",
-      "connections": "Kết nối"
+      "connections": "Kết nối",
+      "mcp": "Máy chủ MCP"
     },
     "tabs": {
       "summary": "Tóm tắt",

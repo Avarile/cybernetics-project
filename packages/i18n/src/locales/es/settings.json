@@ -65,6 +65,84 @@
       "title": "Conexiones",
       "heading": "Conexiones",
       "description": "Administra la configuración de conexiones de tu espacio de trabajo."
+    },
+    "mcp": {
+      "title": "Servidor MCP",
+      "description": "Conecte un asistente de IA a Cybernetics mediante el Model Context Protocol.",
+      "copy": "Copiar",
+      "copied": "Copiado al portapapeles",
+      "endpoint": {
+        "title": "Punto de conexión",
+        "transport": "Streamable HTTP",
+        "stateless": "Sin estado",
+        "hint": "Disponible cuando la API se ejecuta con MCP_SERVER_ENABLED=1.",
+        "test": "Probar la conexión",
+        "testing": "Probando",
+        "connected": "{count, plural, one {Conectado, # herramienta disponible} other {Conectado, # herramientas disponibles}}",
+        "unauthorized": "Ese token fue rechazado. Genere uno nuevo.",
+        "unreachable": "No se pudo conectar con el punto de conexión.",
+        "cross_origin": "No se puede comprobar desde el navegador en desarrollo local.",
+        "needs_token": "Añada un token para probar la conexión."
+      },
+      "token": {
+        "title": "1. Añada un token",
+        "description": "El asistente inicia sesión con un token de acceso personal y actúa en nombre del propietario del token, con los mismos permisos. Solo se mantiene en esta página y el navegador nunca lo guarda.",
+        "generate": "Generar token",
+        "use_existing": "Usar un token existente",
+        "ready": "Token listo",
+        "clear": "Borrar",
+        "paste_placeholder": "Pegue un token que empiece por plane_api_",
+        "revoke_hint": "Revoque un token cuando quiera desde"
+      },
+      "clients": {
+        "title": "2. Conecte su asistente",
+        "description": "Añada el servidor una vez por asistente. La configuración de abajo ya incluye el punto de conexión y el token.",
+        "needs_token": "Añada primero un token.",
+        "claude-code": {
+          "name": "Claude Code",
+          "help": "Ejecute esto en el terminal."
+        },
+        "cursor": {
+          "name": "Cursor",
+          "help": "Instálelo con un clic o añada el archivo manualmente.",
+          "install": "Añadir a Cursor"
+        },
+        "vscode": {
+          "name": "VS Code",
+          "help": "Instálelo con un clic o añada el archivo manualmente.",
+          "install": "Añadir a VS Code"
+        },
+        "claude-desktop": {
+          "name": "Claude Desktop",
+          "help": "Claude Desktop solo acepta una URL en sus propios conectores, así que esta configuración usa mcp-remote como puente."
+        },
+        "other": {
+          "name": "Otros",
+          "help": "Apunte cualquier cliente compatible con Streamable HTTP a este punto de conexión y envíe el token en la cabecera Authorization."
+        }
+      },
+      "tools": {
+        "title": "Herramientas",
+        "description": "Lo que un asistente puede hacer una vez conectado. Las descripciones se muestran en inglés, tal como las recibe el asistente.",
+        "count": "{count, plural, one {# herramienta} other {# herramientas}}",
+        "search_placeholder": "Buscar herramientas",
+        "no_matches": "Ninguna herramienta coincide con esa búsqueda.",
+        "footnote": "Con MCP_READ_ONLY=1, la API solo ofrece las herramientas de lectura.",
+        "modes": {
+          "read": "Lectura",
+          "write": "Escritura",
+          "destructive": "Eliminación"
+        },
+        "groups": {
+          "context": "Cuenta",
+          "projects": "Proyectos y metadatos",
+          "work_items": "Elementos de trabajo",
+          "work_item_extras": "Comentarios, enlaces e historial",
+          "cycles": "Ciclos",
+          "modules": "Módulos",
+          "intake": "Intake"
+        }
+      }
     }
   },
   "profile": {
@@ -103,7 +181,8 @@
       "preferences": "Preferencias",
       "notifications": "Notificaciones",
       "api-tokens": "Tokens de acceso personal",
-      "connections": "Conexiones"
+      "connections": "Conexiones",
+      "mcp": "Servidor MCP"
     },
     "tabs": {
       "summary": "Resumen",

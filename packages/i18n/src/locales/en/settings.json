@@ -65,6 +65,84 @@
       "title": "Connections",
       "heading": "Connections",
       "description": "Manage your workspace connections settings."
+    },
+    "mcp": {
+      "title": "MCP server",
+      "description": "Connect an AI assistant to Cybernetics over the Model Context Protocol.",
+      "copy": "Copy",
+      "copied": "Copied to clipboard",
+      "endpoint": {
+        "title": "Endpoint",
+        "transport": "Streamable HTTP",
+        "stateless": "Stateless",
+        "hint": "Available when the API runs with MCP_SERVER_ENABLED=1.",
+        "test": "Test connection",
+        "testing": "Testing",
+        "connected": "{count, plural, one {Connected, # tool available} other {Connected, # tools available}}",
+        "unauthorized": "That token was rejected. Generate a new one.",
+        "unreachable": "Could not reach the endpoint.",
+        "cross_origin": "Cannot be checked from the browser in local development.",
+        "needs_token": "Add a token to test the connection."
+      },
+      "token": {
+        "title": "1. Add a token",
+        "description": "The assistant signs in with a personal access token and acts as the token's owner, with the same permissions. It stays on this page only and is never saved by the browser.",
+        "generate": "Generate token",
+        "use_existing": "Use an existing token",
+        "ready": "Token ready",
+        "clear": "Clear",
+        "paste_placeholder": "Paste a token that starts with plane_api_",
+        "revoke_hint": "Revoke a token any time from"
+      },
+      "clients": {
+        "title": "2. Connect your assistant",
+        "description": "Add the server once per assistant. The setup below already contains the endpoint and the token.",
+        "needs_token": "Add a token first.",
+        "claude-code": {
+          "name": "Claude Code",
+          "help": "Run this in the terminal."
+        },
+        "cursor": {
+          "name": "Cursor",
+          "help": "Install it in one click, or add the file manually.",
+          "install": "Add to Cursor"
+        },
+        "vscode": {
+          "name": "VS Code",
+          "help": "Install it in one click, or add the file manually.",
+          "install": "Add to VS Code"
+        },
+        "claude-desktop": {
+          "name": "Claude Desktop",
+          "help": "Claude Desktop accepts only a URL for its own connectors, so this setup bridges to it with mcp-remote."
+        },
+        "other": {
+          "name": "Other",
+          "help": "Point any client that speaks Streamable HTTP at this endpoint and send the token in the Authorization header."
+        }
+      },
+      "tools": {
+        "title": "Tools",
+        "description": "What an assistant can do once connected. Descriptions are shown in English, exactly as the assistant receives them.",
+        "count": "{count, plural, one {# tool} other {# tools}}",
+        "search_placeholder": "Search tools",
+        "no_matches": "No tools match that search.",
+        "footnote": "Running the API with MCP_READ_ONLY=1 serves only the read tools.",
+        "modes": {
+          "read": "Read",
+          "write": "Write",
+          "destructive": "Deletes"
+        },
+        "groups": {
+          "context": "Account",
+          "projects": "Projects and metadata",
+          "work_items": "Work items",
+          "work_item_extras": "Comments, links and history",
+          "cycles": "Cycles",
+          "modules": "Modules",
+          "intake": "Intake"
+        }
+      }
     }
   },
   "profile": {
@@ -103,7 +181,8 @@
       "preferences": "Preferences",
       "notifications": "Notifications",
       "api-tokens": "Personal Access Tokens",
-      "connections": "Connections"
+      "connections": "Connections",
+      "mcp": "MCP server"
     },
     "tabs": {
       "summary": "Summary",

@@ -65,6 +65,84 @@
       "title": "Prepojenia",
       "heading": "Prepojenia",
       "description": "Spravujte nastavenia prepojení svojho pracovného priestoru."
+    },
+    "mcp": {
+      "title": "Server MCP",
+      "description": "Pripojte AI asistenta k Cybernetics cez Model Context Protocol.",
+      "copy": "Kopírovať",
+      "copied": "Skopírované do schránky",
+      "endpoint": {
+        "title": "Koncový bod",
+        "transport": "Streamable HTTP",
+        "stateless": "Bezstavový",
+        "hint": "Dostupné, keď API beží s MCP_SERVER_ENABLED=1.",
+        "test": "Otestovať pripojenie",
+        "testing": "Testovanie",
+        "connected": "{count, plural, one {Pripojené, # dostupný nástroj} few {Pripojené, # dostupné nástroje} many {Pripojené, # dostupného nástroja} other {Pripojené, # dostupných nástrojov}}",
+        "unauthorized": "Tento token bol odmietnutý. Vygenerujte nový.",
+        "unreachable": "Koncový bod je nedostupný.",
+        "cross_origin": "Pri lokálnom vývoji sa to nedá overiť z prehliadača.",
+        "needs_token": "Pridajte token na otestovanie pripojenia."
+      },
+      "token": {
+        "title": "1. Pridajte token",
+        "description": "Asistent sa prihlasuje osobným prístupovým tokenom a koná za vlastníka tokenu s rovnakými oprávneniami. Token zostáva len na tejto stránke a prehliadač ho nikdy neukladá.",
+        "generate": "Vygenerovať token",
+        "use_existing": "Použiť existujúci token",
+        "ready": "Token je pripravený",
+        "clear": "Vymazať",
+        "paste_placeholder": "Vložte token začínajúci na plane_api_",
+        "revoke_hint": "Token možno kedykoľvek zneplatniť v"
+      },
+      "clients": {
+        "title": "2. Pripojte svojho asistenta",
+        "description": "Server pridajte raz pre každého asistenta. Konfigurácia nižšie už obsahuje koncový bod aj token.",
+        "needs_token": "Najprv pridajte token.",
+        "claude-code": {
+          "name": "Claude Code",
+          "help": "Spustite to v termináli."
+        },
+        "cursor": {
+          "name": "Cursor",
+          "help": "Nainštalujte jedným kliknutím alebo pridajte súbor ručne.",
+          "install": "Pridať do Cursor"
+        },
+        "vscode": {
+          "name": "VS Code",
+          "help": "Nainštalujte jedným kliknutím alebo pridajte súbor ručne.",
+          "install": "Pridať do VS Code"
+        },
+        "claude-desktop": {
+          "name": "Claude Desktop",
+          "help": "Claude Desktop prijíma vo vlastných konektoroch iba URL, preto táto konfigurácia používa most mcp-remote."
+        },
+        "other": {
+          "name": "Ostatné",
+          "help": "Nasmerujte na tento koncový bod ľubovoľného klienta s podporou Streamable HTTP a token pošlite v hlavičke Authorization."
+        }
+      },
+      "tools": {
+        "title": "Nástroje",
+        "description": "Čo môže asistent robiť po pripojení. Popisy sú v angličtine, presne ako ich asistent dostáva.",
+        "count": "{count, plural, one {# nástroj} few {# nástroje} many {# nástroja} other {# nástrojov}}",
+        "search_placeholder": "Hľadať nástroje",
+        "no_matches": "Hľadaniu nezodpovedá žiadny nástroj.",
+        "footnote": "Pri MCP_READ_ONLY=1 API poskytuje iba nástroje na čítanie.",
+        "modes": {
+          "read": "Čítanie",
+          "write": "Zápis",
+          "destructive": "Mazanie"
+        },
+        "groups": {
+          "context": "Účet",
+          "projects": "Projekty a metadáta",
+          "work_items": "Pracovné položky",
+          "work_item_extras": "Komentáre, odkazy a história",
+          "cycles": "Cykly",
+          "modules": "Moduly",
+          "intake": "Intake"
+        }
+      }
     }
   },
   "profile": {
@@ -103,7 +181,8 @@
       "preferences": "Predvoľby",
       "notifications": "Oznámenia",
       "api-tokens": "Osobné prístupové tokeny",
-      "connections": "Pripojenia"
+      "connections": "Pripojenia",
+      "mcp": "Server MCP"
     },
     "tabs": {
       "summary": "Zhrnutie",

@@ -65,6 +65,84 @@
       "title": "Połączenia",
       "heading": "Połączenia",
       "description": "Zarządzaj ustawieniami połączeń przestrzeni roboczej."
+    },
+    "mcp": {
+      "title": "Serwer MCP",
+      "description": "Podłącz asystenta AI do Cybernetics przez Model Context Protocol.",
+      "copy": "Kopiuj",
+      "copied": "Skopiowano do schowka",
+      "endpoint": {
+        "title": "Punkt końcowy",
+        "transport": "Streamable HTTP",
+        "stateless": "Bezstanowy",
+        "hint": "Dostępny, gdy API działa z MCP_SERVER_ENABLED=1.",
+        "test": "Przetestuj połączenie",
+        "testing": "Testowanie",
+        "connected": "{count, plural, one {Połączono, dostępne # narzędzie} few {Połączono, dostępne # narzędzia} many {Połączono, dostępnych # narzędzi} other {Połączono, dostępne # narzędzia}}",
+        "unauthorized": "Ten token został odrzucony. Wygeneruj nowy.",
+        "unreachable": "Nie udało się połączyć z punktem końcowym.",
+        "cross_origin": "Nie można sprawdzić z przeglądarki w środowisku lokalnym.",
+        "needs_token": "Dodaj token, aby przetestować połączenie."
+      },
+      "token": {
+        "title": "1. Dodaj token",
+        "description": "Asystent loguje się osobistym tokenem dostępu i działa w imieniu właściciela tokena, z tymi samymi uprawnieniami. Token pozostaje tylko na tej stronie i nigdy nie jest zapisywany w przeglądarce.",
+        "generate": "Wygeneruj token",
+        "use_existing": "Użyj istniejącego tokena",
+        "ready": "Token gotowy",
+        "clear": "Wyczyść",
+        "paste_placeholder": "Wklej token zaczynający się od plane_api_",
+        "revoke_hint": "Token można unieważnić w każdej chwili w"
+      },
+      "clients": {
+        "title": "2. Podłącz asystenta",
+        "description": "Serwer wystarczy dodać raz dla każdego asystenta. Konfiguracja poniżej zawiera już punkt końcowy i token.",
+        "needs_token": "Najpierw dodaj token.",
+        "claude-code": {
+          "name": "Claude Code",
+          "help": "Uruchom to w terminalu."
+        },
+        "cursor": {
+          "name": "Cursor",
+          "help": "Zainstaluj jednym kliknięciem albo dodaj plik ręcznie.",
+          "install": "Dodaj do Cursor"
+        },
+        "vscode": {
+          "name": "VS Code",
+          "help": "Zainstaluj jednym kliknięciem albo dodaj plik ręcznie.",
+          "install": "Dodaj do VS Code"
+        },
+        "claude-desktop": {
+          "name": "Claude Desktop",
+          "help": "Claude Desktop przyjmuje w swoich konektorach tylko adres URL, dlatego ta konfiguracja korzysta z mostka mcp-remote."
+        },
+        "other": {
+          "name": "Inne",
+          "help": "Skieruj dowolnego klienta obsługującego Streamable HTTP na ten punkt końcowy i przekaż token w nagłówku Authorization."
+        }
+      },
+      "tools": {
+        "title": "Narzędzia",
+        "description": "Co asystent może robić po podłączeniu. Opisy są w języku angielskim, dokładnie tak, jak otrzymuje je asystent.",
+        "count": "{count, plural, one {# narzędzie} few {# narzędzia} many {# narzędzi} other {# narzędzia}}",
+        "search_placeholder": "Szukaj narzędzi",
+        "no_matches": "Żadne narzędzie nie odpowiada wyszukiwaniu.",
+        "footnote": "Przy MCP_READ_ONLY=1 API udostępnia tylko narzędzia do odczytu.",
+        "modes": {
+          "read": "Odczyt",
+          "write": "Zapis",
+          "destructive": "Usuwanie"
+        },
+        "groups": {
+          "context": "Konto",
+          "projects": "Projekty i metadane",
+          "work_items": "Elementy pracy",
+          "work_item_extras": "Komentarze, linki i historia",
+          "cycles": "Cykle",
+          "modules": "Moduły",
+          "intake": "Intake"
+        }
+      }
     }
   },
   "profile": {
@@ -103,7 +181,8 @@
       "preferences": "Preferencje",
       "notifications": "Powiadomienia",
       "api-tokens": "Osobiste tokeny dostępu",
-      "connections": "Połączenia"
+      "connections": "Połączenia",
+      "mcp": "Serwer MCP"
     },
     "tabs": {
       "summary": "Podsumowanie",

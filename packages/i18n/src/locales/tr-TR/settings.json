@@ -65,6 +65,84 @@
       "title": "Bağlantılar",
       "heading": "Bağlantılar",
       "description": "Çalışma alanı bağlantı ayarlarınızı yönetin."
+    },
+    "mcp": {
+      "title": "MCP sunucusu",
+      "description": "Model Context Protocol üzerinden Cybernetics’e bir AI asistanı bağlayın.",
+      "copy": "Kopyala",
+      "copied": "Panoya kopyalandı",
+      "endpoint": {
+        "title": "Uç nokta",
+        "transport": "Streamable HTTP",
+        "stateless": "Durumsuz",
+        "hint": "API, MCP_SERVER_ENABLED=1 ile çalıştığında kullanılabilir.",
+        "test": "Bağlantıyı test edin",
+        "testing": "Test ediliyor",
+        "connected": "{count, plural, one {Bağlandı, # araç kullanılabilir} other {Bağlandı, # araç kullanılabilir}}",
+        "unauthorized": "Bu token reddedildi. Yeni bir tane oluşturun.",
+        "unreachable": "Uç noktaya ulaşılamadı.",
+        "cross_origin": "Yerel geliştirmede tarayıcıdan kontrol edilemez.",
+        "needs_token": "Bağlantıyı test etmek için bir token ekleyin."
+      },
+      "token": {
+        "title": "1. Bir token ekleyin",
+        "description": "Asistan kişisel erişim tokenı ile oturum açar ve tokenın sahibi adına, aynı izinlerle hareket eder. Token yalnızca bu sayfada kalır ve tarayıcı tarafından hiçbir zaman kaydedilmez.",
+        "generate": "Token oluştur",
+        "use_existing": "Mevcut bir token kullan",
+        "ready": "Token hazır",
+        "clear": "Temizle",
+        "paste_placeholder": "plane_api_ ile başlayan bir token yapıştırın",
+        "revoke_hint": "Bir tokenı dilediğiniz zaman şuradan iptal edebilirsiniz:"
+      },
+      "clients": {
+        "title": "2. Asistanınızı bağlayın",
+        "description": "Sunucuyu her asistan için bir kez ekleyin. Aşağıdaki yapılandırma uç noktayı ve tokenı zaten içeriyor.",
+        "needs_token": "Önce bir token ekleyin.",
+        "claude-code": {
+          "name": "Claude Code",
+          "help": "Bunu terminalde çalıştırın."
+        },
+        "cursor": {
+          "name": "Cursor",
+          "help": "Tek tıkla kurun veya dosyayı kendiniz ekleyin.",
+          "install": "Cursor’a ekle"
+        },
+        "vscode": {
+          "name": "VS Code",
+          "help": "Tek tıkla kurun veya dosyayı kendiniz ekleyin.",
+          "install": "VS Code’a ekle"
+        },
+        "claude-desktop": {
+          "name": "Claude Desktop",
+          "help": "Claude Desktop kendi bağlayıcılarında yalnızca bir URL kabul eder, bu nedenle bu yapılandırma mcp-remote ile köprü kurar."
+        },
+        "other": {
+          "name": "Diğer",
+          "help": "Streamable HTTP destekleyen herhangi bir istemciyi bu uç noktaya yönlendirin ve tokenı Authorization başlığında gönderin."
+        }
+      },
+      "tools": {
+        "title": "Araçlar",
+        "description": "Bağlandıktan sonra bir asistanın yapabilecekleri. Açıklamalar, asistanın aldığı biçimde İngilizce gösterilir.",
+        "count": "{count, plural, one {# araç} other {# araç}}",
+        "search_placeholder": "Araç ara",
+        "no_matches": "Bu aramayla eşleşen araç yok.",
+        "footnote": "API, MCP_READ_ONLY=1 ile çalıştığında yalnızca okuma araçlarını sunar.",
+        "modes": {
+          "read": "Okuma",
+          "write": "Yazma",
+          "destructive": "Silme"
+        },
+        "groups": {
+          "context": "Hesap",
+          "projects": "Projeler ve meta veriler",
+          "work_items": "İş öğeleri",
+          "work_item_extras": "Yorumlar, bağlantılar ve geçmiş",
+          "cycles": "Döngüler",
+          "modules": "Modüller",
+          "intake": "Intake"
+        }
+      }
     }
   },
   "profile": {
@@ -103,7 +181,8 @@
       "preferences": "Tercihler",
       "notifications": "Bildirimler",
       "api-tokens": "Kişisel Erişim Tokenları",
-      "connections": "Bağlantılar"
+      "connections": "Bağlantılar",
+      "mcp": "MCP sunucusu"
     },
     "tabs": {
       "summary": "Özet",

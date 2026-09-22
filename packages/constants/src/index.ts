@@ -27,6 +27,7 @@ export * from "./issue";
 export * from "./members";
 export * from "./label";
 export * from "./metadata";
+export * from "./mcp";
 export * from "./module";
 export * from "./notification";
 export * from "./page";

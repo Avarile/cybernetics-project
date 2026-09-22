@@ -65,6 +65,84 @@
       "title": "Conexões",
       "heading": "Conexões",
       "description": "Gerencie as configurações de conexões do seu espaço de trabalho."
+    },
+    "mcp": {
+      "title": "Servidor MCP",
+      "description": "Conecte um assistente de IA ao Cybernetics pelo Model Context Protocol.",
+      "copy": "Copiar",
+      "copied": "Copiado para a área de transferência",
+      "endpoint": {
+        "title": "Endpoint",
+        "transport": "Streamable HTTP",
+        "stateless": "Sem estado",
+        "hint": "Disponível quando a API roda com MCP_SERVER_ENABLED=1.",
+        "test": "Testar conexão",
+        "testing": "Testando",
+        "connected": "{count, plural, one {Conectado, # ferramenta disponível} many {Conectado, # ferramentas disponíveis} other {Conectado, # ferramentas disponíveis}}",
+        "unauthorized": "Esse token foi recusado. Gere um novo.",
+        "unreachable": "Não foi possível acessar o endpoint.",
+        "cross_origin": "Não é possível verificar pelo navegador em desenvolvimento local.",
+        "needs_token": "Adicione um token para testar a conexão."
+      },
+      "token": {
+        "title": "1. Adicione um token",
+        "description": "O assistente entra com um token de acesso pessoal e age em nome de quem criou o token, com as mesmas permissões. Ele fica apenas nesta página e o navegador nunca o salva.",
+        "generate": "Gerar token",
+        "use_existing": "Usar um token existente",
+        "ready": "Token pronto",
+        "clear": "Limpar",
+        "paste_placeholder": "Cole um token que comece com plane_api_",
+        "revoke_hint": "Revogue um token quando quiser em"
+      },
+      "clients": {
+        "title": "2. Conecte seu assistente",
+        "description": "Adicione o servidor uma vez por assistente. A configuração abaixo já traz o endpoint e o token.",
+        "needs_token": "Adicione um token primeiro.",
+        "claude-code": {
+          "name": "Claude Code",
+          "help": "Execute isto no terminal."
+        },
+        "cursor": {
+          "name": "Cursor",
+          "help": "Instale com um clique ou adicione o arquivo manualmente.",
+          "install": "Adicionar ao Cursor"
+        },
+        "vscode": {
+          "name": "VS Code",
+          "help": "Instale com um clique ou adicione o arquivo manualmente.",
+          "install": "Adicionar ao VS Code"
+        },
+        "claude-desktop": {
+          "name": "Claude Desktop",
+          "help": "O Claude Desktop só aceita uma URL nos conectores dele, então esta configuração faz a ponte com mcp-remote."
+        },
+        "other": {
+          "name": "Outros",
+          "help": "Aponte qualquer cliente compatível com Streamable HTTP para este endpoint e envie o token no cabeçalho Authorization."
+        }
+      },
+      "tools": {
+        "title": "Ferramentas",
+        "description": "O que um assistente pode fazer depois de conectado. As descrições aparecem em inglês, exatamente como o assistente as recebe.",
+        "count": "{count, plural, one {# ferramenta} many {# ferramentas} other {# ferramentas}}",
+        "search_placeholder": "Buscar ferramentas",
+        "no_matches": "Nenhuma ferramenta corresponde a essa busca.",
+        "footnote": "Com MCP_READ_ONLY=1, a API oferece apenas as ferramentas de leitura.",
+        "modes": {
+          "read": "Leitura",
+          "write": "Escrita",
+          "destructive": "Exclusão"
+        },
+        "groups": {
+          "context": "Conta",
+          "projects": "Projetos e metadados",
+          "work_items": "Itens de trabalho",
+          "work_item_extras": "Comentários, links e histórico",
+          "cycles": "Ciclos",
+          "modules": "Módulos",
+          "intake": "Intake"
+        }
+      }
     }
   },
   "profile": {
@@ -103,7 +181,8 @@
       "preferences": "Preferências",
       "notifications": "Notificações",
       "api-tokens": "Tokens de Acesso Pessoal",
-      "connections": "Conexões"
+      "connections": "Conexões",
+      "mcp": "Servidor MCP"
     },
     "tabs": {
       "summary": "Resumo",
