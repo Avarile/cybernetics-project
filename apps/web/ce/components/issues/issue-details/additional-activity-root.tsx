@@ -5,6 +5,8 @@
  */
 
 import { observer } from "mobx-react";
+// plane web imports
+import { CyberneticsRecordActivity } from "@/plane-web/components/cybernetics-data/activity/record-activity";
 
 export type TAdditionalActivityRoot = {
   activityId: string;
@@ -13,6 +15,9 @@ export type TAdditionalActivityRoot = {
   field: string | undefined;
 };
 
-export const AdditionalActivityRoot = observer(function AdditionalActivityRoot(_props: TAdditionalActivityRoot) {
+export const AdditionalActivityRoot = observer(function AdditionalActivityRoot(props: TAdditionalActivityRoot) {
+  const { activityId, ends, field } = props;
+
+  if (field === "cybernetics_record") return <CyberneticsRecordActivity activityId={activityId} ends={ends} />;
   return <></>;
 });

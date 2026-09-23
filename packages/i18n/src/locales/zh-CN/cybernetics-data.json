@@ -1,0 +1,119 @@
+{
+  "cybernetics_data": {
+    "widget": {
+      "button": "数据库",
+      "title": "数据库记录",
+      "empty": "尚未附加任何数据库记录。"
+    },
+    "browser": {
+      "title": "数据库",
+      "subtitle": "将记录附加到 {identifier}",
+      "view_subtitle": "查看记录",
+      "filter_databases": "筛选数据库",
+      "no_databases": "使用该项目的令牌看不到任何数据库。",
+      "no_tables": "此数据库没有表。",
+      "select_table": "选择一个表以浏览其记录。",
+      "search_placeholder": "搜索记录",
+      "all_fields": "所有字段",
+      "filter": "筛选",
+      "sort": "排序",
+      "view": "视图",
+      "default_view": "无视图",
+      "no_records": "没有记录与您的搜索匹配。",
+      "table_empty": "此表为空。",
+      "no_access": "无访问权限",
+      "no_access_description": "该项目的令牌无法读取此数据库。",
+      "already_attached": "已附加",
+      "selected": "已选择（{count}）",
+      "max_selected": "您一次最多可以附加 {count} 条记录。",
+      "remove_selected": "移除 {name}",
+      "attach_n": "{count, plural, one {附加 # 条记录} other {附加 # 条记录}}",
+      "attaching": "正在附加",
+      "cancel": "取消",
+      "back": "返回列表",
+      "open_external": "在 Cybernetics Data 中打开",
+      "view_record": "查看记录",
+      "retry": "重试",
+      "pagination": "{from}–{to} 共 {total}",
+      "pagination_no_total": "{from}–{to}",
+      "previous": "上一页",
+      "next": "下一页",
+      "not_configured": {
+        "title": "Cybernetics Data 尚未连接",
+        "description": "将此项目连接到 Cybernetics Data，以浏览和附加数据库记录。",
+        "description_member": "请项目管理员将此项目连接到 Cybernetics Data。",
+        "cta": "配置 Cybernetics Data"
+      }
+    },
+    "filter": {
+      "add_condition": "添加条件",
+      "remove_condition": "移除条件",
+      "clear": "清除",
+      "apply": "应用",
+      "field": "字段",
+      "operator": "运算符",
+      "value": "值",
+      "true": "已选中",
+      "false": "未选中",
+      "operators": {
+        "is": "为",
+        "isNot": "不为",
+        "contains": "包含",
+        "doesNotContain": "不包含",
+        "isEmpty": "为空",
+        "isNotEmpty": "不为空",
+        "isGreater": "大于",
+        "isLess": "小于",
+        "isBefore": "早于",
+        "isAfter": "晚于"
+      }
+    },
+    "sort": {
+      "none": "不排序",
+      "asc": "升序",
+      "desc": "降序",
+      "clear": "清除排序"
+    },
+    "errors": {
+      "not_configured": "此项目尚未配置 Cybernetics Data。",
+      "unauthorized": "该项目的 Cybernetics Data 令牌无效或已过期。",
+      "forbidden": "该项目的令牌无权访问此资源。",
+      "not_found": "所请求的记录或表已不存在。",
+      "unreachable": "无法连接到 Cybernetics Data。请稍后重试。",
+      "rate_limited": "对 Cybernetics Data 的请求过多。请稍候片刻后重试。",
+      "unreadable_token": "无法读取已保存的令牌。项目管理员需要重新输入令牌。",
+      "bad_request": "Cybernetics Data 拒绝了该请求。",
+      "attach_failed": "部分记录无法附加。这些记录可能已被删除，或项目的令牌无法读取它们。",
+      "generic": "出现错误。请重试。",
+      "open_settings": "打开设置"
+    },
+    "viewer": {
+      "fields": "字段",
+      "show_more": "显示更多",
+      "show_less": "显示更少",
+      "empty_value": "空",
+      "select": "选择此记录"
+    },
+    "item": {
+      "view": "查看",
+      "open_external": "在 Cybernetics Data 中打开",
+      "refresh": "刷新",
+      "copy_link": "复制链接",
+      "remove": "移除",
+      "missing": "记录已不存在",
+      "forbidden": "当前令牌无访问权限",
+      "disconnected": "Cybernetics Data 已断开连接。正在显示已保存的快照。"
+    },
+    "activity": {
+      "attached": "附加了数据库记录",
+      "removed": "移除了数据库记录"
+    },
+    "toast": {
+      "attached": "{count, plural, one {已附加 # 条记录} other {已附加 # 条记录}}",
+      "skipped": "{count, plural, one {# 条记录此前已附加} other {# 条记录此前已附加}}",
+      "removed": "数据库记录已移除",
+      "refreshed": "数据库记录已刷新",
+      "attach_failed": "{count, plural, one {# 条记录附加失败} other {# 条记录附加失败}}"
+    }
+  }
+}

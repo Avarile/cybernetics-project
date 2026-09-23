@@ -1,0 +1,119 @@
+{
+  "cybernetics_data": {
+    "widget": {
+      "button": "資料庫",
+      "title": "資料庫記錄",
+      "empty": "尚未附加任何資料庫記錄。"
+    },
+    "browser": {
+      "title": "資料庫",
+      "subtitle": "將記錄附加到 {identifier}",
+      "view_subtitle": "檢視記錄",
+      "filter_databases": "篩選資料庫",
+      "no_databases": "使用此專案的權杖看不到任何資料庫。",
+      "no_tables": "此資料庫沒有資料表。",
+      "select_table": "選擇一個資料表以瀏覽其記錄。",
+      "search_placeholder": "搜尋記錄",
+      "all_fields": "所有欄位",
+      "filter": "篩選",
+      "sort": "排序",
+      "view": "檢視",
+      "default_view": "無檢視",
+      "no_records": "沒有記錄符合您的搜尋。",
+      "table_empty": "此資料表為空。",
+      "no_access": "無存取權",
+      "no_access_description": "此專案的權杖無法讀取此資料庫。",
+      "already_attached": "已附加",
+      "selected": "已選取（{count}）",
+      "max_selected": "您一次最多可以附加 {count} 筆記錄。",
+      "remove_selected": "移除 {name}",
+      "attach_n": "{count, plural, one {附加 # 筆記錄} other {附加 # 筆記錄}}",
+      "attaching": "附加中",
+      "cancel": "取消",
+      "back": "返回清單",
+      "open_external": "在 Cybernetics Data 中開啟",
+      "view_record": "檢視記錄",
+      "retry": "重試",
+      "pagination": "{from}–{to} 共 {total}",
+      "pagination_no_total": "{from}–{to}",
+      "previous": "上一頁",
+      "next": "下一頁",
+      "not_configured": {
+        "title": "Cybernetics Data 尚未連線",
+        "description": "將此專案連線至 Cybernetics Data，以瀏覽並附加資料庫記錄。",
+        "description_member": "請專案管理員將此專案連線至 Cybernetics Data。",
+        "cta": "設定 Cybernetics Data"
+      }
+    },
+    "filter": {
+      "add_condition": "新增條件",
+      "remove_condition": "移除條件",
+      "clear": "清除",
+      "apply": "應用",
+      "field": "欄位",
+      "operator": "運算子",
+      "value": "值",
+      "true": "已勾選",
+      "false": "未勾選",
+      "operators": {
+        "is": "為",
+        "isNot": "不為",
+        "contains": "包含",
+        "doesNotContain": "不包含",
+        "isEmpty": "為空",
+        "isNotEmpty": "不為空",
+        "isGreater": "大於",
+        "isLess": "小於",
+        "isBefore": "早於",
+        "isAfter": "晚於"
+      }
+    },
+    "sort": {
+      "none": "不排序",
+      "asc": "遞增",
+      "desc": "遞減",
+      "clear": "清除排序"
+    },
+    "errors": {
+      "not_configured": "此專案尚未設定 Cybernetics Data。",
+      "unauthorized": "此專案的 Cybernetics Data 權杖無效或已過期。",
+      "forbidden": "此專案的權杖無權存取此資源。",
+      "not_found": "所請求的記錄或資料表已不存在。",
+      "unreachable": "無法連線至 Cybernetics Data。請稍後再試。",
+      "rate_limited": "對 Cybernetics Data 的請求過多。請稍候片刻後再試。",
+      "unreadable_token": "無法讀取已儲存的權杖。專案管理員需要重新輸入權杖。",
+      "bad_request": "Cybernetics Data 拒絕了此請求。",
+      "attach_failed": "部分記錄無法附加。這些記錄可能已被刪除，或專案的權杖無法讀取它們。",
+      "generic": "出現錯誤。請重試。",
+      "open_settings": "開啟設定"
+    },
+    "viewer": {
+      "fields": "欄位",
+      "show_more": "顯示更多",
+      "show_less": "顯示較少",
+      "empty_value": "空白",
+      "select": "選取此記錄"
+    },
+    "item": {
+      "view": "檢視",
+      "open_external": "在 Cybernetics Data 中開啟",
+      "refresh": "重新整理",
+      "copy_link": "複製連結",
+      "remove": "移除",
+      "missing": "記錄已不存在",
+      "forbidden": "目前的權杖無存取權",
+      "disconnected": "Cybernetics Data 已中斷連線。正在顯示已儲存的快照。"
+    },
+    "activity": {
+      "attached": "附加了資料庫記錄",
+      "removed": "移除了資料庫記錄"
+    },
+    "toast": {
+      "attached": "{count, plural, one {已附加 # 筆記錄} other {已附加 # 筆記錄}}",
+      "skipped": "{count, plural, one {# 筆記錄先前已附加} other {# 筆記錄先前已附加}}",
+      "removed": "資料庫記錄已移除",
+      "refreshed": "資料庫記錄已重新整理",
+      "attach_failed": "{count, plural, one {# 筆記錄附加失敗} other {# 筆記錄附加失敗}}"
+    }
+  }
+}

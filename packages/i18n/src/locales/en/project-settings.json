@@ -521,6 +521,62 @@
           }
         }
       }
+    },
+    "cybernetics_data": {
+      "label": "Cybernetics Data",
+      "heading": "Cybernetics Data",
+      "description": "Connect this project to a Cybernetics Data workspace so members can browse databases and attach records to work items.",
+      "url_label": "CYBERNETICS_DATA_URL",
+      "url_helper": "The origin of your Cybernetics Data deployment, without /api.",
+      "url_placeholder": "https://data.example.com",
+      "url_required": "CYBERNETICS_DATA_URL is required.",
+      "url_invalid": "Enter a valid http(s) URL.",
+      "token_label": "CYBERNETICS_APITOKEN",
+      "token_helper": "A personal access token with read scopes: space, base (including read all), table, field, view and record. Prefer a dedicated service account restricted to specific spaces.",
+      "token_placeholder_new": "Paste your API token",
+      "token_placeholder_stored": "Stored token {hint}. Leave empty to keep it.",
+      "token_required": "CYBERNETICS_APITOKEN is required.",
+      "token_required_url_change": "Re-enter the token when changing the URL.",
+      "token_prefix_warning": "This token doesn't start with \"cybernetics_\". Check that you copied a Cybernetics Data personal access token.",
+      "delegation_warning": "All project members will browse Cybernetics Data with this token's permissions.",
+      "show_token": "Show token",
+      "hide_token": "Hide token",
+      "enabled_label": "Enabled",
+      "enabled_description": "When disabled, members can't browse or attach records. Attached records keep their saved snapshots.",
+      "test_button": "Test connection",
+      "testing": "Testing",
+      "save_button": "Save",
+      "saving": "Saving",
+      "save_anyway": "Save anyway (skip verification)",
+      "verified_ago": "Verified {time}",
+      "status": {
+        "ok": "Connected",
+        "unauthorized": "Invalid or expired token",
+        "forbidden": "Token has limited access",
+        "unreachable": "Can't reach the server",
+        "error": "Connection error",
+        "never": "Not verified yet",
+        "not_configured": "Not connected",
+        "disabled": "Disabled"
+      },
+      "bases_visible": "{count, plural, one {Token accepted · # database visible} other {Token accepted · # databases visible}}",
+      "disconnect": {
+        "heading": "Danger zone",
+        "title": "Disconnect Cybernetics Data",
+        "description": "Removes the URL and token from this project. Attached records keep their saved snapshots.",
+        "confirm": "Are you sure you want to disconnect Cybernetics Data from this project? Members will no longer be able to browse or attach records. Attached records keep their saved snapshots.",
+        "button": "Disconnect",
+        "loading": "Disconnecting"
+      },
+      "toast": {
+        "saved": "Cybernetics Data settings saved.",
+        "enabled": "Cybernetics Data enabled.",
+        "disabled": "Cybernetics Data disabled.",
+        "disconnected": "Cybernetics Data disconnected.",
+        "test_ok": "Connection successful.",
+        "test_failed": "Connection failed.",
+        "error": "Something went wrong. Please try again."
+      }
     }
   }
 }

@@ -521,6 +521,62 @@
           }
         }
       }
+    },
+    "cybernetics_data": {
+      "label": "Cybernetics Data",
+      "heading": "Cybernetics Data",
+      "description": "Pripojte tento projekt k pracovnému priestoru Cybernetics Data, aby členovia mohli prehliadať databázy a pripájať záznamy k pracovným položkám.",
+      "url_label": "CYBERNETICS_DATA_URL",
+      "url_helper": "Zdrojová adresa vášho nasadenia Cybernetics Data, bez /api.",
+      "url_placeholder": "https://data.example.com",
+      "url_required": "CYBERNETICS_DATA_URL je povinné.",
+      "url_invalid": "Zadajte platnú adresu URL http(s).",
+      "token_label": "CYBERNETICS_APITOKEN",
+      "token_helper": "Osobný prístupový token s právami na čítanie: priestor, báza (vrátane čítania všetkého), tabuľka, pole, zobrazenie a záznam. Uprednostnite vyhradený servisný účet obmedzený na konkrétne priestory.",
+      "token_placeholder_new": "Vložte svoj API token",
+      "token_placeholder_stored": "Uložený token {hint}. Ponechajte prázdne, ak ho chcete zachovať.",
+      "token_required": "CYBERNETICS_APITOKEN je povinný.",
+      "token_required_url_change": "Pri zmene URL zadajte token znova.",
+      "token_prefix_warning": "Tento token nezačína na \"cybernetics_\". Skontrolujte, či ste skopírovali osobný prístupový token Cybernetics Data.",
+      "delegation_warning": "Všetci členovia projektu budú prehliadať Cybernetics Data s oprávneniami tohto tokenu.",
+      "show_token": "Zobraziť token",
+      "hide_token": "Skryť token",
+      "enabled_label": "Povolené",
+      "enabled_description": "Po zakázaní nemôžu členovia prehliadať ani pripájať záznamy. Pripojené záznamy si zachovajú svoje uložené snapshoty.",
+      "test_button": "Otestovať pripojenie",
+      "testing": "Testovanie",
+      "save_button": "Uložiť",
+      "saving": "Ukladanie",
+      "save_anyway": "Aj tak uložiť (preskočiť overenie)",
+      "verified_ago": "Overené {time}",
+      "status": {
+        "ok": "Pripojené",
+        "unauthorized": "Neplatný alebo vypršaný token",
+        "forbidden": "Token má obmedzený prístup",
+        "unreachable": "Server je nedostupný",
+        "error": "Chyba pripojenia",
+        "never": "Zatiaľ neoverené",
+        "not_configured": "Nepripojené",
+        "disabled": "Zakázané"
+      },
+      "bases_visible": "{count, plural, one {Token prijatý · # databáza viditeľná} few {Token prijatý · # databázy viditeľné} many {Token prijatý · # databázy viditeľnej} other {Token prijatý · # databáz viditeľných}}",
+      "disconnect": {
+        "heading": "Nebezpečná zóna",
+        "title": "Odpojiť Cybernetics Data",
+        "description": "Odstráni URL adresu a token z tohto projektu. Pripojené záznamy si zachovajú svoje uložené snapshoty.",
+        "confirm": "Naozaj chcete odpojiť Cybernetics Data od tohto projektu? Členovia už nebudú môcť prehliadať ani pripájať záznamy. Pripojené záznamy si zachovajú svoje uložené snapshoty.",
+        "button": "Odpojiť",
+        "loading": "Odpájanie"
+      },
+      "toast": {
+        "saved": "Nastavenia Cybernetics Data boli uložené.",
+        "enabled": "Cybernetics Data bolo povolené.",
+        "disabled": "Cybernetics Data bolo zakázané.",
+        "disconnected": "Cybernetics Data bolo odpojené.",
+        "test_ok": "Pripojenie bolo úspešné.",
+        "test_failed": "Pripojenie zlyhalo.",
+        "error": "Niečo sa pokazilo. Skúste to prosím znova."
+      }
     }
   }
 }

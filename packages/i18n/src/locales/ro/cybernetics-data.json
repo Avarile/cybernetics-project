@@ -1,0 +1,119 @@
+{
+  "cybernetics_data": {
+    "widget": {
+      "button": "Bază de date",
+      "title": "Înregistrări din baza de date",
+      "empty": "Nu există încă înregistrări din baza de date atașate."
+    },
+    "browser": {
+      "title": "Bază de date",
+      "subtitle": "Atașează înregistrări la {identifier}",
+      "view_subtitle": "Vizualizează înregistrarea",
+      "filter_databases": "Filtrează bazele de date",
+      "no_databases": "Nicio bază de date nu este vizibilă cu tokenul proiectului.",
+      "no_tables": "Această bază de date nu are tabele.",
+      "select_table": "Selectează un tabel pentru a-i răsfoi înregistrările.",
+      "search_placeholder": "Caută înregistrări",
+      "all_fields": "Toate câmpurile",
+      "filter": "Filtru",
+      "sort": "Sortare",
+      "view": "Vizualizare",
+      "default_view": "Nicio vizualizare",
+      "no_records": "Nicio înregistrare nu corespunde căutării tale.",
+      "table_empty": "Acest tabel este gol.",
+      "no_access": "Fără acces",
+      "no_access_description": "Tokenul proiectului nu poate citi această bază de date.",
+      "already_attached": "Deja atașat",
+      "selected": "Selectate ({count})",
+      "max_selected": "Poți atașa până la {count} înregistrări simultan.",
+      "remove_selected": "Elimină {name}",
+      "attach_n": "{count, plural, one {Atașează # înregistrare} few {Atașează # înregistrări} other {Atașează # de înregistrări}}",
+      "attaching": "Se atașează",
+      "cancel": "Anulează",
+      "back": "Înapoi la listă",
+      "open_external": "Deschide în Cybernetics Data",
+      "view_record": "Vizualizează înregistrarea",
+      "retry": "Reîncearcă",
+      "pagination": "{from}–{to} din {total}",
+      "pagination_no_total": "{from}–{to}",
+      "previous": "Anterior",
+      "next": "Înainte",
+      "not_configured": {
+        "title": "Cybernetics Data nu este conectat",
+        "description": "Conectează acest proiect la Cybernetics Data pentru a răsfoi și atașa înregistrări din baza de date.",
+        "description_member": "Cere unui administrator de proiect să conecteze acest proiect la Cybernetics Data.",
+        "cta": "Configurează Cybernetics Data"
+      }
+    },
+    "filter": {
+      "add_condition": "Adaugă condiție",
+      "remove_condition": "Elimină condiția",
+      "clear": "Șterge",
+      "apply": "Aplică",
+      "field": "Câmp",
+      "operator": "Operator",
+      "value": "Valoare",
+      "true": "Bifat",
+      "false": "Nebifat",
+      "operators": {
+        "is": "este",
+        "isNot": "nu este",
+        "contains": "conține",
+        "doesNotContain": "nu conține",
+        "isEmpty": "este gol",
+        "isNotEmpty": "nu este gol",
+        "isGreater": "este mai mare decât",
+        "isLess": "este mai mic decât",
+        "isBefore": "este înainte de",
+        "isAfter": "este după"
+      }
+    },
+    "sort": {
+      "none": "Fără sortare",
+      "asc": "Crescător",
+      "desc": "Descrescător",
+      "clear": "Șterge sortarea"
+    },
+    "errors": {
+      "not_configured": "Cybernetics Data nu este configurat pentru acest proiect.",
+      "unauthorized": "Tokenul Cybernetics Data al proiectului este nevalid sau a expirat.",
+      "forbidden": "Tokenul proiectului nu are acces la această resursă.",
+      "not_found": "Înregistrarea sau tabelul solicitat nu mai există.",
+      "unreachable": "Cybernetics Data nu a putut fi contactat. Încearcă din nou peste puțin timp.",
+      "rate_limited": "Prea multe solicitări către Cybernetics Data. Așteaptă puțin și încearcă din nou.",
+      "unreadable_token": "Tokenul stocat nu poate fi citit. Un administrator de proiect trebuie să îl introducă din nou.",
+      "bad_request": "Cybernetics Data a respins solicitarea.",
+      "attach_failed": "Unele înregistrări nu au putut fi atașate. Este posibil să fi fost șterse sau tokenul proiectului nu le poate citi.",
+      "generic": "Ceva nu a funcționat. Te rugăm să încerci din nou.",
+      "open_settings": "Deschide setările"
+    },
+    "viewer": {
+      "fields": "Câmpuri",
+      "show_more": "Arată mai mult",
+      "show_less": "Arată mai puțin",
+      "empty_value": "Gol",
+      "select": "Selectează această înregistrare"
+    },
+    "item": {
+      "view": "Vizualizează",
+      "open_external": "Deschide în Cybernetics Data",
+      "refresh": "Reîmprospătează",
+      "copy_link": "Copiază link-ul",
+      "remove": "Elimină",
+      "missing": "Înregistrarea nu mai există",
+      "forbidden": "Fără acces cu tokenul curent",
+      "disconnected": "Cybernetics Data este deconectat. Se afișează instantaneele salvate."
+    },
+    "activity": {
+      "attached": "a atașat o înregistrare din baza de date",
+      "removed": "a eliminat o înregistrare din baza de date"
+    },
+    "toast": {
+      "attached": "{count, plural, one {# înregistrare atașată} few {# înregistrări atașate} other {# de înregistrări atașate}}",
+      "skipped": "{count, plural, one {# înregistrare era deja atașată} few {# înregistrări erau deja atașate} other {# de înregistrări erau deja atașate}}",
+      "removed": "Înregistrare din baza de date eliminată",
+      "refreshed": "Înregistrări din baza de date reîmprospătate",
+      "attach_failed": "{count, plural, one {Nu s-a putut atașa # înregistrare} few {Nu s-au putut atașa # înregistrări} other {Nu s-au putut atașa # de înregistrări}}"
+    }
+  }
+}

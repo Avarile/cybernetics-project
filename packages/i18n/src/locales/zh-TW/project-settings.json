@@ -521,6 +521,62 @@
           }
         }
       }
+    },
+    "cybernetics_data": {
+      "label": "Cybernetics Data",
+      "heading": "Cybernetics Data",
+      "description": "將此專案連線至 Cybernetics Data 工作區，讓成員可以瀏覽資料庫並將記錄附加到工作事項。",
+      "url_label": "CYBERNETICS_DATA_URL",
+      "url_helper": "您 Cybernetics Data 部署的來源網址，不含 /api。",
+      "url_placeholder": "https://data.example.com",
+      "url_required": "CYBERNETICS_DATA_URL 為必填欄位。",
+      "url_invalid": "請輸入有效的 http(s) URL。",
+      "token_label": "CYBERNETICS_APITOKEN",
+      "token_helper": "具有讀取權限範圍的個人存取權杖：空間、資料庫（含讀取全部權限）、資料表、欄位、檢視和記錄。建議使用僅限於特定空間的專用服務帳號。",
+      "token_placeholder_new": "貼上您的 API 權杖",
+      "token_placeholder_stored": "已儲存的權杖 {hint}。留空以保留目前的權杖。",
+      "token_required": "CYBERNETICS_APITOKEN 為必填欄位。",
+      "token_required_url_change": "變更 URL 時，請重新輸入權杖。",
+      "token_prefix_warning": "此權杖並非以「cybernetics_」開頭。請確認您複製的是 Cybernetics Data 的個人存取權杖。",
+      "delegation_warning": "所有專案成員都將使用此權杖的權限瀏覽 Cybernetics Data。",
+      "show_token": "顯示權杖",
+      "hide_token": "隱藏權杖",
+      "enabled_label": "已啟用",
+      "enabled_description": "停用後，成員將無法瀏覽或附加記錄。已附加的記錄會保留其已儲存的快照。",
+      "test_button": "測試連線",
+      "testing": "正在測試",
+      "save_button": "儲存",
+      "saving": "儲存中",
+      "save_anyway": "仍要儲存（略過驗證）",
+      "verified_ago": "已驗證 {time}",
+      "status": {
+        "ok": "已連線",
+        "unauthorized": "權杖無效或已過期",
+        "forbidden": "權杖的存取權限受限",
+        "unreachable": "無法連線至伺服器",
+        "error": "連線錯誤",
+        "never": "尚未驗證",
+        "not_configured": "未連線",
+        "disabled": "已停用"
+      },
+      "bases_visible": "{count, plural, one {權杖已通過驗證 · 可見 # 個資料庫} other {權杖已通過驗證 · 可見 # 個資料庫}}",
+      "disconnect": {
+        "heading": "危險區域",
+        "title": "斷開 Cybernetics Data 連線",
+        "description": "將從此專案中移除該 URL 與權杖。已附加的記錄會保留其已儲存的快照。",
+        "confirm": "您確定要中斷此專案與 Cybernetics Data 的連線嗎？成員將無法再瀏覽或附加記錄。已附加的記錄會保留其已儲存的快照。",
+        "button": "中斷連線",
+        "loading": "正在中斷連線"
+      },
+      "toast": {
+        "saved": "Cybernetics Data 設定已儲存。",
+        "enabled": "Cybernetics Data 已啟用。",
+        "disabled": "Cybernetics Data 已停用。",
+        "disconnected": "Cybernetics Data 已中斷連線。",
+        "test_ok": "連線成功。",
+        "test_failed": "連線失敗。",
+        "error": "出現錯誤。請重試。"
+      }
     }
   }
 }

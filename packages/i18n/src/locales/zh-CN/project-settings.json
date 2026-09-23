@@ -521,6 +521,62 @@
           }
         }
       }
+    },
+    "cybernetics_data": {
+      "label": "Cybernetics Data",
+      "heading": "Cybernetics Data",
+      "description": "将此项目连接到 Cybernetics Data 工作区，以便成员浏览数据库并将记录附加到工作项。",
+      "url_label": "CYBERNETICS_DATA_URL",
+      "url_helper": "您的 Cybernetics Data 部署的来源地址，不包含 /api。",
+      "url_placeholder": "https://data.example.com",
+      "url_required": "CYBERNETICS_DATA_URL 为必填项。",
+      "url_invalid": "请输入有效的 http(s) URL。",
+      "token_label": "CYBERNETICS_APITOKEN",
+      "token_helper": "具有读取权限范围的个人访问令牌：空间、数据库（含读取全部权限）、表、字段、视图和记录。建议使用仅限于特定空间的专用服务账号。",
+      "token_placeholder_new": "粘贴您的 API 令牌",
+      "token_placeholder_stored": "已保存的令牌 {hint}。留空以保留当前令牌。",
+      "token_required": "CYBERNETICS_APITOKEN 为必填项。",
+      "token_required_url_change": "更改 URL 时，请重新输入令牌。",
+      "token_prefix_warning": "该令牌不是以“cybernetics_”开头。请确认您复制的是 Cybernetics Data 的个人访问令牌。",
+      "delegation_warning": "所有项目成员都将使用此令牌的权限浏览 Cybernetics Data。",
+      "show_token": "显示令牌",
+      "hide_token": "隐藏令牌",
+      "enabled_label": "已启用",
+      "enabled_description": "禁用后，成员将无法浏览或附加记录。已附加的记录会保留其已保存的快照。",
+      "test_button": "测试连接",
+      "testing": "正在测试",
+      "save_button": "保存",
+      "saving": "保存中",
+      "save_anyway": "仍然保存（跳过验证）",
+      "verified_ago": "已验证 {time}",
+      "status": {
+        "ok": "已连接",
+        "unauthorized": "令牌无效或已过期",
+        "forbidden": "令牌的访问权限受限",
+        "unreachable": "无法连接到服务器",
+        "error": "连接错误",
+        "never": "尚未验证",
+        "not_configured": "未连接",
+        "disabled": "已禁用"
+      },
+      "bases_visible": "{count, plural, one {令牌已通过验证 · 可见 # 个数据库} other {令牌已通过验证 · 可见 # 个数据库}}",
+      "disconnect": {
+        "heading": "危险区域",
+        "title": "断开 Cybernetics Data 连接",
+        "description": "将从此项目中移除该 URL 和令牌。已附加的记录会保留其已保存的快照。",
+        "confirm": "您确定要断开此项目与 Cybernetics Data 的连接吗？成员将无法再浏览或附加记录。已附加的记录会保留其已保存的快照。",
+        "button": "断开连接",
+        "loading": "正在断开连接"
+      },
+      "toast": {
+        "saved": "Cybernetics Data 设置已保存。",
+        "enabled": "Cybernetics Data 已启用。",
+        "disabled": "Cybernetics Data 已禁用。",
+        "disconnected": "Cybernetics Data 已断开连接。",
+        "test_ok": "连接成功。",
+        "test_failed": "连接失败。",
+        "error": "出现错误。请重试。"
+      }
     }
   }
 }

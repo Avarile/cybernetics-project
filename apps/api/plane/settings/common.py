@@ -90,6 +90,35 @@ WEBHOOK_DISALLOWED_DOMAINS = [
     if _d.strip()
 ]
 
+# Cybernetics-Data integration — outbound network policy. Per-project URL and
+# token are stored in the database; these only govern where Plane may connect.
+# Hosts / CIDRs listed here may resolve to private networks (e.g. docker DNS).
+def _parse_allowed_ips(env_var):
+    """Comma-separated IPs / CIDRs → list of ip_network; invalid entries are skipped."""
+    networks = []
+    for entry in os.environ.get(env_var, "").split(","):
+        entry = entry.strip()
+        if not entry:
+            continue
+        try:
+            networks.append(ipaddress.ip_network(entry, strict=False))
+        except ValueError:
+            _logger.warning("%s: skipping invalid entry %r", env_var, entry)
+    return networks
+
+
+def _parse_allowed_hosts(env_var):
+    """Comma-separated hostnames → lower-cased list without trailing dots."""
+    return [host.strip().rstrip(".").lower() for host in os.environ.get(env_var, "").split(",") if host.strip()]
+
+
+CYBERNETICS_DATA_ENABLED = os.environ.get("CYBERNETICS_DATA_ENABLED", "1") == "1"
+CYBERNETICS_DATA_ALLOWED_IPS = _parse_allowed_ips("CYBERNETICS_DATA_ALLOWED_IPS")
+CYBERNETICS_DATA_ALLOWED_HOSTS = _parse_allowed_hosts("CYBERNETICS_DATA_ALLOWED_HOSTS")
+CYBERNETICS_DATA_TIMEOUT = float(os.environ.get("CYBERNETICS_DATA_TIMEOUT", "10"))
+CYBERNETICS_DATA_REQUIRE_HTTPS = os.environ.get("CYBERNETICS_DATA_REQUIRE_HTTPS", "1") == "1"
+CYBERNETICS_DATA_PROXY_RATE = os.environ.get("CYBERNETICS_DATA_PROXY_RATE", "120/minute")
+
 # Allowed Hosts
 ALLOWED_HOSTS = os.environ.get("ALLOWED_HOSTS", "*").split(",")
 
@@ -141,6 +170,7 @@ REST_FRAMEWORK = {
     "DEFAULT_THROTTLE_RATES": {
         "anon": "30/minute",
         "asset_id": "5/minute",
+        "cybernetics_data": CYBERNETICS_DATA_PROXY_RATE,
     },
     "DEFAULT_PERMISSION_CLASSES": ("rest_framework.permissions.IsAuthenticated",),
     "DEFAULT_RENDERER_CLASSES": ("rest_framework.renderers.JSONRenderer",),

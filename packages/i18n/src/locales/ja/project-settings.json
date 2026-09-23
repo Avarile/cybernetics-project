@@ -521,6 +521,62 @@
           }
         }
       }
+    },
+    "cybernetics_data": {
+      "label": "Cybernetics Data",
+      "heading": "Cybernetics Data",
+      "description": "このプロジェクトをCybernetics Dataワークスペースに接続すると、メンバーがデータベースを閲覧し、作業項目にレコードを添付できるようになります。",
+      "url_label": "CYBERNETICS_DATA_URL",
+      "url_helper": "Cybernetics Dataデプロイのオリジン（/apiを含まない）。",
+      "url_placeholder": "https://data.example.com",
+      "url_required": "CYBERNETICS_DATA_URLは必須です。",
+      "url_invalid": "有効なhttp(s) URLを入力してください。",
+      "token_label": "CYBERNETICS_APITOKEN",
+      "token_helper": "space、base（すべて読み取るを含む）、table、field、view、recordの読み取りスコープを持つ個人アクセストークン。特定のスペースに制限された専用のサービスアカウントの使用を推奨します。",
+      "token_placeholder_new": "APIトークンを貼り付けてください",
+      "token_placeholder_stored": "保存済みトークン {hint}。変更しない場合は空欄のままにしてください。",
+      "token_required": "CYBERNETICS_APITOKENは必須です。",
+      "token_required_url_change": "URL を変更する場合は、トークンを再入力してください。",
+      "token_prefix_warning": "このトークンは「cybernetics_」で始まっていません。Cybernetics Dataの個人アクセストークンをコピーしたか確認してください。",
+      "delegation_warning": "すべてのプロジェクトメンバーは、このトークンの権限でCybernetics Dataを閲覧します。",
+      "show_token": "トークンを表示",
+      "hide_token": "トークンを非表示",
+      "enabled_label": "有効",
+      "enabled_description": "無効にすると、メンバーはレコードの閲覧や添付ができなくなります。添付済みのレコードは保存済みのスナップショットを保持します。",
+      "test_button": "接続をテスト",
+      "testing": "テスト中",
+      "save_button": "保存",
+      "saving": "保存中",
+      "save_anyway": "検証をスキップして保存",
+      "verified_ago": "{time}に確認済み",
+      "status": {
+        "ok": "接続済み",
+        "unauthorized": "トークンが無効または期限切れです",
+        "forbidden": "トークンのアクセスが制限されています",
+        "unreachable": "サーバーに接続できません",
+        "error": "接続エラー",
+        "never": "まだ確認されていません",
+        "not_configured": "未接続",
+        "disabled": "無効"
+      },
+      "bases_visible": "{count, plural, one {トークンが承認されました・データベース#件が表示可能} other {トークンが承認されました・データベース#件が表示可能}}",
+      "disconnect": {
+        "heading": "危険な操作",
+        "title": "Cybernetics Dataを切断",
+        "description": "このプロジェクトからURLとトークンを削除します。添付済みのレコードは保存済みのスナップショットを保持します。",
+        "confirm": "このプロジェクトからCybernetics Dataを切断してもよろしいですか？メンバーはレコードを閲覧・添付できなくなります。添付済みのレコードは保存済みのスナップショットを保持します。",
+        "button": "切断",
+        "loading": "切断中"
+      },
+      "toast": {
+        "saved": "Cybernetics Dataの設定を保存しました。",
+        "enabled": "Cybernetics Dataを有効にしました。",
+        "disabled": "Cybernetics Dataを無効にしました。",
+        "disconnected": "Cybernetics Dataを切断しました。",
+        "test_ok": "接続に成功しました。",
+        "test_failed": "接続に失敗しました。",
+        "error": "問題が発生しました。もう一度お試しください。"
+      }
     }
   }
 }

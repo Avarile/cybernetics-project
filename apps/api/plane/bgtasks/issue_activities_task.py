@@ -1014,6 +1014,69 @@ def delete_link_activity(
     )
 
 
+def _cybernetics_record_label(data):
+    table_name = (data or {}).get("table_name") or ""
+    record_name = (data or {}).get("record_name") or (data or {}).get("record_id") or ""
+    return f"{table_name} / {record_name}" if table_name else record_name
+
+
+def create_cybernetics_record_activity(
+    requested_data,
+    current_instance,
+    issue_id,
+    project_id,
+    workspace_id,
+    actor_id,
+    issue_activities,
+    epoch,
+):
+    requested_data = json.loads(requested_data) if requested_data is not None else None
+
+    issue_activities.append(
+        IssueActivity(
+            issue_id=issue_id,
+            project_id=project_id,
+            workspace_id=workspace_id,
+            comment="attached a database record",
+            verb="created",
+            actor_id=actor_id,
+            field="cybernetics_record",
+            new_value=_cybernetics_record_label(requested_data),
+            new_identifier=requested_data.get("id", None),
+            epoch=epoch,
+        )
+    )
+
+
+def delete_cybernetics_record_activity(
+    requested_data,
+    current_instance,
+    issue_id,
+    project_id,
+    workspace_id,
+    actor_id,
+    issue_activities,
+    epoch,
+):
+    current_instance = json.loads(current_instance) if current_instance is not None else None
+
+    issue_activities.append(
+        IssueActivity(
+            issue_id=issue_id,
+            project_id=project_id,
+            workspace_id=workspace_id,
+            comment="removed a database record",
+            verb="deleted",
+            actor_id=actor_id,
+            field="cybernetics_record",
+            old_value=_cybernetics_record_label(current_instance),
+            old_identifier=current_instance.get("id", None),
+            new_value="",
+            epoch=epoch,
+        )
+    )
+
+
 def create_attachment_activity(
     requested_data,
     current_instance,
@@ -1553,6 +1616,8 @@ def issue_activity(
             "link.activity.deleted": delete_link_activity,
             "attachment.activity.created": create_attachment_activity,
             "attachment.activity.deleted": delete_attachment_activity,
+            "cybernetics_record.activity.created": create_cybernetics_record_activity,
+            "cybernetics_record.activity.deleted": delete_cybernetics_record_activity,
             "issue_relation.activity.created": create_issue_relation_activity,
             "issue_relation.activity.deleted": delete_issue_relation_activity,
             "issue_reaction.activity.created": create_issue_reaction_activity,

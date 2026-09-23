@@ -91,6 +91,7 @@ export interface IIssueDetail
   isRelationModalOpen: TIssueRelationModal | null;
   isSubIssuesModalOpen: string | null;
   attachmentDeleteModalId: string | null;
+  isAdditionalWidgetModalOpen: boolean;
   // computed
   isAnyModalOpen: boolean;
   isPeekOpen: boolean;
@@ -107,6 +108,7 @@ export interface IIssueDetail
   toggleRelationModal: (issueId: string | null, relationType: TIssueRelationTypes | null) => void;
   toggleSubIssuesModal: (value: string | null) => void;
   toggleDeleteAttachmentModal: (attachmentId: string | null) => void;
+  setAdditionalWidgetModalOpen: (value: boolean) => void;
   setOpenWidgets: (state: TWorkItemWidgets[]) => void;
   setLastWidgetAction: (action: TWorkItemWidgets) => void;
   toggleOpenWidget: (state: TWorkItemWidgets) => void;
@@ -153,6 +155,8 @@ export abstract class IssueDetail implements IIssueDetail {
   isRelationModalOpen: TIssueRelationModal | null = null;
   isSubIssuesModalOpen: string | null = null;
   attachmentDeleteModalId: string | null = null;
+  // set by extension widgets (plane-web) that render their own modals
+  isAdditionalWidgetModalOpen: boolean = false;
   // service type
   serviceType: TIssueServiceType;
   // store
@@ -183,6 +187,7 @@ export abstract class IssueDetail implements IIssueDetail {
       isRelationModalOpen: observable.ref,
       isSubIssuesModalOpen: observable.ref,
       attachmentDeleteModalId: observable.ref,
+      isAdditionalWidgetModalOpen: observable.ref,
       openWidgets: observable.ref,
       lastWidgetAction: observable.ref,
       // computed
@@ -199,6 +204,7 @@ export abstract class IssueDetail implements IIssueDetail {
       toggleRelationModal: action,
       toggleSubIssuesModal: action,
       toggleDeleteAttachmentModal: action,
+      setAdditionalWidgetModalOpen: action,
       setOpenWidgets: action,
       setLastWidgetAction: action,
       toggleOpenWidget: action,
@@ -231,7 +237,8 @@ export abstract class IssueDetail implements IIssueDetail {
       !!this.isArchiveIssueModalOpen ||
       !!this.isRelationModalOpen?.issueId ||
       !!this.isSubIssuesModalOpen ||
-      !!this.attachmentDeleteModalId
+      !!this.attachmentDeleteModalId ||
+      this.isAdditionalWidgetModalOpen
     );
   }
 
@@ -255,6 +262,7 @@ export abstract class IssueDetail implements IIssueDetail {
     (this.isRelationModalOpen = { issueId, relationType });
   toggleSubIssuesModal = (issueId: string | null) => (this.isSubIssuesModalOpen = issueId);
   toggleDeleteAttachmentModal = (attachmentId: string | null) => (this.attachmentDeleteModalId = attachmentId);
+  setAdditionalWidgetModalOpen = (value: boolean) => (this.isAdditionalWidgetModalOpen = value);
   setOpenWidgets = (state: TWorkItemWidgets[]) => {
     this.openWidgets = state;
     if (this.lastWidgetAction) this.lastWidgetAction = null;

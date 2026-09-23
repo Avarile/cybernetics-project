@@ -238,3 +238,14 @@ from .notification.base import MarkAllReadNotificationViewSet
 from .user.base import AccountEndpoint, ProfileEndpoint, UserSessionEndpoint
 
 from .timezone.base import TimezoneEndpoint
+
+from .cybernetics_data import (
+    CyberneticsDatabasesEndpoint,
+    CyberneticsRecordDetailEndpoint,
+    CyberneticsRecordsEndpoint,
+    CyberneticsTableSchemaEndpoint,
+    CyberneticsTablesEndpoint,
+    IssueCyberneticsRecordViewSet,
+    ProjectCyberneticsDataEndpoint,
+    ProjectCyberneticsDataTestEndpoint,
+)

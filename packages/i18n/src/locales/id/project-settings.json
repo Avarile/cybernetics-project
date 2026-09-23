@@ -521,6 +521,62 @@
           }
         }
       }
+    },
+    "cybernetics_data": {
+      "label": "Cybernetics Data",
+      "heading": "Cybernetics Data",
+      "description": "Hubungkan proyek ini ke ruang kerja Cybernetics Data agar anggota dapat menelusuri database dan melampirkan rekaman ke item kerja.",
+      "url_label": "CYBERNETICS_DATA_URL",
+      "url_helper": "URL asal deployment Cybernetics Data Anda, tanpa /api.",
+      "url_placeholder": "https://data.example.com",
+      "url_required": "CYBERNETICS_DATA_URL wajib diisi.",
+      "url_invalid": "Masukkan URL http(s) yang valid.",
+      "token_label": "CYBERNETICS_APITOKEN",
+      "token_helper": "Token akses personal dengan cakupan baca: ruang, database (termasuk baca semua), tabel, kolom, tampilan, dan rekaman. Sebaiknya gunakan akun layanan khusus yang dibatasi pada ruang tertentu.",
+      "token_placeholder_new": "Tempel token API Anda",
+      "token_placeholder_stored": "Token tersimpan {hint}. Kosongkan untuk mempertahankannya.",
+      "token_required": "CYBERNETICS_APITOKEN wajib diisi.",
+      "token_required_url_change": "Masukkan ulang token saat mengubah URL.",
+      "token_prefix_warning": "Token ini tidak diawali dengan cybernetics_. Pastikan Anda menyalin token akses personal Cybernetics Data.",
+      "delegation_warning": "Semua anggota proyek akan menelusuri Cybernetics Data dengan izin token ini.",
+      "show_token": "Tampilkan token",
+      "hide_token": "Sembunyikan token",
+      "enabled_label": "Diaktifkan",
+      "enabled_description": "Saat dinonaktifkan, anggota tidak dapat menelusuri atau melampirkan rekaman. Rekaman yang telah dilampirkan akan tetap menyimpan snapshot tersimpannya.",
+      "test_button": "Uji koneksi",
+      "testing": "Menguji",
+      "save_button": "Simpan",
+      "saving": "Menyimpan",
+      "save_anyway": "Tetap simpan (lewati verifikasi)",
+      "verified_ago": "Diverifikasi {time}",
+      "status": {
+        "ok": "Terhubung",
+        "unauthorized": "Token tidak valid atau sudah kedaluwarsa",
+        "forbidden": "Token memiliki akses terbatas",
+        "unreachable": "Tidak dapat menjangkau server",
+        "error": "Kesalahan koneksi",
+        "never": "Belum diverifikasi",
+        "not_configured": "Belum terhubung",
+        "disabled": "Dinonaktifkan"
+      },
+      "bases_visible": "{count, plural, one {Token diterima · # database terlihat} other {Token diterima · # database terlihat}}",
+      "disconnect": {
+        "heading": "Zona berbahaya",
+        "title": "Putuskan Cybernetics Data",
+        "description": "Menghapus URL dan token dari proyek ini. Rekaman yang telah dilampirkan akan tetap menyimpan snapshot tersimpannya.",
+        "confirm": "Apakah Anda yakin ingin memutuskan Cybernetics Data dari proyek ini? Anggota tidak akan lagi dapat menelusuri atau melampirkan rekaman. Rekaman yang telah dilampirkan akan tetap menyimpan snapshot tersimpannya.",
+        "button": "Putuskan",
+        "loading": "Memutuskan"
+      },
+      "toast": {
+        "saved": "Pengaturan Cybernetics Data disimpan.",
+        "enabled": "Cybernetics Data diaktifkan.",
+        "disabled": "Cybernetics Data dinonaktifkan.",
+        "disconnected": "Cybernetics Data terputus.",
+        "test_ok": "Koneksi berhasil.",
+        "test_failed": "Koneksi gagal.",
+        "error": "Terjadi kesalahan. Silakan coba lagi."
+      }
     }
   }
 }

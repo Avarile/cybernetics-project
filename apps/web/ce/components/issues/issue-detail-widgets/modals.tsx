@@ -4,8 +4,11 @@
  * See the LICENSE file for details.
  */
 
-// plane types
+// plane imports
+import { EIssueServiceType } from "@plane/types";
 import type { TIssueServiceType, TWorkItemWidgets } from "@plane/types";
+// plane web imports
+import { CyberneticsDataBrowserModal } from "@/plane-web/components/cybernetics-data/browser/modal";
 
 export type TWorkItemAdditionalWidgetModalsProps = {
   hideWidgets: TWorkItemWidgets[];
@@ -15,6 +18,10 @@ export type TWorkItemAdditionalWidgetModalsProps = {
   workspaceSlug: string;
 };
 
-export function WorkItemAdditionalWidgetModals(_props: TWorkItemAdditionalWidgetModalsProps) {
-  return null;
+export function WorkItemAdditionalWidgetModals(props: TWorkItemAdditionalWidgetModalsProps) {
+  const { hideWidgets, issueServiceType, projectId, workItemId, workspaceSlug } = props;
+
+  if (issueServiceType !== EIssueServiceType.ISSUES || hideWidgets.includes("cybernetics-records")) return null;
+
+  return <CyberneticsDataBrowserModal workspaceSlug={workspaceSlug} projectId={projectId} workItemId={workItemId} />;
 }

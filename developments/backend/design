@@ -1,0 +1,1380 @@
+# Cybernetics-Projects × Cybernetics-Data Integration — Design
+
+> Goal source: [`./current_goal`](./current_goal)
+> Status: **design only** — no application code written yet.
+> Date: 2026-09-23
+
+Paths are abbreviated:
+- `P/` = `cybernetics-projects/` (Plane fork; Django API in `P/apps/api/plane`, React Router web in `P/apps/web`)
+- `D/` = `cybernetics-data-centre/` (Teable fork; NestJS in `D/apps/nestjs-backend`, contracts in `D/packages/openapi`, `D/packages/core`)
+
+Every claim about existing code below was read from source (file + line where useful) so the design can be audited.
+
+---
+
+## Table of contents
+
+0. Summary & locked decisions
+1. Analysis — Cybernetics-Data (the system we integrate with)
+2. Analysis — Cybernetics-Projects backend (Django)
+3. Analysis — Cybernetics-Projects frontend (web)
+4. Architecture overview
+5. Backend design
+   5.1 Settings / env · 5.2 Data model · 5.3 Secret handling · 5.4 Outbound client · 5.5 Service layer
+   5.6 REST API · 5.7 Permissions matrix · 5.8 Activity · 5.9 Caching & throttling · 5.10 Errors · 5.11 File map
+6. Frontend design
+   6.1 Types/constants · 6.2 Settings page (Feature 1) · 6.3 Service & store · 6.4 "Database" button (Feature 2)
+   6.5 Browser modal · 6.6 Record viewer · 6.7 Collapsible list · 6.8 Activity · 6.9 i18n · 6.10 File map
+7. Security review
+8. Testing plan
+9. Implementation roadmap
+10. Risks & open questions
+
+---
+
+## 0. Summary & locked decisions
+
+**Feature 1: Setup.** Add a new project-settings side-nav item, **"Cybernetics Data"**, at
+`/<workspaceSlug>/settings/projects/<projectId>/cybernetics-data`. A project admin enters:
+
+| Field (UI label) | Meaning | Storage |
+|---|---|---|
+| `CYBERNETICS_DATA_URL` | Origin of the Cybernetics-Data deployment (its `PUBLIC_ORIGIN`), e.g. `https://data.example.com` | plaintext, normalised |
+| `CYBERNETICS_APITOKEN` | A Cybernetics-Data personal access token (`cybernetics_<id>_<sig>`) | **Fernet-encrypted**, write-only |
+
+**Feature 2: Select.** In the work-item detail view (peek overview and full page), a new **"Database"** button sits next to
+*Add sub-work item / Add relation / Add link / Attach*. It opens a modal where the user can:
+- browse **Space → Base ("database") → Table**;
+- query records (search, view, filter, sort, paginate);
+- select records and attach them to the work item;
+- view a single record in detail.
+
+Attached records then appear in a **"Database records"** collapsible under the other widgets.
+
+**Locked decisions** (reasons in §1–§3):
+
+1. **The Plane backend is a server-side proxy.** The browser never sees the token and never calls Cybernetics-Data directly.
+   The token must stay secret, the Data-Centre may sit on a private network, and this keeps one auth model.
+2. **"Database" = Teable Base.** Space is an optional grouping level above it. Teable's `db-connection` feature (raw Postgres
+   DSN) is **not** used (§1.1).
+3. **Configuration is per project.** It lives in a new table `project_cybernetics_data_integrations`, one active row per project.
+4. **Attached records are stored as references plus a display snapshot.** New table `issue_cybernetics_records`, holding
+   ids + record name + table/base names + deep link. Plane never copies full record data. Live data is always fetched through
+   the proxy.
+5. **Every outbound call goes through `pinned_fetch`** (`P/apps/api/plane/utils/url_security.py:198`), the existing
+   SSRF-safe client. A dedicated allowlist, `CYBERNETICS_DATA_ALLOWED_HOSTS/IPS`, permits private-network deployments.
+6. **Frontend changes go into the CE extension points** (`apps/web/ce/...` stubs and `routes/extended.ts`) where possible,
+   to keep core diffs small and merges from upstream Plane easy.
+
+**Product decisions confirmed 2026-09-23 (v1):**
+
+| # | Decision | Effect on this design |
+|---|---|---|
+| D1 | **Shared project token.** Every project member (Member/Admin) browses Cybernetics-Data with the permissions of the one token the project admin configured. There are no per-user tokens in v1. | §5.2 one integration row per project; §5.7 delegation warning shown in settings; per-user tokens deferred (§10 Q4). |
+| D2 | **Guests see only saved previews.** They can see attached records' snapshots, but can't browse, open the live record viewer, attach or refresh. | §5.7 matrix; §6.7 guest rows are static (no click-to-view, no ↗ deep link needed beyond the stored `source_url`). |
+| D3 | **Work items only.** No epics and no intake items in v1. | §6.4 button hidden unless `issueServiceType === ISSUES`; backend routes under `issues/…` only. |
+| D4 | **Read-only.** Nothing is written back to Cybernetics-Data. | Client exposes GET methods only; token needs read scopes only (§1.2). |
+
+---
+
+## 1. Analysis — Cybernetics-Data (Teable fork)
+
+### 1.1 Domain hierarchy
+
+- ID prefixes are defined in `D/packages/core/src/utils/id-generator.ts:4-13`:
+  `Space (spc…) → Base (bse…) → Table (tbl…) → Field (fld…) / View (viw…) / Record (rec…)`.
+- The UI still calls them "Space" and "Base". The fork's own MCP tools use `list_spaces`, `list_bases`, `list_tables`
+  (`D/apps/nestjs-backend/src/features/mcp/tools/discovery.tools.ts`).
+- There is a separate **db-connection** feature: `POST|GET|DELETE /api/base/{baseId}/connection`, scope
+  `base|db_connection` (`base.controller.ts:254-270`). It hands out a raw Postgres DSN, needs `PUBLIC_DATABASE_PROXY`, and is
+  marked for removal / enterprise-only. **Not used.**
+- **Mapping used in this design:** UI "Database" = Base. The picker shows Space as a grouping level above it.
+
+### 1.2 Authentication with an API token
+
+- **Header:** `Authorization: Bearer <token>`. This is the only extractor
+  (`D/.../auth/strategies/access-token.strategy.ts:26,77-86`).
+- **Token format:** `${prefix}_${accessTokenId}_${encryptedSign}` (`access-token.encryptor.ts:20-24`). The fork's prefix is
+  `cybernetics` (`D/.../configs/auth.config.ts:35`). We can use the prefix for a cheap client-side sanity check (warning only).
+- **Validation** (`access-token.service.ts:61-80`): the token must exist, have a valid sign and not be expired; the user must
+  not be deactivated. Otherwise **401** `unauthorized`.
+- **Scopes** are in `D/packages/core/src/auth/actions.ts`. The integration needs **read-only** scopes:
+  `space|read, base|read, base|read_all, table|read, view|read, field|read, record|read`.
+- **Effective permission** = user role ∩ token scopes (`permission.service.ts:418-432`).
+- **Resource restriction** (`permission.service.ts:248-330`): when not `hasFullAccess`, the resource must be in `spaceIds`
+  / `baseIds`. Otherwise **403** `restricted_resource`.
+- **Caveats that shape the design:**
+  - `GET /api/space` is filtered by the token's `spaceIds` and returns `[]` for a token restricted to bases only.
+  - `GET /api/space/{spc}/base` returns 403 for a token restricted to bases only.
+  - `GET /api/base/access/all` is **not** filtered by the token's lists: it returns every base the *user* can see. Calls on a
+    base outside the token's restriction still return 403.
+  - **Therefore the picker lists bases from `/api/base/access/all`** and groups them by `spaceId` on the client. This works
+    for every token shape. Bases that return 403 are shown as "no access" rather than as an error (§5.5).
+- **Rate limiting:** there is no global API throttle in the Data-Centre. **Plane must throttle its own proxy** (§5.9).
+
+### 1.3 REST endpoints used
+
+The base URL is `${PUBLIC_ORIGIN}/api`. There is no version segment and no global prefix: each controller hard-codes `api/...`.
+
+| Purpose | Method + path | Scope | Response |
+|---|---|---|---|
+| List spaces | `GET /api/space` | `space\|read` | `[{id,name,role,organization?}]` |
+| List all accessible bases | `GET /api/base/access/all` | `base\|read_all` | `IGetBaseItem[]` `{id,name,spaceId,icon,role,…}` |
+| Get one base | `GET /api/base/{baseId}` | `base\|read` | `IGetBaseItem` |
+| List tables | `GET /api/base/{baseId}/table` | `table\|read` | `[{id,name,description?,icon?,order?,defaultViewId?,…}]` |
+| Get one table (checks base↔table) | `GET /api/base/{baseId}/table/{tableId}` | `table\|read` | table |
+| List fields | `GET /api/table/{tableId}/field?viewId=&filterHidden=` | `field\|read` | `IFieldVo[]` `{id,name,type,isPrimary,cellValueType,isMultipleCellValue,options,…}` |
+| List views | `GET /api/table/{tableId}/view` | `view\|read` | `[{id,name,type,…}]` |
+| List records | `GET /api/table/{tableId}/record` | `record\|read` | `{records: IRecord[], extra?}` |
+| Row count | `GET /api/table/{tableId}/aggregation/row-count` | `table\|read` | `{rowCount}` |
+| Get one record | `GET /api/table/{tableId}/record/{recordId}` | `record\|read` | `IRecord` |
+
+**`GET /record` query parameters** (`D/packages/openapi/src/record/get-list.ts`):
+
+- `take`: default 100, **max 1000**. `skip`: min 0.
+- `viewId`: applies the view's filter and sort. `ignoreViewQuery` turns that off.
+- `filter`: a **JSON string**, `{conjunction:'and'|'or', filterSet:[{fieldId,operator,value}|nested]}`.
+  Operators include `is, isNot, contains, doesNotContain, isEmpty, isNotEmpty, isGreater, isLess, isAnyOf, isBefore, isAfter, …`
+  (`D/packages/core/src/models/view/filter/operator.ts`).
+- `orderBy`: a JSON string, `[{fieldId, order}]`.
+- `search`: a tuple `[value]`, `[value, fieldIdOrName]` or `[value, field, "true"|"false"]`, where the third element is
+  "hide rows that don't match". Express 4.21 uses `qs`, so it is sent as `search[]=v&search[]=fld&search[]=true`.
+- `projection` (string[]), `cellFormat` (`json`|`text`), `fieldKeyType` (`name`|`id`|`dbFieldName`).
+- **`filterByTql` is deprecated.** There is no `filterByTkm`.
+- The canonical client JSON-stringifies `filter`, `orderBy`, `groupBy` and `collapsedGroupIds` (`get-list.ts:296-314`).
+  **The Python client must do the same.**
+- The response has **no total count**, so call `aggregation/row-count` with the same query params.
+
+**`IRecord`** (`D/packages/core/src/models/record/record.ts:44-73`):
+
+```ts
+{ id: "rec…", name?: string /* primary-field value as string */, fields: Record<string, unknown>,
+  autoNumber?, createdTime?, lastModifiedTime?, createdBy?, lastModifiedBy? }
+```
+
+`name` is derived from the primary field (`record.service.ts:1864-1883`). **If `projection` omits the primary field, `name`
+is empty.** Always include the primary field id.
+
+**There is no public SQL/query endpoint.** `base|query_data` exists as a scope but no route uses it. The Data-Centre also
+exposes `POST /api/mcp` (JSON-RPC, same bearer token), which we deliberately don't use: REST is typed, cacheable and easier
+to test.
+
+### 1.4 Deep link
+
+The canonical "copy record URL" (`D/apps/nextjs-app/src/features/app/blocks/view/hooks/useContextMenu.ts:20`) is:
+
+```
+${PUBLIC_ORIGIN}/base/{baseId}/table/{tableId}?recordId={recordId}
+```
+
+- An optional view can be added: `/base/{baseId}/table/{tableId}/{viewId}?recordId=…`.
+- The `recordId` query parameter opens the expand-record dialog.
+- The page requires a Data-Centre web session (`ensureLogin`).
+- The Next.js app and the Nest API share one origin, so the configured `CYBERNETICS_DATA_URL` serves both API calls and deep
+  links.
+
+### 1.5 Errors
+
+The global filter (`D/.../filter/global-exception.filter.ts:61-68`) returns
+`{ "message": "...", "status": <int>, "code": "<code>", "data": {...} }`.
+
+| Code | Status | Meaning |
+|---|---|---|
+| `validation_error` | 400 | Bad query parameter |
+| `unauthorized` | 401 | Bad or expired token, or deactivated user |
+| `restricted_resource` | 403 | Scope missing or resource outside the token's restriction |
+| `not_found` | 404 | e.g. record deleted |
+| `too_many_requests` | 429 | |
+| `internal_server_error` | 500 | |
+| `database_connection_unavailable` | 503 | |
+
+A plain Nest guard failure returns 403 "Forbidden resource".
+
+### 1.6 Field types and rendering
+
+Field types (`D/packages/core/src/models/field/constant.ts`): `singleLineText, longText, user, attachment, checkbox,
+multipleSelect, singleSelect, date, number, rating, formula, rollup, conditionalRollup, link, createdTime, lastModifiedTime,
+createdBy, lastModifiedBy, autoNumber, button`. Lookups have `isLookup: true`.
+
+- **`cellFormat=text`** returns every value as its display string (`record.service.ts:218`). **Use it for grids and lists.**
+- **`cellFormat=json`** returns typed values. **Use it for the record viewer.** The tricky types:
+  - `attachment`: `[{id,name,mimetype,size,presignedUrl?,smThumbnailUrl?,lgThumbnailUrl?,…}]`. Presigned URLs expire
+    (`BACKEND_STORAGE_URL_EXPIRE_IN`, default 6d). **Never persist them.**
+  - `link`: `{id:'rec…', title?}` or an array of these. The records belong to another table.
+  - `user`, `createdBy`, `lastModifiedBy`: `{id,title,email?,avatarUrl?}`, single or array.
+  - `date`: an ISO string. Format and time zone are in the field's `options`.
+  - `singleSelect`: a string. `multipleSelect`: string[]. Colours are in `options.choices`.
+
+### 1.7 Existing clients
+
+`@teable/openapi` (`D/packages/openapi/src/axios.ts:170-241`) is an axios client built with `configApi({endpoint, token})`.
+There is **no Python SDK**, so we write a small typed Python client (§5.4) that mirrors that serialisation.
+
+---
+
+## 2. Analysis — Cybernetics-Projects backend (Django, `P/apps/api/plane`)
+
+| Concern | Existing code | Implication for us |
+|---|---|---|
+| Base models | `db/models/base.py:17` `BaseModel(AuditModel)`: UUID pk, created/updated by+at, soft delete via `deleted_at` (`db/mixins.py`). `db/models/project.py:180` `ProjectBaseModel` adds project + workspace FKs and derives workspace from project in `save()`. | Both new models extend `ProjectBaseModel`. |
+| Uniqueness under soft delete | `unique_together=[…, "deleted_at"]` plus a `UniqueConstraint(condition=Q(deleted_at__isnull=True))` (Project L145-160). | We use the same pattern. |
+| Model exports | Flat imports in `db/models/__init__.py`. | Add the new module there. |
+| Migrations | Latest is `db/migrations/0121_alter_estimate_type.py`. | New migration `0122_cybernetics_data_integration.py`. |
+| Integration models | `db/models/integration/*` (`GithubRepositorySync.credentials`, `SlackProjectSync.access_token`) store secrets **in plaintext** and are unused/dead. | Don't reuse them; build a new, encrypted model. |
+| Encryption | `license/utils/encryption.py`: `encrypt_data(data)->str` (L20) and `decrypt_data(enc)->str` (L34). Fernet, key derived from `SECRET_KEY` with a static salt. **Both return `""` on error.** | Use them, but wrap them so failures raise instead of silently returning `""` (§5.3). |
+| Links (template) | `db/models/issue.py:371` `IssueLink`; view `app/views/issue/link.py:26` (`ProjectEntityPermission`, queryset scoped to active membership in non-archived projects, `issue_activity.delay` on create/update/delete); URLs `app/urls/issue.py:109-125`. | The attached-records viewset copies this almost 1:1. |
+| Activity | `bgtasks/issue_activities_task.py`: `issue_activity(type, requested_data, current_instance, issue_id, actor_id, project_id, epoch, subscriber=True, notification=False, origin=None, intake=None)` (L1503); `ACTIVITY_MAPPER` (L1540-1568); `create_link_activity` (L928) as the example. | Add two handlers and two mapper entries. |
+| Permissions | `app/permissions/base.py:19` `allow_permission(allowed_roles, level="PROJECT", creator=False, model=None)` (needs `slug` + `project_id` kwargs); `ROLE` ADMIN=20 / MEMBER=15 / GUEST=5; `ProjectEntityPermission`, `ProjectAdminPermission` in `permissions/project.py`. | Per-method `@allow_permission`. |
+| Base views | `app/views/base.py`: `BaseViewSet` (L48) and `BaseAPIView` (L149), with session auth and `handle_exception` mapping ValidationError→400, DoesNotExist→404. | New views extend these. |
+| SSRF-safe HTTP | `utils/url_security.py`: `pinned_fetch(method, url, *, allowed_ips=None, allowed_hosts=None, headers=None, timeout=30, **kwargs)` (L198). It pins the validated IP, never follows redirects and sets `trust_env=False`. `utils/ip_address.py:159` `validate_url(url, allowed_ips, allowed_hosts)` raises `ValueError`. The webhook settings pattern is in `settings/common.py:55-92`. | **Always** use `pinned_fetch`. Add `CYBERNETICS_DATA_ALLOWED_HOSTS/IPS` settings, built like the webhook ones. |
+| Throttling | Only anon + asset + API-key throttles; the session-authenticated app views have **no per-user throttle**. | Add `CyberneticsDataProxyThrottle`. |
+| Cache | `utils/cache.py` (`cache_response`, `invalidate_cache`); django-redis; `settings/redis.py` `redis_instance()`. | Use the Django cache directly with explicit keys (§5.9). |
+| Project model | Feature booleans such as `module_view`, `cycle_view` (`db/models/project.py:93-100`); no generic settings JSON. | Keep configuration in its own table, not on `Project`. |
+| MCP | `plane/mcp`: tools replay calls in-process against the public `/api/v1` with the caller's API key (`mcp/client.py`). | Future MCP tools need `/api/v1` endpoints (phase 4, optional). |
+| URL aggregation | `app/urls/__init__.py` imports each module's `urlpatterns`. | Add `cybernetics_data.py` there. |
+
+---
+
+## 3. Analysis — Cybernetics-Projects frontend (`P/apps/web`)
+
+Aliases: `@/*` → `apps/web/core/*` and `@/plane-web/*` → `apps/web/ce/*` (`apps/web/tsconfig.json`). There is no `ee` directory.
+
+### 3.1 Project settings (Feature 1)
+
+- **Routes:** `apps/web/app/routes/core.ts:291-351` holds the project-settings block, with a nested
+  `layout("…/settings/projects/[projectId]/layout.tsx", [...])`.
+  - `routes.ts` merges `coreRoutes` with `extendedRoutes` (`routes/extended.ts`, currently `[]`) through `mergeRoutes`, which
+    deep-merges layouts that use the same file.
+  - **So a new page can be registered in `extended.ts` without touching `core.ts`.**
+- **Layout:** `[projectId]/layout.tsx` renders `SettingsMobileNav`, `ProjectSettingsSidebarRoot` and
+  `ProjectAuthWrapper` → `Outlet`. The sidebar, auth and project loading come for free.
+- **Side-nav items:**
+  - Type: `packages/types/src/settings.ts:22-40`. `TProjectSettingsTabs` is a union; `TProjectSettingsItem` is
+    `{key, i18n_label, href, access: EUserProjectRoles[], highlight}`.
+  - Constants: `packages/constants/src/settings/project.ts`.
+    - `PROJECT_SETTINGS` record (L32-110).
+    - `PROJECT_SETTINGS_CATEGORY` enum GENERAL, FEATURES, WORK_STRUCTURE, EXECUTION, with `PROJECT_SETTINGS_CATEGORIES` and
+      `PROJECT_SETTINGS_CATEGORY_LABELS` (L11-30).
+    - `GROUPED_PROJECT_SETTINGS` (L114-129) decides what the sidebar shows.
+  - Icons: `apps/web/core/components/settings/project/sidebar/item-icon.tsx:25-37`. This is a `Record<TProjectSettingsTabs, …>`,
+    so the compiler **forces** an icon for every new key.
+  - Rendering and permissions: `sidebar/item-categories.tsx:43-74` filters with
+    `allowPermissions(item.access, EUserPermissionsLevel.PROJECT, …)`. The active state is a regex on `${href}/`.
+  - The mobile-nav label (`core/components/settings/helper.ts:22-51`) and the Power-K command palette
+    (`power-k/ui/pages/open-entity/project-settings-menu.tsx`) both read `PROJECT_SETTINGS`, so a new entry appears in both
+    automatically.
+- **Page templates:**
+  - Estimates (`[projectId]/estimates/page.tsx` + `header.tsx`): admin gate → `NotAuthorizedView`; layout via
+    `SettingsContentWrapper`, `SettingsPageHeader` and `Breadcrumbs`.
+  - Automations: `SettingsHeading`.
+- **Form conventions:**
+  - Pattern from `core/components/project/form.tsx`: `react-hook-form` `Controller` wrapping `Input` from `@plane/ui`,
+    `Button` from `@plane/propel/button`, and `setToast` / `TOAST_TYPE` from `@plane/propel/toast`.
+  - Password field with show/hide toggle: `apps/admin/components/common/controller-input.tsx` (admin app, so it has to be
+    ported) or the web MCP token step `core/components/settings/profile/content/pages/mcp/token-step.tsx`.
+- **Services and stores:**
+  - `core/services/api.service.ts`: abstract `APIService` (axios, `withCredentials`, redirects on 401).
+  - Project-scoped service example: `services/project/project-publish.service.ts`.
+  - Store example: `store/project/project-publish.store.ts`, a map keyed by projectId using `runInAction` + `set`.
+  - `ce/store/root.store.ts`: `RootStore extends CoreRootStore`. **Pitfall:** `CoreRootStore.resetOnSignOut()` rebuilds its
+    sub-stores, so CE-added stores must be rebuilt in an override.
+- **Existing integrations UI:** the workspace `integrations/page.tsx` and project `integration-card.tsx` are dead, OAuth-based
+  GitHub/Slack code. **Not reused.**
+
+### 3.2 Work-item widgets (Feature 2)
+
+- **Where it's mounted:** `core/components/issues/issue-detail-widgets/root.tsx`, used by:
+  - peek overview `peek-overview/view.tsx:191,232`;
+  - full page `issue-detail/main-content.tsx:192-198`, with `renderWidgetModals={!isPeekModeActive}` so modals don't render
+    twice.
+- **Button row** (`issue-detail-widgets/action-buttons.tsx:31-105`):
+  - Each button is `<Trigger customButton={<IssueDetailWidgetButton title icon disabled/>} …/>`, gated by
+    `!hideWidgets?.includes(key)`.
+  - **CE hook points:** `<WorkItemAdditionalWidgetActionButtons disabled hideWidgets issueServiceType projectId workItemId workspaceSlug/>`
+    at L95-102. The stub is `ce/components/issues/issue-detail-widgets/action-buttons.tsx` and **returns null today** (verified).
+  - `IssueDetailWidgetButton` (`widget-button.tsx`) is a `Button variant="secondary" size="lg"` with an icon and
+    `text-body-xs-medium` label.
+  - Best trigger template: `links/quick-action-button.tsx:21-38`, a plain `<button>` that calls `preventDefault` +
+    `stopPropagation` and then toggles a store flag.
+- **Collapsibles:** `issue-detail-widget-collapsibles.tsx:31-102` renders each widget only when its count is > 0, then
+  `<WorkItemAdditionalWidgetCollapsibles/>` (CE stub).
+  - Each widget is a trio `root.tsx` / `title.tsx` / `content.tsx` using `Collapsible` + `CollapsibleButton` from `@plane/ui`,
+    with a count badge and an `actionItemElement` "+" button.
+  - Open state lives in `store/issue/issue-details/root.store.ts:146`: `openWidgets: TWorkItemWidgets[]`, `toggleOpenWidget`,
+    `setLastWidgetAction`. `isAnyModalOpen` is computed at L225-236.
+  - `TWorkItemWidgets = "sub-work-items" | "relations" | "links" | "attachments"` (`packages/types/src/issues/issue.ts:158`).
+- **Modals:** `issue-detail-widget-modals.tsx:157-209` ends with `<WorkItemAdditionalWidgetModals/>` (CE stub).
+- **Primitives:**
+  - `ModalCore` + `EModalPosition` / `EModalWidth` (up to `VIIXL`) from `@plane/ui`.
+  - `@plane/propel/table` (shadcn table; tanstack example in `analytics/insight-table/data-table.tsx`).
+  - `@plane/propel/combobox`, `@plane/propel/empty-state` (`EmptyStateCompact`), `Loader` / `Spinner` from `@plane/ui`.
+  - `useDebounce`.
+  - Selection template: `core/components/core/modals/existing-issues-list-modal.tsx` (search + checkboxes + "Add selected").
+  - Multi-step template: `change-email-modal.tsx` (`TModalStep` state).
+- **Permissions:** `peek-overview/root.tsx:231` and `issue-detail/root.tsx:221` compute
+  `isEditable = allowPermissions([ADMIN, MEMBER], PROJECT)`. Widgets receive `disabled = !isEditable || isArchived`.
+- **Activity rendering:** `issue-activity/activity/activity-list.tsx` switches on `activity.field`. `default:` →
+  `AdditionalActivityRoot` (CE stub `ce/components/issues/issue-details/additional-activity-root.tsx`), which is where a new
+  field goes.
+- **i18n:** keys live in `packages/i18n/src/locales/<lang>/<ns>.json` (19 locales; English is the fallback).
+  - `issue.add.*` keys are in `en/work-item.json`.
+  - Project settings keys are in `en/project-settings.json` under `project_settings.*`.
+  - The repo's **`translate` skill** must be followed when editing locale files.
+
+---
+
+## 4. Architecture overview
+
+```
+┌──────────────────────── Browser (apps/web) ────────────────────────┐
+│ Settings › Cybernetics Data         Work item › [Database] button   │
+│  (URL + token form, Test)           → CyberneticsDataBrowserModal   │
+│                                     → "Database records" widget     │
+└───────────────┬───────────────────────────────┬────────────────────┘
+                │ session cookie (same as all Plane app calls)
+                ▼                               ▼
+┌──────────────────────── Plane Django API ──────────────────────────┐
+│ app/views/cybernetics_data/                                        │
+│   config.py   ── ProjectCyberneticsDataIntegration (encrypted token)│
+│   browse.py   ── read-only proxy (spaces/bases/tables/fields/views/ │
+│                  records/record)          + throttle + short cache  │
+│   records.py  ── IssueCyberneticsRecord CRUD + issue_activity       │
+│ utils/cybernetics_data/                                             │
+│   client.py   ── CyberneticsDataClient (pinned_fetch, timeouts,     │
+│                  error mapping, param serialisation)                │
+│   service.py  ── config lookup, decrypt, cache, snapshot builder    │
+└───────────────┬────────────────────────────────────────────────────┘
+                │ HTTPS, Authorization: Bearer cybernetics_<id>_<sig>
+                ▼
+┌──────────────── Cybernetics-Data (NestJS /api/*) ──────────────────┐
+│ /api/space  /api/base/access/all  /api/base/{b}/table               │
+│ /api/table/{t}/field|view|record  /api/table/{t}/record/{r}          │
+│ /api/table/{t}/aggregation/row-count                                 │
+└─────────────────────────────────────────────────────────────────────┘
+```
+
+**Request flow when attaching records:**
+
+1. The modal calls `GET …/cybernetics-data/tables/{tbl}/records?search=…` → Django → Data-Centre.
+2. The user ticks rows → `POST …/issues/{id}/cybernetics-records/` with `[{base_id, table_id, record_id}]`.
+3. Django re-fetches each record server-side. This checks that the table belongs to the base, the record exists and the token
+   can read it. Django then stores the reference plus snapshot and queues `issue_activity`.
+4. The widget re-renders from the returned rows, and activity refreshes.
+
+---
+
+## 5. Backend design (Django)
+
+### 5.1 Settings / environment (`plane/settings/common.py`)
+
+Added next to the `WEBHOOK_*` block (L55-92) and parsed the same way:
+
+```python
+# Cybernetics-Data integration
+CYBERNETICS_DATA_ENABLED = os.environ.get("CYBERNETICS_DATA_ENABLED", "1") == "1"
+CYBERNETICS_DATA_ALLOWED_HOSTS = [...]      # comma-separated hostnames allowed to resolve to private IPs
+CYBERNETICS_DATA_ALLOWED_IPS = [...]        # comma-separated CIDRs (ip_network) – e.g. docker network
+CYBERNETICS_DATA_TIMEOUT = float(os.environ.get("CYBERNETICS_DATA_TIMEOUT", "10"))
+CYBERNETICS_DATA_REQUIRE_HTTPS = os.environ.get("CYBERNETICS_DATA_REQUIRE_HTTPS", "1") == "1"
+CYBERNETICS_DATA_PROXY_RATE = os.environ.get("CYBERNETICS_DATA_PROXY_RATE", "120/minute")
+```
+
+Add the new throttle scope to `REST_FRAMEWORK["DEFAULT_THROTTLE_RATES"]` (`settings/common.py:140`):
+`"cybernetics_data": CYBERNETICS_DATA_PROXY_RATE`.
+
+> **Naming note.** `CYBERNETICS_DATA_URL` and `CYBERNETICS_APITOKEN` are **per-project form fields stored in the DB**, not
+> env vars. Configuration is per project, and one Plane instance may talk to several Data-Centre deployments. The env vars
+> above only govern the network policy. If an instance-wide default is wanted later, it can be added as a fallback without a
+> schema change (§10, Q2).
+
+### 5.2 Data model — `plane/db/models/cybernetics_data.py`
+
+```python
+class ProjectCyberneticsDataIntegration(ProjectBaseModel):
+    """Per-project connection to a Cybernetics-Data deployment."""
+
+    base_url = models.URLField(max_length=2048)                  # CYBERNETICS_DATA_URL, normalised origin
+    api_token_encrypted = models.TextField()                     # Fernet(CYBERNETICS_APITOKEN)
+    token_hint = models.CharField(max_length=16, blank=True)     # "cybe…1a2b" for display
+    token_fingerprint = models.CharField(max_length=64)          # sha256(token) – cache-key namespace, change detection
+    is_enabled = models.BooleanField(default=True)
+    last_verified_at = models.DateTimeField(null=True, blank=True)
+    last_verified_status = models.CharField(                     # "ok" | "unauthorized" | "forbidden" | "unreachable" | "error"
+        max_length=32, blank=True, default="")
+    last_verified_message = models.TextField(blank=True, default="")
+
+    class Meta:
+        db_table = "project_cybernetics_data_integrations"
+        verbose_name = "Project Cybernetics Data Integration"
+        ordering = ("-created_at",)
+        unique_together = ["project", "deleted_at"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["project"],
+                condition=models.Q(deleted_at__isnull=True),
+                name="project_cybernetics_data_unique_project_when_deleted_at_null",
+            )
+        ]
+
+
+class IssueCyberneticsRecord(ProjectBaseModel):
+    """A Cybernetics-Data record referenced by a work item (reference + display snapshot)."""
+
+    issue = models.ForeignKey("db.Issue", on_delete=models.CASCADE, related_name="issue_cybernetics_records")
+    space_id = models.CharField(max_length=64, blank=True, default="")
+    base_id = models.CharField(max_length=64)          # bse…
+    table_id = models.CharField(max_length=64)         # tbl…
+    record_id = models.CharField(max_length=64)        # rec…
+    view_id = models.CharField(max_length=64, blank=True, default="")   # viw… the user picked from (optional)
+    # snapshot — display only, refreshed on demand; never authoritative
+    record_name = models.CharField(max_length=512, blank=True, default="")
+    base_name = models.CharField(max_length=255, blank=True, default="")
+    table_name = models.CharField(max_length=255, blank=True, default="")
+    primary_field_id = models.CharField(max_length=64, blank=True, default="")
+    preview = models.JSONField(default=dict)           # ≤ 5 {fieldName: textValue} pairs, text format only
+    source_url = models.CharField(max_length=2048, blank=True, default="")   # deep link at attach time
+    snapshot_at = models.DateTimeField(null=True, blank=True)
+    status = models.CharField(max_length=16, default="ok")  # "ok" | "missing" | "forbidden" (last refresh outcome)
+
+    class Meta:
+        db_table = "issue_cybernetics_records"
+        verbose_name = "Issue Cybernetics Record"
+        ordering = ("-created_at",)
+        unique_together = ["issue", "table_id", "record_id", "deleted_at"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["issue", "table_id", "record_id"],
+                condition=models.Q(deleted_at__isnull=True),
+                name="issue_cybernetics_record_unique_when_deleted_at_null",
+            )
+        ]
+        indexes = [models.Index(fields=["project", "table_id", "record_id"], name="icr_project_table_record_idx")]
+```
+
+Design notes:
+
+- **Ids are `CharField`, not FKs.** They are foreign system ids. The `(project, table_id, record_id)` index supports a future
+  reverse lookup ("which work items reference this record?").
+- **`preview` stores only `cellFormat=text` strings,** capped at 5 fields and 256 chars each. It is never used for
+  authorisation. **It never holds attachment/presigned URLs.**
+- **Soft delete** of an `Issue` cascades through `soft_delete_related_objects` like `IssueLink`.
+- **Deleting the integration does not delete attachments.** The widget shows snapshots with a "disconnected" state (§6.7).
+- Export from `db/models/__init__.py`:
+  `from .cybernetics_data import IssueCyberneticsRecord, ProjectCyberneticsDataIntegration`.
+- Migration: `db/migrations/0122_cybernetics_data_integration.py`, generated with `makemigrations` and depending on
+  `0121_alter_estimate_type`.
+
+### 5.3 Secret handling — `plane/utils/cybernetics_data/secrets.py`
+
+`encrypt_data` / `decrypt_data` swallow errors and return `""`. A thin strict wrapper makes failures explicit:
+
+```python
+from plane.license.utils.encryption import encrypt_data, decrypt_data
+
+class TokenDecryptionError(Exception): ...
+
+def encrypt_token(token: str) -> str:
+    enc = encrypt_data(token)
+    if token and not enc:
+        raise ValueError("Failed to encrypt Cybernetics-Data token")
+    return enc
+
+def decrypt_token(enc: str) -> str:
+    value = decrypt_data(enc)
+    if enc and not value:
+        # typically SECRET_KEY rotated → stored secret unreadable
+        raise TokenDecryptionError()
+    return value
+
+def token_hint(token: str) -> str:            # "cybe…1a2b"
+    return f"{token[:4]}…{token[-4:]}" if len(token) > 8 else "••••"
+
+def token_fingerprint(token: str) -> str:     # hashlib.sha256(token.encode()).hexdigest()
+```
+
+Rules:
+
+- **The token is never returned by any endpoint,** never logged, and never placed in activity rows or error messages. The
+  client's error mapping strips request headers before logging.
+- On `TokenDecryptionError`, the API returns **409** `{"error": "...", "code": "CYBERNETICS_TOKEN_UNREADABLE"}` and the settings
+  page asks the admin to re-enter the token.
+- **Known limitation:** the key derivation uses a static salt tied to `SECRET_KEY`. This matches `InstanceConfiguration`, so
+  it's not a regression, but it is recorded in §10.
+
+### 5.4 Outbound client — `plane/utils/cybernetics_data/client.py`
+
+```python
+class CyberneticsDataError(Exception):
+    code = "CYBERNETICS_ERROR"; http_status = 502
+class CyberneticsUnauthorized(CyberneticsDataError): code = "CYBERNETICS_UNAUTHORIZED"; http_status = 424
+class CyberneticsForbidden(CyberneticsDataError):    code = "CYBERNETICS_FORBIDDEN";    http_status = 403
+class CyberneticsNotFound(CyberneticsDataError):     code = "CYBERNETICS_NOT_FOUND";    http_status = 404
+class CyberneticsBadRequest(CyberneticsDataError):   code = "CYBERNETICS_BAD_REQUEST";  http_status = 400
+class CyberneticsRateLimited(CyberneticsDataError):  code = "CYBERNETICS_RATE_LIMITED"; http_status = 429
+class CyberneticsUnreachable(CyberneticsDataError):  code = "CYBERNETICS_UNREACHABLE";  http_status = 502
+
+
+class CyberneticsDataClient:
+    MAX_TAKE = 200            # Plane-side cap (Data-Centre allows 1000)
+    MAX_RESPONSE_BYTES = 5 * 1024 * 1024
+
+    def __init__(self, base_url: str, token: str, timeout: float | None = None): ...
+
+    # discovery
+    def list_spaces(self) -> list[dict]                               # GET /api/space
+    def list_bases(self) -> list[dict]                                # GET /api/base/access/all
+    def get_base(self, base_id) -> dict                               # GET /api/base/{b}
+    def list_tables(self, base_id) -> list[dict]                      # GET /api/base/{b}/table
+    def get_table(self, base_id, table_id) -> dict                    # GET /api/base/{b}/table/{t}
+    def list_fields(self, table_id, view_id=None) -> list[dict]       # GET /api/table/{t}/field
+    def list_views(self, table_id) -> list[dict]                      # GET /api/table/{t}/view
+    # records
+    def list_records(self, table_id, *, take, skip, view_id=None, search=None, search_field=None,
+                     filter=None, order_by=None, projection=None, cell_format="text") -> dict
+    def row_count(self, table_id, *, view_id=None, search=None, search_field=None, filter=None) -> int
+    def get_record(self, table_id, record_id, *, cell_format="json", projection=None) -> dict
+```
+
+Implementation rules:
+
+- **Transport:**
+  - `pinned_fetch("GET", url, allowed_hosts=settings.CYBERNETICS_DATA_ALLOWED_HOSTS,
+    allowed_ips=settings.CYBERNETICS_DATA_ALLOWED_IPS, headers=…, timeout=self.timeout, params=…, stream=True)`.
+  - Redirects are never followed. A 3xx becomes `CyberneticsUnreachable("unexpected redirect")`.
+  - The body is read with a byte cap (`MAX_RESPONSE_BYTES`) and the response is always closed.
+- **Headers:** `Authorization: Bearer <token>`, `Accept: application/json`,
+  `User-Agent: cybernetics-projects/<version>`.
+- **Parameter serialisation** mirrors `D/packages/openapi/src/record/get-list.ts:296-314`:
+  - `fieldKeyType=id` always, so field keys are stable across renames.
+  - `filter` and `orderBy` are `json.dumps(...)` strings.
+  - `search` goes out as a list: `params=[("search[]", value), ("search[]", field_id), ("search[]", "true")]`.
+    This relies on Express 4.21 / `qs` (`D/apps/nestjs-backend/package.json`); verify it once in integration tests.
+  - `projection` goes out as a repeated `projection[]`.
+  - `ignoreViewQuery` is not sent.
+- **Status mapping** (`{message, status, code}` body):
+  - 401 → `CyberneticsUnauthorized`. This is 424 to *our* client, **not 401**, because Plane's axios interceptor treats 401 as
+    "Plane session expired" and would log the user out (`core/services/api.service.ts`).
+  - 403 → `Forbidden`, 404 → `NotFound`, 400/422 → `BadRequest`, 429 → `RateLimited`.
+  - 5xx, `requests.RequestException` or `ValueError` from the SSRF guard → `Unreachable`.
+  - The remote `message` is passed through, truncated to 300 chars.
+- **Base URL normalisation** (`normalise_base_url`, also used by the serializer):
+  - strip whitespace and trailing `/`;
+  - strip a trailing `/api`, since users often paste the API root;
+  - require scheme `https` (or `http` only when `CYBERNETICS_DATA_REQUIRE_HTTPS=0` or `DEBUG`);
+  - reject userinfo, query and fragment;
+  - keep an optional path prefix for sub-path deployments.
+
+### 5.5 Service layer — `plane/utils/cybernetics_data/service.py`
+
+```python
+def get_integration(project_id) -> ProjectCyberneticsDataIntegration      # raises IntegrationNotConfigured (→ 404 code CYBERNETICS_NOT_CONFIGURED)
+def get_client(project_id) -> CyberneticsDataClient                       # checks CYBERNETICS_DATA_ENABLED, is_enabled, decrypts
+def verify_connection(base_url, token) -> VerificationResult              # used by /test and on save
+def list_databases(project_id) -> list[dict]                              # bases grouped by space (see below)
+def build_deep_link(base_url, base_id, table_id, record_id, view_id=None) -> str
+def build_snapshot(client, base_id, table_id, record_id) -> dict          # for attach + refresh
+```
+
+- **`list_databases`**:
+  - Calls `list_bases()` (`/api/base/access/all`) and, where it can, `list_spaces()` to get names. It then groups bases by
+    `spaceId`.
+  - If `list_spaces()` returns `[]` or 403 (a token restricted to bases), the group label falls back to "Space `<id>`".
+  - Returns `[{space: {id, name}, bases: [{id, name, icon}]}]`.
+  - Per §1.2, some listed bases may still be restricted by the token. The UI finds this out lazily when it lists tables and
+    greys the base out after a 403.
+- **`verify_connection`** runs three probes in order and reports the first failure:
+  1. `list_bases()` → 401 means a bad token; a network failure means unreachable.
+  2. If at least one base exists: `list_tables(first_base)` → checks `table|read`.
+  3. If a table exists: `list_records(first_table, take=1)` → checks `record|read`.
+
+  Result: `{status: "ok"|"unauthorized"|"forbidden"|"unreachable"|"error", message, bases_visible: int}`.
+- **`build_snapshot`**:
+  - `get_table(base_id, table_id)` checks that the table belongs to the base and gives the table name.
+  - `get_base(base_id)` gives the base name and spaceId; `list_fields(table_id)` finds `isPrimary` plus the first 4 visible
+    non-attachment fields.
+  - `get_record(table_id, record_id, cell_format="text", projection=[primary + preview fields])` gives the name and preview.
+  - **Base, table and field metadata is cached** (§5.9), so attaching N records from one table costs about N+3 calls.
+
+### 5.6 REST API
+
+All routes are under the Plane app surface, `/api/workspaces/<str:slug>/projects/<uuid:project_id>/…`. They use session auth,
+extend `BaseAPIView` / `BaseViewSet`, and live in the URL module `app/urls/cybernetics_data.py`, registered in
+`app/urls/__init__.py`.
+
+#### 5.6.1 Configuration (Feature 1)
+
+| Method | Path | Roles | Body → Response |
+|---|---|---|---|
+| GET | `cybernetics-data/` | ADMIN, MEMBER, GUEST | → `IntegrationPublic` (200), or `{"is_configured": false}` (200) |
+| PUT | `cybernetics-data/` | ADMIN | `{base_url, api_token?, is_enabled?, skip_verification?}` → `IntegrationPublic` |
+| DELETE | `cybernetics-data/` | ADMIN | → 204 (soft delete; attached records keep their snapshots) |
+| POST | `cybernetics-data/test/` | ADMIN | `{base_url?, api_token?}` → `VerificationResult`. Missing fields fall back to the stored values. |
+
+```jsonc
+// IntegrationPublic — token is NEVER included
+{
+  "id": "uuid", "project": "uuid", "is_configured": true, "is_enabled": true,
+  "base_url": "https://data.example.com",
+  "token_hint": "cybe…1a2b",
+  "last_verified_at": "2026-09-23T10:00:00Z", "last_verified_status": "ok", "last_verified_message": "",
+  "updated_at": "…", "updated_by": "uuid"
+}
+```
+
+**PUT semantics:**
+- Upsert: create the row if none is active, otherwise update it.
+- `api_token` is **required on create**. When it's omitted on update, the stored token is kept, so the admin can edit the URL
+  without re-entering the secret.
+- `base_url` is normalised (§5.4) and validated with `plane.utils.ip_address.validate_url(url, allowed_ips, allowed_hosts)` →
+  400 `{"base_url": "Invalid or disallowed URL."}`, mirroring `app/serializers/webhook.py:30`.
+- Unless `skip_verification=true`, `verify_connection` runs first:
+  - `unauthorized` or `unreachable` → **400**, nothing is saved;
+  - `forbidden` (partial scopes) → saved with a warning status.
+- `last_verified_*` is updated.
+- If the URL or token fingerprint changed, the project's cache namespace is invalidated (§5.9).
+
+**Serializer:** `ProjectCyberneticsDataIntegrationSerializer(BaseSerializer)`. `api_token` is `write_only=True`. `base_url`
+goes through `validate_base_url`. `to_representation` adds `is_configured=True`.
+
+#### 5.6.2 Browse proxy (Feature 2, read-only)
+
+All of these use `throttle_classes=[CyberneticsDataProxyThrottle]`. Roles: **ADMIN, MEMBER** (see §5.7 for why guests are
+excluded).
+
+| Method | Path | Query | Response |
+|---|---|---|---|
+| GET | `cybernetics-data/databases/` | — | `[{space:{id,name}, bases:[{id,name,icon}]}]` |
+| GET | `cybernetics-data/bases/<str:base_id>/tables/` | — | `[{id,name,icon,description,default_view_id}]` |
+| GET | `cybernetics-data/tables/<str:table_id>/schema/` | `base_id` (required), `view_id?` | `{fields:[{id,name,type,is_primary,cell_value_type,is_multiple,options_lite}], views:[{id,name,type}]}` |
+| GET | `cybernetics-data/tables/<str:table_id>/records/` | `base_id`, `take` (≤200, default 50), `skip`, `view_id?`, `search?`, `search_field?`, `filter?` (JSON), `order_by?` (JSON), `with_total?` | `{records:[{id,name,fields}], total?:int, take, skip}` |
+| GET | `cybernetics-data/tables/<str:table_id>/records/<str:record_id>/` | `base_id`, `cell_format=json\|text` (default json) | `{record:{id,name,fields,created_time,last_modified_time,auto_number}, fields:[…schema…], deep_link}` |
+
+Behaviour:
+
+- **Id validation:** every `*_id` path/query value is checked against `^(spc|bse|tbl|viw|fld|rec)[A-Za-z0-9]{8,32}$` with the
+  right prefix. This blocks path injection into the upstream URL.
+- **Table ownership:** endpoints that take a `table_id` require `base_id` and check `get_table(base_id, table_id)` (cached).
+  This keeps behaviour consistent and lets the response carry names.
+- **Records list:**
+  - The proxy always sends `fieldKeyType=id` and `cellFormat=text`, and adds the primary field to `projection`.
+  - `filter` and `order_by` are parsed as JSON and validated by a small Plane-side schema:
+    - depth ≤ 3 and ≤ 20 conditions;
+    - operators must come from an allowlist that mirrors Teable's operator list;
+    - the result is re-serialised before sending.
+  - Invalid input → 400.
+- **`with_total=true`** (default on the first page) also calls `aggregation/row-count` with the same query.
+- **Passthrough:** the proxy passes data through without persisting it. Responses are shaped (snake_case keys, trimmed field
+  options), and **attachment values in `cell_format=json` are passed through as-is** so thumbnails render. Presigned URLs
+  are never stored (§7).
+
+#### 5.6.3 Work-item attached records (Feature 2)
+
+| Method | Path | Roles | Notes |
+|---|---|---|---|
+| GET | `issues/<uuid:issue_id>/cybernetics-records/` | ADMIN, MEMBER, GUEST | DB only (snapshots); never calls upstream |
+| POST | `issues/<uuid:issue_id>/cybernetics-records/` | ADMIN, MEMBER | Body `{records:[{base_id, table_id, record_id, view_id?}]}`, 1–10 items (*as built*: `MAX_RECORDS_PER_REQUEST = 10`); returns the created rows (201) |
+| DELETE | `issues/<uuid:issue_id>/cybernetics-records/<uuid:pk>/` | ADMIN, MEMBER (creator or project admin) | Soft delete → 204 |
+| POST | `issues/<uuid:issue_id>/cybernetics-records/refresh/` | ADMIN, MEMBER | Body `{ids?: uuid[]}`; re-snapshots and sets `status` |
+
+**POST flow** (`IssueCyberneticsRecordViewSet.create`):
+
+1. Resolve the issue. Its queryset copies `IssueLinkViewSet.get_queryset` (`app/views/issue/link.py:32-46`): active project
+   member, non-archived project. The issue must not be archived.
+2. `get_client(project_id)` → 404 `CYBERNETICS_NOT_CONFIGURED` or 409 `CYBERNETICS_TOKEN_UNREADABLE` as appropriate.
+3. De-duplicate against existing active rows for `(issue, table_id, record_id)`. Duplicates are **skipped and reported**,
+   not treated as errors.
+4. Call `build_snapshot` for each record.
+   - If any record returns 404 or 403 upstream, the whole request is rejected with 400
+     `CYBERNETICS_ATTACH_FAILED` and `failed: [{record_id, table_id, error_message}]`. Partial attachment would confuse users.
+   - Calls run sequentially. *As built:* at most 10 records per request (attach and refresh), with no extra time budget.
+     10 records from one table is about 13 calls with metadata cached.
+5. `bulk_create` the rows inside `transaction.atomic()`.
+6. For each created row, call `issue_activity.delay(type="cybernetics_record.activity.created", requested_data=json.dumps(row_data), …)`,
+   copying the argument list from `link.py:57-68`.
+7. Return `{"created": [...], "skipped": [...]}`.
+
+**Serializer:** `IssueCyberneticsRecordSerializer` returns
+`id, issue_id, base_id, base_name, table_id, table_name, record_id, record_name, view_id, preview, source_url, snapshot_at,
+status, created_by, created_at`. It also adds a computed `deep_link`, rebuilt from the *current* `base_url` when the
+integration exists and falling back to `source_url`.
+
+**Optional issue payload enrichment** (phase 3): annotate `cybernetics_record_count` in the issue detail query, the same way
+`link_count` is annotated (`app/views/issue/base.py`, e.g. L118/223). The widget could then render without an extra request.
+Until then, the widget fetches the list itself (§6.7).
+
+### 5.7 Permissions matrix
+
+| Action | Guest | Member | Project admin | Workspace admin (+ project member) |
+|---|---|---|---|---|
+| See the settings nav item / page | ✗ | ✗ (hidden) | ✓ | ✓ |
+| Read config (`GET cybernetics-data/`, non-secret) | ✓ | ✓ | ✓ | ✓ |
+| Save / test / delete config | ✗ | ✗ | ✓ | ✓ |
+| Browse proxy (databases/tables/records/record) | ✗ | ✓ | ✓ | ✓ |
+| See attached records (snapshots) | ✓ | ✓ | ✓ | ✓ |
+| Attach / refresh | ✗ | ✓ | ✓ | ✓ |
+| Remove an attachment | ✗ | own only | ✓ | ✓ |
+
+- Implemented with `@allow_permission([...], level="PROJECT")` per method. Remove uses
+  `allow_permission([ROLE.ADMIN], creator=True, model=IssueCyberneticsRecord)`.
+- `allow_permission` already lets in a workspace admin who is an active project member.
+- **Why guests can't browse:** the token carries the *token owner's* Data-Centre permissions. Opening the proxy to guests
+  would let external collaborators read arbitrary Data-Centre tables. Guests see only snapshots that members chose to attach.
+- **Delegation risk:** every project member browses with the configuring admin's Data-Centre privileges. The settings page
+  states this explicitly and recommends a dedicated, read-only, space-scoped service token (§7).
+
+### 5.8 Activity — `bgtasks/issue_activities_task.py`
+
+Two handlers with the same keyword signature as `create_link_activity` (L928):
+
+```python
+def create_cybernetics_record_activity(requested_data, current_instance, issue_id, project_id,
+                                       workspace_id, actor_id, issue_activities, epoch):
+    requested_data = json.loads(requested_data) if requested_data is not None else None
+    issue_activities.append(IssueActivity(
+        issue_id=issue_id, project_id=project_id, workspace_id=workspace_id, actor_id=actor_id,
+        comment="attached a database record", verb="created", field="cybernetics_record",
+        new_value=f'{requested_data.get("table_name","")} / {requested_data.get("record_name","")}',
+        new_identifier=requested_data.get("id"), epoch=epoch))
+
+def delete_cybernetics_record_activity(...):   # verb="deleted", old_value=<table / record>, new_value=""
+```
+
+- Register `"cybernetics_record.activity.created"` and `"cybernetics_record.activity.deleted"` in `ACTIVITY_MAPPER`
+  (L1540-1568).
+- Refresh does **not** create activity (it's noise).
+- `notification=True` on create/delete matches links.
+
+### 5.9 Caching & throttling
+
+- **Throttle:** `plane/throttles/cybernetics_data.py`
+
+  ```python
+  class CyberneticsDataProxyThrottle(UserRateThrottle):
+      scope = "cybernetics_data"
+      def get_cache_key(self, request, view):
+          return self.cache_format % {"scope": self.scope,
+                                      "ident": f'{request.user.pk}:{view.kwargs.get("project_id")}'}
+  ```
+
+  - Applied to the browse endpoints and to attach/refresh. Default rate is 120/min per user per project.
+  - It protects the Data-Centre, which has no global throttle of its own (§1.2).
+- **Cache** (Django cache / django-redis). Key format:
+  `cyb:{project_id}:{token_fingerprint[:12]}:{kind}:{args-hash}`.
+
+  | Kind | TTL | Why |
+  |---|---|---|
+  | `databases` | 60 s | Rarely changes. Called on every modal open. |
+  | `tables:{base}` | 60 s | |
+  | `table:{base}:{table}` | 300 s | Ownership check and names, used on every records call. |
+  | `schema:{table}` | 120 s | Fields and views. |
+  | records / record | **not cached** | Must be live. Permission changes upstream must take effect immediately. |
+
+  - The token fingerprint in the key namespace means rotating the token invalidates everything without an explicit delete.
+  - *As built:* the namespace is `sha256(base_url | token_fingerprint)`, so changing the URL or the token invalidates the
+    cache automatically. There is no prefix scan; entries simply expire after their TTL.
+  - Cached payloads are per project, not per user. That's acceptable because all members use the same token.
+
+### 5.10 Error envelope (Plane → web)
+
+*As built:* every error body is `{"error": "<message>", "error_code": <int>, "error_message": "CYBERNETICS_*"}`.
+This is the same shape as the existing `ERROR_CODES` responses (`app/views/page/base.py`). The ints are registered in
+`plane/utils/error_codes.py` (4801–4812), and `app/views/cybernetics_data/base.py::error_response` builds the body.
+Additional keys: `CYBERNETICS_TOKEN_REQUIRED` (4803, the URL changed without a new token),
+`CYBERNETICS_VERIFICATION_FAILED` (4810, with a `verification` payload), `CYBERNETICS_ATTACH_FAILED` (4811, with
+`failed`), and `CYBERNETICS_ERROR` (4812).
+
+| Situation | HTTP | `error_message` |
+|---|---|---|
+| No integration, or disabled (per project or instance flag) | 404 | `CYBERNETICS_NOT_CONFIGURED` |
+| Stored token can't be decrypted | 409 | `CYBERNETICS_TOKEN_UNREADABLE` |
+| Upstream 401 | **424** | `CYBERNETICS_UNAUTHORIZED` |
+| Upstream 403 | 403 | `CYBERNETICS_FORBIDDEN` |
+| Upstream 404 | 404 | `CYBERNETICS_NOT_FOUND` |
+| Invalid id/filter, or upstream 400/422 | 400 | `CYBERNETICS_BAD_REQUEST` |
+| Plane throttle, or upstream 429 | 429 | `CYBERNETICS_RATE_LIMITED` |
+| Timeout, network error, SSRF block, 5xx | 502 | `CYBERNETICS_UNREACHABLE` |
+
+- A `handle_exception` override in a `CyberneticsDataBaseMixin` maps `CyberneticsDataError` subclasses and falls back to
+  `super()`.
+- **Never return 401** for upstream failures (see §5.4).
+
+### 5.11 Backend file map
+
+```
+apps/api/plane/
+├── db/models/cybernetics_data.py                  NEW  models (§5.2)
+├── db/models/__init__.py                          EDIT export
+├── db/migrations/0122_cybernetics_data_integration.py  NEW
+├── utils/cybernetics_data/__init__.py             NEW
+├── utils/cybernetics_data/client.py               NEW  HTTP client + exceptions (§5.4)
+├── utils/cybernetics_data/secrets.py              NEW  strict encrypt/decrypt/hint/fingerprint (§5.3)
+├── utils/cybernetics_data/service.py              NEW  config lookup, verify, snapshot, cache (§5.5, §5.9)
+├── utils/cybernetics_data/filters.py              NEW  filter/orderBy JSON validation, id regexes
+├── throttles/cybernetics_data.py                  NEW  CyberneticsDataProxyThrottle
+├── app/serializers/cybernetics_data.py            NEW  integration + record serializers
+├── app/serializers/__init__.py                    EDIT export
+├── app/views/cybernetics_data/__init__.py         NEW
+├── app/views/cybernetics_data/base.py             NEW  CyberneticsDataBaseMixin (error mapping)
+├── app/views/cybernetics_data/config.py           NEW  ProjectCyberneticsDataEndpoint, ...TestEndpoint
+├── app/views/cybernetics_data/browse.py           NEW  Databases/Tables/Schema/Records/Record endpoints
+├── app/views/cybernetics_data/records.py          NEW  IssueCyberneticsRecordViewSet (+ refresh)
+├── app/views/__init__.py                          EDIT export
+├── app/urls/cybernetics_data.py                   NEW  urlpatterns (§5.6)
+├── app/urls/__init__.py                           EDIT include
+├── bgtasks/issue_activities_task.py               EDIT 2 handlers + ACTIVITY_MAPPER entries
+├── settings/common.py                             EDIT env + throttle rate (§5.1)
+└── tests/…/test_cybernetics_data_*.py             NEW  (§8)
+```
+
+Each new file stays under 500 lines, per the repo rule.
+
+---
+
+## 6. Frontend design (`apps/web` + packages)
+
+### 6.1 Types and constants
+
+**`packages/types/src/cybernetics-data.ts`** (NEW, exported from `packages/types/src/index.ts`):
+
+```ts
+export type TCyberneticsIntegration = {
+  id?: string; project?: string; is_configured: boolean; is_enabled?: boolean;
+  base_url?: string; token_hint?: string;
+  last_verified_at?: string | null;
+  last_verified_status?: "ok" | "unauthorized" | "forbidden" | "unreachable" | "error" | "";
+  last_verified_message?: string; updated_at?: string;
+};
+export type TCyberneticsIntegrationPayload = { base_url: string; api_token?: string; is_enabled?: boolean; skip_verification?: boolean };
+export type TCyberneticsVerification = { status: NonNullable<TCyberneticsIntegration["last_verified_status"]>; message: string; bases_visible?: number };
+
+export type TCyberneticsDatabaseGroup = { space: { id: string; name: string }; bases: { id: string; name: string; icon?: string | null }[] };
+export type TCyberneticsTable = { id: string; name: string; icon?: string | null; description?: string; default_view_id?: string };
+export type TCyberneticsField = { id: string; name: string; type: TCyberneticsFieldType; is_primary: boolean;
+  cell_value_type: "string" | "number" | "boolean" | "dateTime"; is_multiple: boolean; options_lite?: Record<string, unknown> };
+export type TCyberneticsView = { id: string; name: string; type: string };
+export type TCyberneticsRecord = { id: string; name?: string; fields: Record<string, unknown>;
+  created_time?: string; last_modified_time?: string; auto_number?: number };
+export type TCyberneticsRecordsQuery = { base_id: string; take?: number; skip?: number; view_id?: string;
+  search?: string; search_field?: string; filter?: TCyberneticsFilter; order_by?: { field_id: string; order: "asc" | "desc" }[]; with_total?: boolean };
+export type TCyberneticsRecordsResponse = { records: TCyberneticsRecord[]; total?: number; take: number; skip: number };
+
+export type TIssueCyberneticsRecord = { id: string; issue_id: string; base_id: string; base_name: string;
+  table_id: string; table_name: string; record_id: string; record_name: string; view_id?: string;
+  preview: Record<string, string>; deep_link: string; snapshot_at: string | null;
+  status: "ok" | "missing" | "forbidden"; created_by: string; created_at: string };
+```
+
+**`packages/types/src/settings.ts:22`**: add `"cybernetics_data"` to `TProjectSettingsTabs`.
+
+**`packages/types/src/issues/issue.ts:158`**: add `"cybernetics-records"` to `TWorkItemWidgets`. This enables `openWidgets`,
+`setLastWidgetAction` and `hideWidgets`.
+
+**`packages/constants/src/settings/project.ts`**:
+
+```ts
+export enum PROJECT_SETTINGS_CATEGORY { GENERAL = "general", FEATURES = "features", WORK_STRUCTURE = "work-structure",
+  EXECUTION = "execution", INTEGRATIONS = "integrations" }                   // + CATEGORIES order + LABELS "common.integrations"
+
+cybernetics_data: {
+  key: "cybernetics_data",
+  i18n_label: "project_settings.cybernetics_data.label",
+  href: `/cybernetics-data`,
+  access: [EUserProjectRoles.ADMIN],
+  highlight: (pathname: string, baseUrl: string) => pathname === `${baseUrl}/cybernetics-data/`,
+},
+// GROUPED_PROJECT_SETTINGS[INTEGRATIONS] = [PROJECT_SETTINGS["cybernetics_data"]]
+```
+
+A new **Integrations** category is used rather than squeezing the item into EXECUTION, because future integrations will need
+a home. If `common.integrations` doesn't exist in `en/common.json`, add it.
+
+**`packages/constants/src/cybernetics-data.ts`** (NEW):
+- `CYBERNETICS_DATA_PAGE_SIZE = 50`, `CYBERNETICS_DATA_MAX_ATTACH = 50`;
+- the error-code → i18n-key map;
+- the SWR key builders.
+
+### 6.2 Settings page (Feature 1)
+
+**Route**, in `apps/web/app/routes/extended.ts`. It nests the same two layout files so `mergeRoutes` deep-merges it into the
+existing project-settings layout, keeping `core.ts` untouched:
+
+```ts
+import { layout, route } from "@react-router/dev/routes";
+export const extendedRoutes: RouteConfigEntry[] = [
+  layout("./(all)/[workspaceSlug]/(settings)/settings/projects/layout.tsx", [
+    layout("./(all)/[workspaceSlug]/(settings)/settings/projects/[projectId]/layout.tsx", [
+      route(":workspaceSlug/settings/projects/:projectId/cybernetics-data",
+            "./(all)/[workspaceSlug]/(settings)/settings/projects/[projectId]/cybernetics-data/page.tsx"),
+    ]),
+  ]),
+];
+```
+
+> Check with `react-router typegen`: the `layout` path strings must match `core.ts` exactly for the merge to happen (see
+> `routes/helper.ts`). If the merge proves brittle, fall back to adding the route to `core.ts` after `estimates` (about L341).
+
+**Files** (under `app/(all)/[workspaceSlug]/(settings)/settings/projects/[projectId]/cybernetics-data/`):
+- `page.tsx`, a copy of the estimates page structure:
+  ```tsx
+  const { workspaceUserInfo, allowPermissions } = useUserPermissions();
+  const isAdmin = allowPermissions([EUserPermissions.ADMIN], EUserPermissionsLevel.PROJECT);
+  if (workspaceUserInfo && !isAdmin) return <NotAuthorizedView section="settings" isProjectView className="h-auto" />;
+  return (
+    <SettingsContentWrapper header={<CyberneticsDataSettingsHeader />}>
+      <PageHead title={`${currentProjectDetails?.name} - ${t("project_settings.cybernetics_data.label")}`} />
+      <CyberneticsDataSettingsRoot workspaceSlug={workspaceSlug} projectId={projectId} />
+    </SettingsContentWrapper>
+  );
+  ```
+- `header.tsx`: `SettingsPageHeader` + `Breadcrumbs` using `PROJECT_SETTINGS.cybernetics_data` and
+  `PROJECT_SETTINGS_ICONS.cybernetics_data`.
+
+**Icon**: add `cybernetics_data: Database` (lucide) to `PROJECT_SETTINGS_ICONS` in `sidebar/item-icon.tsx`.
+
+**Component** `ce/components/cybernetics-data/settings/root.tsx` (+ `form.tsx`, `status-badge.tsx`, `danger-zone.tsx`).
+Layout:
+
+```
+┌ SettingsHeading: "Cybernetics Data"  —  "Connect this project to a Cybernetics-Data workspace…" ┐
+│ [status badge: Connected ✓ · verified 3 min ago]   [toggle: Enabled]                            │
+│                                                                                                 │
+│ CYBERNETICS_DATA_URL   [ https://data.example.com                  ]                            │
+│   Helper: origin of your Cybernetics-Data deployment (no /api).                                 │
+│ CYBERNETICS_APITOKEN   [ •••••••••••••••• cybe…1a2b          👁 ]  (placeholder when stored)    │
+│   Helper: personal access token with read scopes: space, base (+read_all), table, field, view,  │
+│           record. Prefer a dedicated service account scoped to specific spaces.                 │
+│   ⚠ All project members will browse data with this token's permissions.                         │
+│                                                                                                 │
+│ [Test connection]                                         [Save]                                │
+│─────────────────────────────────────────────────────────────────────────────────────────────────│
+│ Danger zone: [Disconnect] → confirm modal (attached records keep their snapshots)               │
+└─────────────────────────────────────────────────────────────────────────────────────────────────┘
+```
+
+**Behaviour:**
+- **Form:** `react-hook-form` `useForm<{base_url: string; api_token: string}>`.
+  - `base_url` is required and must pass a URL pattern check; a trailing `/api` is stripped client-side (the server also
+    normalises).
+  - `api_token` is required only when `!is_configured`. When a token is stored, the input stays empty with a
+    `placeholder={token_hint}`. Leaving it empty keeps the stored token.
+  - If the token doesn't start with `cybernetics_`, show a soft warning (not a blocker).
+- **Password input:** port `ControllerInput`'s eye toggle (`apps/admin/components/common/controller-input.tsx`) into
+  `ce/components/cybernetics-data/settings/secret-input.tsx`.
+- **Test connection:** `POST …/cybernetics-data/test/` with the current form values. The result shows inline as a status badge
+  with a message, e.g. "Token accepted · 12 databases visible", or "Token lacks record|read on base X".
+- **Save:** `PUT`. On 400 with `base_url` → field error. Verification failure → inline error with a
+  "Save anyway (skip verification)" secondary action. Success → toast `project_settings.cybernetics_data.toast.saved`.
+- **Enabled toggle:** `PUT {is_enabled}`, no verification.
+- **Disconnect:** `DELETE` behind the existing `AlertModalCore` confirm pattern.
+
+### 6.3 Service and store
+
+**Service** `ce/services/cybernetics-data.service.ts`, `class CyberneticsDataService extends APIService` with
+`super(API_BASE_URL)`. Errors are thrown as `error?.response?.data` so callers can read `code`.
+
+```ts
+getIntegration(ws, pid)                       GET    …/cybernetics-data/
+saveIntegration(ws, pid, data)                PUT    …/cybernetics-data/
+deleteIntegration(ws, pid)                    DELETE …/cybernetics-data/
+testIntegration(ws, pid, data?)               POST   …/cybernetics-data/test/
+listDatabases(ws, pid)                        GET    …/cybernetics-data/databases/
+listTables(ws, pid, baseId)                   GET    …/cybernetics-data/bases/${baseId}/tables/
+getSchema(ws, pid, tableId, {base_id, view_id})    GET …/cybernetics-data/tables/${tableId}/schema/
+listRecords(ws, pid, tableId, query)          GET    …/cybernetics-data/tables/${tableId}/records/   (filter/order_by JSON.stringify'd)
+getRecord(ws, pid, tableId, recordId, {base_id, cell_format})
+listIssueRecords(ws, pid, issueId)            GET    …/issues/${issueId}/cybernetics-records/
+attachIssueRecords(ws, pid, issueId, records) POST   …/issues/${issueId}/cybernetics-records/
+removeIssueRecord(ws, pid, issueId, id)       DELETE …/issues/${issueId}/cybernetics-records/${id}/
+refreshIssueRecords(ws, pid, issueId, ids?)   POST   …/issues/${issueId}/cybernetics-records/refresh/
+```
+
+**Store** `ce/store/cybernetics-data.store.ts` (MobX, modelled on `ProjectPublishStore`). It holds only what several
+components share:
+
+```ts
+interface ICyberneticsDataStore {
+  integrationMap: Record<string /*projectId*/, TCyberneticsIntegration>;
+  issueRecordIds: Record<string /*issueId*/, string[]>;
+  recordMap: Record<string /*linkId*/, TIssueCyberneticsRecord>;
+  browserModal: { isOpen: boolean; issueId: string | null; mode: "browse" | "view"; target?: { baseId: string; tableId: string; recordId: string } };
+  // getters
+  getIntegration(projectId): TCyberneticsIntegration | undefined;
+  isIntegrationActive(projectId): boolean;               // is_configured && is_enabled
+  getRecordsByIssueId(issueId): TIssueCyberneticsRecord[];
+  getRecordCountByIssueId(issueId): number;
+  // actions
+  fetchIntegration / saveIntegration / deleteIntegration / testIntegration
+  fetchIssueRecords / attachIssueRecords / removeIssueRecord / refreshIssueRecords
+  openBrowser(issueId, mode?, target?) / closeBrowser()
+}
+```
+
+- **Browse data (databases, tables, schema, records) is fetched with `useSWR` inside the modal, not stored in MobX.** It is
+  transient and paginated, and SWR gives dedupe and revalidation for free.
+- **Registration:** add `cyberneticsData: ICyberneticsDataStore` to `ce/store/root.store.ts` and override
+  `resetOnSignOut()`:
+  ```ts
+  resetOnSignOut() { super.resetOnSignOut(); this.cyberneticsData = new CyberneticsDataStore(this); }
+  ```
+  Check whether `CoreRootStore.resetOnSignOut` is an arrow property or a method. If it's an arrow property, re-assign it in
+  the constructor.
+- **Hook:** `ce/hooks/store/use-cybernetics-data.ts` → `context.cyberneticsData`. The context type is the CE `RootStore`.
+- **Side effects after attach/remove:** call `issueDetail.activity.fetchActivities(ws, pid, issueId)`, the same way
+  `link.store.ts:119` does, then `setLastWidgetAction("cybernetics-records")`.
+- **`isAnyModalOpen`** (`core/store/issue/issue-details/root.store.ts:225-236`): add a one-line core edit so it also checks
+  `this.rootIssueStore.rootStore.cyberneticsData?.browserModal.isOpen`. Otherwise keyboard shortcuts and peek-close fire while
+  the modal is open. The optional chaining keeps core compiling without the CE store.
+
+### 6.4 The "Database" button (Feature 2)
+
+Implemented in the CE stub `ce/components/issues/issue-detail-widgets/action-buttons.tsx`:
+
+```tsx
+export const WorkItemAdditionalWidgetActionButtons = observer((props: TWorkItemAdditionalWidgetActionButtonsProps) => {
+  const { disabled, hideWidgets, issueServiceType, projectId, workItemId, workspaceSlug } = props;
+  const { t } = useTranslation();
+  const { getIntegration, fetchIntegration, isIntegrationActive } = useCyberneticsData();
+  const { allowPermissions } = useUserPermissions();
+  useSWR(projectId ? `CYBERNETICS_INTEGRATION_${projectId}` : null, () => fetchIntegration(workspaceSlug, projectId),
+         { revalidateOnFocus: false });
+
+  if (hideWidgets.includes("cybernetics-records") || issueServiceType !== EIssueServiceType.ISSUES) return null;
+  const isAdmin = allowPermissions([EUserPermissions.ADMIN], EUserPermissionsLevel.PROJECT, workspaceSlug, projectId);
+  const integration = getIntegration(projectId);
+  if (!integration) return null;                                   // loading
+  if (!isIntegrationActive(projectId) && !isAdmin) return null;    // hide for non-admins when unconfigured
+
+  return (
+    <CyberneticsDataActionButton workItemId={workItemId} disabled={disabled}
+      customButton={<IssueDetailWidgetButton title={t("cybernetics_data.widget.button")}
+        icon={<Database className="h-3.5 w-3.5 flex-shrink-0" strokeWidth={2} />} disabled={disabled} />} />
+  );
+});
+```
+
+- `CyberneticsDataActionButton` follows `links/quick-action-button.tsx`: a `<button type="button">` that calls
+  `preventDefault` + `stopPropagation`, then `openBrowser(workItemId, "browse")`.
+- **Unconfigured + admin:** the button still shows. The modal opens on an empty state (`EmptyStateCompact`) with a
+  "Configure Cybernetics Data" button linking to `/${ws}/settings/projects/${pid}/cybernetics-data`.
+- **Order:** the CE slot renders after "Attach" (`core/action-buttons.tsx:95-102`), which matches the requirement
+  ("alongside Add sub-work item, Add relation, Add link, Attach").
+- **Scope:** epics (`EIssueServiceType.EPICS`) are excluded in v1 because the backend routes are `issues/…` only (§10, Q5).
+- **`disabled`:** mirrors the other buttons (`!isEditable || isArchived`). Guests see the collapsible but not the button.
+
+### 6.5 Browser modal — `ce/components/cybernetics-data/browser/`
+
+Rendered from the CE stub `WorkItemAdditionalWidgetModals` (`ce/components/issues/issue-detail-widgets/modals.tsx`).
+
+- Because `renderWidgetModals` is already false on the full page while a peek is open, the modal renders exactly once.
+- **Additional guard:** render only when `browserModal.issueId === workItemId`.
+- Uses `ModalCore` with `position=EModalPosition.TOP` and `width=EModalWidth.VIXL`.
+
+```
+┌──────────────────────────────────────────────────────────────────────────────────────────────┐
+│ Database · Attach records to PROJ-123                                                    [✕] │
+├──────────────────────────┬───────────────────────────────────────────────────────────────────┤
+│ ▾ Marketing (space)      │ Breadcrumb: Marketing › CRM › Customers        View: [Grid ▾]     │
+│   ▸ CRM            ←base │ [🔍 Search records…      ] in [All fields ▾]  [Filter ▾] [Sort ▾]  │
+│     • Customers  ←table  │ ┌──┬─────────────────┬──────────┬──────────┬─────────┬────┐        │
+│     • Deals              │ │☐ │ Name (primary)  │ Email    │ Status   │ Owner   │ ⤢  │        │
+│   ▸ Inventory            │ │☑ │ ACME Ltd        │ a@acme…  │ Active   │ Jane    │ ⤢  │        │
+│ ▾ Finance                │ │☐ │ Globex          │ …        │ Lead     │ Hank    │ ⤢  │        │
+│   ▸ Ledger 🔒 no access  │ └──┴─────────────────┴──────────┴──────────┴─────────┴────┘        │
+│ [🔍 filter databases]    │ 1–50 of 1,204            [‹ Prev] [Next ›]                         │
+├──────────────────────────┴───────────────────────────────────────────────────────────────────┤
+│ Selected (2): [ACME Ltd ✕] [Initech ✕]                        [Cancel]  [Attach 2 records]   │
+└──────────────────────────────────────────────────────────────────────────────────────────────┘
+```
+
+**Component tree:**
+
+```
+CyberneticsDataBrowserModal          (ModalCore; step/state owner)
+├── BrowserNotConfigured             (empty state + settings link, when !isIntegrationActive)
+├── DatabaseTree                     (useSWR listDatabases; lazy useSWR listTables on expand; local text filter)
+├── RecordsPane
+│   ├── RecordsToolbar               (search input w/ useDebounce 400ms, search-field select, ViewSelect, FilterPopover, SortPopover)
+│   ├── RecordsTable                 (@plane/propel/table; columns = primary + first N visible fields from schema; checkbox col; ⤢ opens viewer)
+│   └── RecordsPagination            (take=50, skip; total from with_total)
+├── SelectedChips                    (selection across pages/tables; max 10)
+├── RecordViewer                     (§6.6; replaces RecordsPane when a row is opened; "‹ Back to list")
+└── Footer                           (Cancel / Attach N — loading state; disabled when 0 selected or disabled prop)
+```
+
+**State** (local `useState`, reset on close like `change-email-modal.tsx:56`):
+
+```ts
+type TBrowserState = {
+  spaceId?: string; baseId?: string; tableId?: string; viewId?: string;
+  search: string; searchField?: string; filter?: TCyberneticsFilter; orderBy?: TOrder[];
+  skip: number; viewerRecordId?: string;
+  selection: Map<string /*tableId:recordId*/, { baseId: string; tableId: string; recordId: string; name: string; tableName: string }>;
+};
+```
+
+**Behaviour details:**
+- **Initial selection:** restore the last-used base/table for the project from `localStorage`
+  (`cybernetics-data:last:<projectId>`, wrapped in try/catch). Otherwise select the first table of the first base.
+- **Already-attached records** (from the store) are shown ticked and disabled with the tooltip "Already attached".
+- **Selection** can span several tables. Chips show `Table › Record`. Attach sends one POST with all of them (≤ 10).
+- **Filter popover (v1):** a simple builder, field → operator → value.
+  - Operators come from the field's `cell_value_type`: text `contains/is/isEmpty`, number `is/isGreater/isLess`,
+    boolean `is`, date `is/isBefore/isAfter` with `exactDate`. Conditions are combined with AND.
+  - An advanced JSON filter is out of scope for v1.
+  - A selected view's own filter still applies server-side.
+- **Sort popover:** a single field with asc/desc.
+- **Errors, by `code`:**
+  - `CYBERNETICS_FORBIDDEN` on a base: mark the tree node 🔒 and show an inline message.
+  - `CYBERNETICS_UNAUTHORIZED`: a banner saying "The project's Cybernetics-Data token is invalid or expired", plus a settings
+    link for admins.
+  - `CYBERNETICS_UNREACHABLE`: a banner with a retry button.
+  - `CYBERNETICS_RATE_LIMITED`: a toast.
+- **Loading:** `Loader` skeleton rows in the table and a `Spinner` in tree nodes.
+- **Empty states:** "No records match" or "This table is empty" (`EmptyStateCompact`).
+- **Keyboard:** `Esc` closes. `Enter` in search applies immediately. Rows are toggled with Space when focused.
+- **Attach:** `attachIssueRecords` → success toast "2 records attached" (plus "1 already attached" when some were skipped) →
+  `closeBrowser()` → `setLastWidgetAction("cybernetics-records")`. On 400 with `failed[]`, the failed chips are highlighted.
+
+### 6.6 Record viewer
+
+`RecordViewer` (inside the modal) handles both entry points: "⤢" from the table, and "View" from the attached list (modal
+opened with `mode="view"` and `target`).
+
+- Data comes from `getRecord(…, {base_id, cell_format: "json"})` plus the cached `getSchema`.
+- It renders a two-column field list (`name | value`) in schema order, with a renderer chosen by `field.type`:
+
+  | Type | Rendering |
+  |---|---|
+  | singleLineText / longText | text (longText with `whitespace-pre-wrap`, clamped with "show more") |
+  | number / rating / autoNumber | formatted number / stars |
+  | checkbox | check icon |
+  | singleSelect / multipleSelect | pills (colour from `options_lite.choices`) |
+  | date / createdTime / lastModifiedTime | `renderFormattedDate` in the user's time zone |
+  | user / createdBy / lastModifiedBy | avatar + name (`avatarUrl` is an external image) |
+  | attachment | thumbnail grid (`smThumbnailUrl` / `presignedUrl`), opened in a new tab; never persisted |
+  | link | chips with `title`; clicking one opens the viewer on the linked record (requires resolving the foreign table: `options_lite.foreign_table_id`) |
+  | formula / rollup / lookup | fall back to `cellValue` → string (the backend can also pass the `cell_format=text` value) |
+  | button | hidden |
+
+- **Header:** record name, `Base › Table`, an "Open in Cybernetics Data ↗" button (`deep_link`, `target=_blank`,
+  `rel="noopener noreferrer"`), and, in browse mode, a checkbox to add or remove the record from the selection.
+- **All values are rendered as text.** There is no `dangerouslySetInnerHTML`: longText is shown as plain text, not rendered
+  as markdown or HTML.
+- Image URLs are allowed only from `https:` / `http:`.
+
+### 6.7 Collapsible list — "Database records"
+
+Rendered from the CE stub `WorkItemAdditionalWidgetCollapsibles`
+(`ce/components/issues/issue-detail-widgets/collapsibles.tsx`). The trio mirrors `links/`:
+
+- `ce/components/cybernetics-data/widget/root.tsx`
+  - `useSWR(\`ISSUE_CYBERNETICS_RECORDS_${issueId}\`, () => fetchIssueRecords(ws, pid, issueId))`.
+  - Renders nothing when the count is 0, matching the other widgets.
+  - `<Collapsible isOpen={openWidgets.includes("cybernetics-records")} onToggle={() => toggleOpenWidget("cybernetics-records")} …>`.
+- `title.tsx`
+  - `CollapsibleButton` with `title={t("cybernetics_data.widget.title")}`, a count badge, and `actionItemElement` "+" →
+    `openBrowser(issueId)` when not `disabled` and the integration is active.
+- `content.tsx`: the list of `CyberneticsRecordItem` rows, styled like `link-item.tsx`:
+
+  ```
+  [🗄] ACME Ltd                         Customers · CRM      2d ago   [↗] [⋯]
+       Email: a@acme.com · Status: Active                (preview line, text-tertiary, 1 line clamp)
+  ```
+
+  - **Row click** → `openBrowser(issueId, "view", {baseId, tableId, recordId})`. Members only; guests see a static row.
+  - **↗** → the `deep_link` in a new tab.
+  - **⋯ menu** (`CustomMenu`): View · Refresh · Copy link · Remove (Remove only for the creator or an admin, and not when
+    `disabled`).
+  - **Status badges:**
+    - `status="missing"` → strikethrough and "Record no longer exists".
+    - `status="forbidden"` → "No access with current token".
+    - Integration inactive → a single notice at the top: "Cybernetics Data disconnected — showing saved snapshots".
+      View and refresh are hidden.
+
+`openWidgets` initial state (`root.store.ts:146`): **don't** add `"cybernetics-records"` to the default-open list. It opens
+through `setLastWidgetAction` after an attach, which avoids noisy expansions.
+
+### 6.8 Activity rendering
+
+In the CE stub `ce/components/issues/issue-details/additional-activity-root.tsx`:
+
+```tsx
+if (field === "cybernetics_record") return <CyberneticsRecordActivity activityId={activityId} ends={ends} />;
+```
+
+`CyberneticsRecordActivity` copies `issue-activity/activity/actions/link.tsx`:
+- `IssueActivityBlockComponent` with a `Database` icon;
+- verb `created` → "attached database record **{new_value}**";
+- verb `deleted` → "removed database record **{old_value}**".
+
+### 6.9 i18n
+
+The **`translate` skill** is mandatory before editing locales. English goes in first; the other 18 locales fall back to
+English until they are translated.
+
+`packages/i18n/src/locales/en/project-settings.json` → `project_settings.cybernetics_data`:
+`label, heading, description, url_label, url_helper, url_placeholder, token_label, token_helper, token_placeholder_new,
+token_placeholder_stored, token_prefix_warning, delegation_warning, enabled_label, test_button, save_button,
+status.{ok,unauthorized,forbidden,unreachable,error,never}, bases_visible, save_anyway, disconnect.{title,description,button},
+toast.{saved,disconnected,test_ok,test_failed,error}`.
+
+New namespace `en/cybernetics-data.json`, added to `packages/i18n/src/constants/namespaces.ts` → `cybernetics_data`:
+`widget.{button,title,empty}, browser.{title,search_placeholder,all_fields,filter,sort,view,no_records,table_empty,
+no_access,already_attached,selected,attach_n,cancel,back,open_external,not_configured.{title,description,cta}},
+errors.{unauthorized,forbidden,not_found,unreachable,rate_limited,unreadable_token,bad_request},
+viewer.{fields,show_more}, item.{view,refresh,copy_link,remove,missing,forbidden,disconnected},
+activity.{attached,removed}, toast.{attached,skipped,removed,refreshed}`.
+
+Add `common.integrations` to `en/common.json` if it's missing (the new category label).
+
+"Cybernetics Data" is a product name and should be listed as do-not-translate.
+
+### 6.10 Frontend file map
+
+```
+packages/types/src/cybernetics-data.ts                     NEW
+packages/types/src/index.ts                                EDIT export
+packages/types/src/settings.ts                             EDIT + "cybernetics_data"
+packages/types/src/issues/issue.ts                         EDIT + "cybernetics-records" widget key
+packages/constants/src/settings/project.ts                 EDIT entry + INTEGRATIONS category
+packages/constants/src/cybernetics-data.ts                 NEW  (+ export in index)
+packages/i18n/src/locales/en/{project-settings,common,cybernetics-data}.json   EDIT/NEW
+packages/i18n/src/constants/namespaces.ts                  EDIT + "cybernetics-data"
+
+apps/web/app/routes/extended.ts                            EDIT route (§6.2)
+apps/web/app/(all)/[workspaceSlug]/(settings)/settings/projects/[projectId]/cybernetics-data/{page,header}.tsx   NEW
+apps/web/core/components/settings/project/sidebar/item-icon.tsx                 EDIT + icon
+apps/web/core/store/issue/issue-details/root.store.ts                           EDIT isAnyModalOpen (1 line)
+
+apps/web/ce/services/cybernetics-data.service.ts           NEW
+apps/web/ce/store/cybernetics-data.store.ts                NEW
+apps/web/ce/store/root.store.ts                            EDIT register + resetOnSignOut
+apps/web/ce/hooks/store/use-cybernetics-data.ts            NEW
+apps/web/ce/components/cybernetics-data/settings/{root,form,secret-input,status-badge,danger-zone}.tsx   NEW
+apps/web/ce/components/cybernetics-data/browser/{modal,database-tree,records-pane,records-toolbar,records-table,
+        records-pagination,filter-popover,sort-popover,selected-chips,not-configured}.tsx               NEW
+apps/web/ce/components/cybernetics-data/viewer/{record-viewer,field-value}.tsx                          NEW
+apps/web/ce/components/cybernetics-data/widget/{action-button,root,title,content,record-item}.tsx       NEW
+apps/web/ce/components/cybernetics-data/activity/record-activity.tsx                                    NEW
+apps/web/ce/components/issues/issue-detail-widgets/{action-buttons,collapsibles,modals}.tsx             EDIT (fill stubs)
+apps/web/ce/components/issues/issue-details/additional-activity-root.tsx                                EDIT
+```
+
+**Core files touched:** only `item-icon.tsx` (forced by the `Record` type) and a one-line `isAnyModalOpen`, plus the
+types/constants packages. Everything else is CE.
+
+---
+
+## 7. Security review
+
+| Threat | Mitigation |
+|---|---|
+| Token disclosure | Fernet-encrypted at rest (§5.3); `write_only` in the serializer; only `token_hint` is returned; never logged or placed in activity/errors; not sent to the browser; stripped from exception context. |
+| SSRF via `CYBERNETICS_DATA_URL` | Validated at write time (`validate_url`) **and** at every call (`pinned_fetch` re-resolves and pins the IP, blocks private/metadata ranges, no redirects, `trust_env=False`). Private deployments must be allowlisted explicitly (`CYBERNETICS_DATA_ALLOWED_HOSTS/IPS`). Only project admins can set the URL. |
+| Path injection into upstream URLs | Strict id regexes with prefixes (`bse…`, `tbl…`, `rec…`, `viw…`, `fld…`) before URL building; ids are never concatenated unvalidated. |
+| Filter abuse / expensive queries | Plane-side filter schema (operator allowlist, depth ≤ 3, ≤ 20 conditions); `take` ≤ 200; per-user/project throttle; 10 s timeout; 5 MB response cap. |
+| Privilege delegation (members act with the admin's token) | Admin-only configuration; explicit warning in the UI; documented recommendation to use a dedicated service account with `spaceIds` restriction and read-only scopes; guests excluded from live browsing. |
+| Cross-project leakage | Everything is keyed by `project_id` from the URL and checked by `allow_permission`; the cache key includes `project_id` + token fingerprint; the issue queryset checks active membership and a non-archived project. |
+| XSS from external data | Every value is rendered as React text; no HTML/markdown rendering of external values; image URLs are restricted to http(s); external links use `rel="noopener noreferrer"`. |
+| Accidental Plane logout | Upstream 401 is mapped to **424** so Plane's axios 401 interceptor isn't triggered. |
+| Secret-key rotation | Decrypt failure → 409 `CYBERNETICS_TOKEN_UNREADABLE`; the UI prompts for re-entry. |
+| Stale attachment/presigned URLs | Never persisted; only text previews are stored in snapshots. |
+
+---
+
+## 8. Testing plan
+
+**Backend** (pytest, `apps/api/plane/tests/`). Mock upstream by patching `plane.utils.cybernetics_data.client.pinned_fetch`.
+
+- **`secrets`:** round-trip; `encrypt_data` returning `""` raises; a decrypt failure raises `TokenDecryptionError`; hint and
+  fingerprint.
+- **`client`:**
+  - `normalise_base_url` table tests: trailing `/api`, slash, http vs https, userinfo rejected;
+  - query serialisation (`filter`/`orderBy` JSON, `search[]` list, `fieldKeyType=id`, primary field in projection);
+  - status mapping (401→Unauthorized, 403, 404, 429, 5xx, timeout, redirect, size cap).
+- **`service`:**
+  - `list_databases` grouping, including the token restricted to bases (`/api/space` → `[]`);
+  - `verify_connection` result for each probe failure;
+  - `build_snapshot` with the table not in the base (→ NotFound) and with the primary field missing from the record.
+- **Config views:**
+  - permission matrix (guest/member/admin);
+  - upsert with the token required on create and retained on update;
+  - the token is never present in any response body (assert on the serialised JSON);
+  - SSRF-blocked URL → 400;
+  - the `skip_verification` path;
+  - delete keeps records.
+- **Browse views:** id-regex rejection; `base_id` required; throttle hit → 429; cache hit avoids a second upstream call;
+  records `with_total`.
+- **Record views:**
+  - bulk attach with duplicates → `skipped`;
+  - one upstream 404 → whole request 400 with `failed`;
+  - 51 items → 400;
+  - archived issue → 400/403;
+  - delete by a non-creator member → 403;
+  - `issue_activity.delay` called with the right `type` (mock it).
+- **Activity handlers:** `IssueActivity` rows created with `field="cybernetics_record"`.
+- **Migration:** apply/rollback; the unique constraint under soft delete (re-attach after remove succeeds).
+- **Contract smoke test** (manual/CI-optional): against a local Data-Centre (`D/`, `pnpm dev`), create a read-scoped token and
+  run `verify_connection`, `list_records` with `search` and `filter`, and `get_record`. This confirms the `search[]` encoding
+  in practice.
+
+**Frontend:**
+- Unit tests for the filter builder → JSON, the error-code → message map, and the selection reducer (cross-table, max 10,
+  already-attached).
+- Component tests for the settings form (token required only on create; the empty token keeps the stored one) and for the
+  modal states (not configured / unauthorized / empty / loading).
+- `pnpm check:types` and `react-router typegen`, to confirm the `extended.ts` merge produces `./+types/page`.
+- Manual QA in peek, full-page, and full-page-with-peek (the modal must render once); guest vs member vs admin; archived work
+  item.
+
+---
+
+## 9. Implementation roadmap
+
+| Phase | Scope | Exit criteria |
+|---|---|---|
+| **0. Contract spike** (0.5 d) | Local Data-Centre + token; confirm `/api/base/access/all`, `search[]` encoding, the `name` field with projection, the deep-link format. | curl transcript checked into the PR description. |
+| **1. Setup (Feature 1)** | Models + migration; secrets; client (discovery subset); `verify_connection`; config + test endpoints; settings page, nav item, icon, i18n. | An admin can save, test, disable and disconnect; members can't see the page; the token never leaves the server; tests green. |
+| **2. Browse + view** | Browse proxy endpoints, throttle, cache; modal (tree, records table, search, pagination, view select); record viewer; "Database" button. | A member can browse any permitted table and view a record from a work item; error states are handled. |
+| **3. Attach + widget + activity** | `issue_cybernetics_records` endpoints; bulk attach; collapsible list; remove/refresh; activity handlers + UI; `isAnyModalOpen`. | Attached records persist, show in the widget with a deep link, produce activity entries, and survive integration disconnect as snapshots. |
+| **4. Polish (optional)** | Filter/sort popovers; `cybernetics_record_count` annotation on the issue payload; epics support; public `/api/v1` endpoints + MCP tools (`list_cybernetics_records`, `attach_cybernetics_record`) via `plane/mcp/tools`; reverse lookup "work items referencing this record". | — |
+
+Required checks for each phase, per `CLAUDE.md`:
+- `npm run build && npm test` (web);
+- `pytest` for the api;
+- `react-doctor` on the changed React code before committing.
+
+---
+
+## 10. Risks & open questions
+
+**Risks**
+
+1. **Token-shape pitfalls.** Tokens restricted to bases only can't list spaces. Tokens with full access expose everything the
+   user can see. The UI copy steers admins to space-scoped service tokens, and `list_databases` tolerates both shapes.
+2. **`/api/base/access/all` over-lists bases.** It isn't filtered by the token's `baseIds`/`spaceIds`. Handled lazily with a
+   🔒 on 403. If this is too noisy, a v2 could probe each base in parallel once and cache the result for 60 s.
+3. **Snapshot staleness.** Names can drift after renames upstream. Mitigated by the Refresh action and live data in the
+   viewer. A periodic Celery refresh is possible later, but it would need an upstream call budget.
+4. **Upstream fork drift.** Cybernetics-Data is a Teable fork, and parameter names may change. The contract spike (phase 0)
+   and the client's small surface keep this contained. Pin the verified Data-Centre version in the README of the client
+   module.
+5. **Encryption key coupling.** Rotating `SECRET_KEY` makes stored tokens unreadable, the same as for existing instance
+   secrets. Handled with the explicit 409 and re-entry.
+6. **The `mergeRoutes` merge from `extended.ts`** depends on identical layout file strings. The fallback is `core.ts` (§6.2).
+
+**Resolved (2026-09-23):** guest access (→ D2, snapshots only), token model (→ D1, shared project token), scope
+(→ D3, work items only), write-back (→ D4, read-only). See §0.
+
+**Open questions (still need product input; none block v1)**
+
+1. ~~Guests and the live viewer~~: resolved by D2 (no).
+2. **Instance-level default:** should the god-mode admin be able to set a default `CYBERNETICS_DATA_URL` (and token) that
+   projects inherit? The schema allows it later without migration changes.
+3. ~~Write-back~~: resolved by D4 (read-only in v1). A post-v1 version would need write scopes and much stricter UX.
+4. **Per-user tokens (post-v1):** v1 uses the shared project token (D1). A later version could let members use their *own*
+   Data-Centre tokens so access matches theirs exactly. This would add a `ProjectMemberCyberneticsToken` model, with the
+   project token as a fallback.
+5. ~~Epics / intake~~: resolved by D3 (work items only in v1).
+6. **Record → work item reverse view:** should Cybernetics-Data show which work items reference a record? That would need a
+   public Plane endpoint plus a Data-Centre plugin.

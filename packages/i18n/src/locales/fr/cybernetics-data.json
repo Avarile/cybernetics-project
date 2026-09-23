@@ -1,0 +1,119 @@
+{
+  "cybernetics_data": {
+    "widget": {
+      "button": "Base de données",
+      "title": "Enregistrements de la base de données",
+      "empty": "Aucun enregistrement de base de données rattaché pour le moment."
+    },
+    "browser": {
+      "title": "Base de données",
+      "subtitle": "Rattacher des enregistrements à {identifier}",
+      "view_subtitle": "Afficher l’enregistrement",
+      "filter_databases": "Filtrer les bases de données",
+      "no_databases": "Aucune base de données n’est visible avec le jeton du projet.",
+      "no_tables": "Cette base de données ne contient aucune table.",
+      "select_table": "Sélectionnez une table pour parcourir ses enregistrements.",
+      "search_placeholder": "Rechercher des enregistrements",
+      "all_fields": "Tous les champs",
+      "filter": "Filtrer",
+      "sort": "Trier",
+      "view": "Vue",
+      "default_view": "Aucune vue",
+      "no_records": "Aucun enregistrement ne correspond à votre recherche.",
+      "table_empty": "Cette table est vide.",
+      "no_access": "Aucun accès",
+      "no_access_description": "Le jeton du projet ne peut pas lire cette base de données.",
+      "already_attached": "Déjà rattaché",
+      "selected": "Sélectionné(s) ({count})",
+      "max_selected": "Vous pouvez rattacher jusqu’à {count} enregistrements à la fois.",
+      "remove_selected": "Retirer {name}",
+      "attach_n": "{count, plural, one {Rattacher # enregistrement} many {Rattacher # enregistrements} other {Rattacher # enregistrements}}",
+      "attaching": "Rattachement en cours",
+      "cancel": "Annuler",
+      "back": "Retour à la liste",
+      "open_external": "Ouvrir dans Cybernetics Data",
+      "view_record": "Afficher l’enregistrement",
+      "retry": "Réessayer",
+      "pagination": "{from}–{to} sur {total}",
+      "pagination_no_total": "{from}–{to}",
+      "previous": "Précédent",
+      "next": "Suivant",
+      "not_configured": {
+        "title": "Cybernetics Data n’est pas connecté",
+        "description": "Connectez ce projet à Cybernetics Data pour parcourir et rattacher des enregistrements de base de données.",
+        "description_member": "Demandez à un administrateur du projet de connecter ce projet à Cybernetics Data.",
+        "cta": "Configurer Cybernetics Data"
+      }
+    },
+    "filter": {
+      "add_condition": "Ajouter une condition",
+      "remove_condition": "Supprimer la condition",
+      "clear": "Effacer",
+      "apply": "Appliquer",
+      "field": "Champ",
+      "operator": "Opérateur",
+      "value": "Valeur",
+      "true": "Coché",
+      "false": "Décoché",
+      "operators": {
+        "is": "est",
+        "isNot": "n’est pas",
+        "contains": "contient",
+        "doesNotContain": "ne contient pas",
+        "isEmpty": "est vide",
+        "isNotEmpty": "n’est pas vide",
+        "isGreater": "est supérieur à",
+        "isLess": "est inférieur à",
+        "isBefore": "est avant",
+        "isAfter": "est après"
+      }
+    },
+    "sort": {
+      "none": "Aucun tri",
+      "asc": "Croissant",
+      "desc": "Décroissant",
+      "clear": "Effacer le tri"
+    },
+    "errors": {
+      "not_configured": "Cybernetics Data n’est pas configuré pour ce projet.",
+      "unauthorized": "Le jeton Cybernetics Data du projet est invalide ou a expiré.",
+      "forbidden": "Le jeton du projet n’a pas accès à cette ressource.",
+      "not_found": "L’enregistrement ou la table demandée n’existe plus.",
+      "unreachable": "Impossible de joindre Cybernetics Data. Réessayez dans un instant.",
+      "rate_limited": "Trop de requêtes vers Cybernetics Data. Patientez un instant puis réessayez.",
+      "unreadable_token": "Le jeton enregistré ne peut pas être lu. Un administrateur du projet doit le saisir à nouveau.",
+      "bad_request": "Cybernetics Data a rejeté la requête.",
+      "attach_failed": "Certains enregistrements n’ont pas pu être rattachés. Ils ont peut-être été supprimés, ou le token du projet ne peut pas les lire.",
+      "generic": "Une erreur s’est produite. Veuillez réessayer.",
+      "open_settings": "Ouvrir les paramètres"
+    },
+    "viewer": {
+      "fields": "Champs",
+      "show_more": "Afficher plus",
+      "show_less": "Afficher moins",
+      "empty_value": "Vide",
+      "select": "Sélectionner cet enregistrement"
+    },
+    "item": {
+      "view": "Afficher",
+      "open_external": "Ouvrir dans Cybernetics Data",
+      "refresh": "Actualiser",
+      "copy_link": "Copier le lien",
+      "remove": "Supprimer",
+      "missing": "L’enregistrement n’existe plus",
+      "forbidden": "Aucun accès avec le jeton actuel",
+      "disconnected": "Cybernetics Data est déconnecté. Affichage des instantanés enregistrés."
+    },
+    "activity": {
+      "attached": "a rattaché un enregistrement de base de données",
+      "removed": "a supprimé un enregistrement de base de données"
+    },
+    "toast": {
+      "attached": "{count, plural, one {# enregistrement rattaché} many {# enregistrements rattachés} other {# enregistrements rattachés}}",
+      "skipped": "{count, plural, one {# enregistrement était déjà rattaché} many {# enregistrements étaient déjà rattachés} other {# enregistrements étaient déjà rattachés}}",
+      "removed": "Enregistrement de base de données supprimé",
+      "refreshed": "Enregistrements de base de données actualisés",
+      "attach_failed": "{count, plural, one {# enregistrement n’a pas pu être rattaché} many {# enregistrements n’ont pas pu être rattachés} other {# enregistrements n’ont pas pu être rattachés}}"
+    }
+  }
+}

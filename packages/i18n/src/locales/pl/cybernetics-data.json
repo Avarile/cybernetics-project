@@ -1,0 +1,119 @@
+{
+  "cybernetics_data": {
+    "widget": {
+      "button": "Baza danych",
+      "title": "Rekordy bazy danych",
+      "empty": "Nie dołączono jeszcze żadnych rekordów bazy danych."
+    },
+    "browser": {
+      "title": "Baza danych",
+      "subtitle": "Dołącz rekordy do {identifier}",
+      "view_subtitle": "Wyświetl rekord",
+      "filter_databases": "Filtruj bazy danych",
+      "no_databases": "Żadna baza danych nie jest widoczna przy użyciu tokena projektu.",
+      "no_tables": "Ta baza danych nie ma tabel.",
+      "select_table": "Wybierz tabelę, aby przeglądać jej rekordy.",
+      "search_placeholder": "Szukaj rekordów",
+      "all_fields": "Wszystkie pola",
+      "filter": "Filtruj",
+      "sort": "Sortuj",
+      "view": "Widok",
+      "default_view": "Brak widoku",
+      "no_records": "Żaden rekord nie pasuje do wyszukiwania.",
+      "table_empty": "Ta tabela jest pusta.",
+      "no_access": "Brak dostępu",
+      "no_access_description": "Token projektu nie może odczytać tej bazy danych.",
+      "already_attached": "Już dołączono",
+      "selected": "Wybrano ({count})",
+      "max_selected": "Możesz dołączyć maksymalnie {count} rekordów naraz.",
+      "remove_selected": "Usuń {name}",
+      "attach_n": "{count, plural, one {Dołącz # rekord} few {Dołącz # rekordy} many {Dołącz # rekordów} other {Dołącz # rekordu}}",
+      "attaching": "Dołączanie",
+      "cancel": "Anuluj",
+      "back": "Powrót do listy",
+      "open_external": "Otwórz w Cybernetics Data",
+      "view_record": "Wyświetl rekord",
+      "retry": "Ponów",
+      "pagination": "{from}–{to} z {total}",
+      "pagination_no_total": "{from}–{to}",
+      "previous": "Wstecz",
+      "next": "Dalej",
+      "not_configured": {
+        "title": "Cybernetics Data nie jest połączone",
+        "description": "Połącz ten projekt z Cybernetics Data, aby przeglądać i dołączać rekordy bazy danych.",
+        "description_member": "Poproś administratora projektu o połączenie tego projektu z Cybernetics Data.",
+        "cta": "Skonfiguruj Cybernetics Data"
+      }
+    },
+    "filter": {
+      "add_condition": "Dodaj warunek",
+      "remove_condition": "Usuń warunek",
+      "clear": "Wyczyść",
+      "apply": "Zastosuj",
+      "field": "Pole",
+      "operator": "Operator",
+      "value": "Wartość",
+      "true": "Zaznaczone",
+      "false": "Niezaznaczone",
+      "operators": {
+        "is": "jest",
+        "isNot": "nie jest",
+        "contains": "zawiera",
+        "doesNotContain": "nie zawiera",
+        "isEmpty": "jest puste",
+        "isNotEmpty": "nie jest puste",
+        "isGreater": "jest większe niż",
+        "isLess": "jest mniejsze niż",
+        "isBefore": "jest przed",
+        "isAfter": "jest po"
+      }
+    },
+    "sort": {
+      "none": "Brak sortowania",
+      "asc": "Rosnąco",
+      "desc": "Malejąco",
+      "clear": "Wyczyść sortowanie"
+    },
+    "errors": {
+      "not_configured": "Cybernetics Data nie jest skonfigurowane dla tego projektu.",
+      "unauthorized": "Token Cybernetics Data tego projektu jest nieprawidłowy lub wygasł.",
+      "forbidden": "Token projektu nie ma dostępu do tego zasobu.",
+      "not_found": "Żądany rekord lub tabela już nie istnieje.",
+      "unreachable": "Nie udało się połączyć z Cybernetics Data. Spróbuj ponownie za chwilę.",
+      "rate_limited": "Zbyt wiele żądań do Cybernetics Data. Poczekaj chwilę i spróbuj ponownie.",
+      "unreadable_token": "Nie można odczytać zapisanego tokena. Administrator projektu musi wprowadzić go ponownie.",
+      "bad_request": "Cybernetics Data odrzuciło żądanie.",
+      "attach_failed": "Nie udało się dołączyć niektórych rekordów. Mogły zostać usunięte lub token projektu nie ma do nich dostępu.",
+      "generic": "Coś poszło nie tak. Spróbuj ponownie.",
+      "open_settings": "Otwórz ustawienia"
+    },
+    "viewer": {
+      "fields": "Pola",
+      "show_more": "Pokaż więcej",
+      "show_less": "Pokaż mniej",
+      "empty_value": "Puste",
+      "select": "Wybierz ten rekord"
+    },
+    "item": {
+      "view": "Wyświetl",
+      "open_external": "Otwórz w Cybernetics Data",
+      "refresh": "Odśwież",
+      "copy_link": "Kopiuj link",
+      "remove": "Usuń",
+      "missing": "Rekord już nie istnieje",
+      "forbidden": "Brak dostępu przy użyciu bieżącego tokena",
+      "disconnected": "Cybernetics Data jest odłączone. Wyświetlanie zapisanych migawek."
+    },
+    "activity": {
+      "attached": "dołączenie rekordu bazy danych",
+      "removed": "usunięcie rekordu bazy danych"
+    },
+    "toast": {
+      "attached": "{count, plural, one {Dołączono # rekord} few {Dołączono # rekordy} many {Dołączono # rekordów} other {Dołączono # rekordu}}",
+      "skipped": "{count, plural, one {# rekord był już dołączony} few {# rekordy były już dołączone} many {# rekordów było już dołączonych} other {# rekordu było już dołączone}}",
+      "removed": "Rekord bazy danych usunięty",
+      "refreshed": "Odświeżono rekordy bazy danych",
+      "attach_failed": "Nie udało się dołączyć {count, plural, one {# rekordu} few {# rekordów} many {# rekordów} other {# rekordu}}"
+    }
+  }
+}

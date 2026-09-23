@@ -1,0 +1,119 @@
+{
+  "cybernetics_data": {
+    "widget": {
+      "button": "Veritabanı",
+      "title": "Veritabanı kayıtları",
+      "empty": "Henüz eklenmiş veritabanı kaydı yok."
+    },
+    "browser": {
+      "title": "Veritabanı",
+      "subtitle": "{identifier} öğesine kayıt ekleyin",
+      "view_subtitle": "Kaydı görüntüle",
+      "filter_databases": "Veritabanlarını filtrele",
+      "no_databases": "Projenin tokenıyla görünen bir veritabanı yok.",
+      "no_tables": "Bu veritabanında tablo yok.",
+      "select_table": "Kayıtlarına göz atmak için bir tablo seçin.",
+      "search_placeholder": "Kayıtlarda ara",
+      "all_fields": "Tüm alanlar",
+      "filter": "Filtre",
+      "sort": "Sırala",
+      "view": "Görünüm",
+      "default_view": "Görünüm yok",
+      "no_records": "Aramanızla eşleşen kayıt yok.",
+      "table_empty": "Bu tablo boş.",
+      "no_access": "Erişim yok",
+      "no_access_description": "Projenin tokenı bu veritabanını okuyamıyor.",
+      "already_attached": "Zaten eklendi",
+      "selected": "Seçildi ({count})",
+      "max_selected": "Bir seferde en fazla {count} kayıt ekleyebilirsiniz.",
+      "remove_selected": "{name} öğesini kaldır",
+      "attach_n": "{count, plural, one {# kaydı ekle} other {# kaydı ekle}}",
+      "attaching": "Ekleniyor",
+      "cancel": "İptal",
+      "back": "Listeye dön",
+      "open_external": "Cybernetics Data'da aç",
+      "view_record": "Kaydı görüntüle",
+      "retry": "Tekrar dene",
+      "pagination": "{from}–{to} / {total}",
+      "pagination_no_total": "{from}–{to}",
+      "previous": "Önceki",
+      "next": "Sonraki",
+      "not_configured": {
+        "title": "Cybernetics Data bağlı değil",
+        "description": "Veritabanı kayıtlarına göz atmak ve kayıt eklemek için bu projeyi Cybernetics Data'ya bağlayın.",
+        "description_member": "Bu projeyi Cybernetics Data'ya bağlamasını proje yöneticinizden isteyin.",
+        "cta": "Cybernetics Data'yı yapılandır"
+      }
+    },
+    "filter": {
+      "add_condition": "Koşul ekle",
+      "remove_condition": "Koşulu kaldır",
+      "clear": "Temizle",
+      "apply": "Uygula",
+      "field": "Alan",
+      "operator": "Operatör",
+      "value": "Değer",
+      "true": "İşaretli",
+      "false": "İşaretsiz",
+      "operators": {
+        "is": "eşittir",
+        "isNot": "eşit değildir",
+        "contains": "içerir",
+        "doesNotContain": "içermez",
+        "isEmpty": "boş",
+        "isNotEmpty": "boş değil",
+        "isGreater": "büyüktür",
+        "isLess": "küçüktür",
+        "isBefore": "önce",
+        "isAfter": "sonra"
+      }
+    },
+    "sort": {
+      "none": "Sıralama yok",
+      "asc": "Artan",
+      "desc": "Azalan",
+      "clear": "Sıralamayı temizle"
+    },
+    "errors": {
+      "not_configured": "Cybernetics Data bu proje için yapılandırılmamış.",
+      "unauthorized": "Projenin Cybernetics Data tokenı geçersiz veya süresi dolmuş.",
+      "forbidden": "Projenin tokenının bu kaynağa erişimi yok.",
+      "not_found": "İstenen kayıt veya tablo artık mevcut değil.",
+      "unreachable": "Cybernetics Data'ya ulaşılamadı. Bir süre sonra tekrar deneyin.",
+      "rate_limited": "Cybernetics Data'ya çok fazla istek gönderildi. Biraz bekleyip tekrar deneyin.",
+      "unreadable_token": "Kayıtlı token okunamıyor. Bir proje yöneticisinin onu yeniden girmesi gerekiyor.",
+      "bad_request": "Cybernetics Data isteği reddetti.",
+      "attach_failed": "Bazı kayıtlar eklenemedi. Silinmiş olabilirler veya projenin tokenı bu kayıtları okuyamıyor olabilir.",
+      "generic": "Bir şeyler ters gitti. Lütfen tekrar deneyin.",
+      "open_settings": "Ayarları aç"
+    },
+    "viewer": {
+      "fields": "Alanlar",
+      "show_more": "Daha fazla göster",
+      "show_less": "Daha az göster",
+      "empty_value": "Boş",
+      "select": "Bu kaydı seç"
+    },
+    "item": {
+      "view": "Görüntüle",
+      "open_external": "Cybernetics Data'da aç",
+      "refresh": "Yenile",
+      "copy_link": "Bağlantıyı kopyala",
+      "remove": "Kaldır",
+      "missing": "Kayıt artık mevcut değil",
+      "forbidden": "Geçerli tokenla erişim yok",
+      "disconnected": "Cybernetics Data bağlantısı kesildi. Kaydedilmiş anlık görüntüler gösteriliyor."
+    },
+    "activity": {
+      "attached": "veritabanı kaydı ekledi",
+      "removed": "veritabanı kaydını kaldırdı"
+    },
+    "toast": {
+      "attached": "{count, plural, one {# kayıt eklendi} other {# kayıt eklendi}}",
+      "skipped": "{count, plural, one {# kayıt zaten eklenmişti} other {# kayıt zaten eklenmişti}}",
+      "removed": "Veritabanı kaydı kaldırıldı",
+      "refreshed": "Veritabanı kayıtları yenilendi",
+      "attach_failed": "{count, plural, one {# kayıt eklenemedi} other {# kayıt eklenemedi}}"
+    }
+  }
+}

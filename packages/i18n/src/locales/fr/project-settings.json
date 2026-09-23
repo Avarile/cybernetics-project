@@ -521,6 +521,62 @@
           }
         }
       }
+    },
+    "cybernetics_data": {
+      "label": "Cybernetics Data",
+      "heading": "Cybernetics Data",
+      "description": "Connectez ce projet à un espace de travail Cybernetics Data afin que les membres puissent parcourir les bases de données et rattacher des enregistrements aux éléments de travail.",
+      "url_label": "CYBERNETICS_DATA_URL",
+      "url_helper": "L’origine de votre déploiement Cybernetics Data, sans /api.",
+      "url_placeholder": "https://data.example.com",
+      "url_required": "CYBERNETICS_DATA_URL est requis.",
+      "url_invalid": "Saisissez une URL http(s) valide.",
+      "token_label": "CYBERNETICS_APITOKEN",
+      "token_helper": "Un jeton d’accès personnel avec les portées de lecture suivantes : espace de travail, base (y compris « tout lire »), table, champ, vue et enregistrement. Privilégiez un compte de service dédié, restreint à des espaces de travail spécifiques.",
+      "token_placeholder_new": "Collez votre jeton API",
+      "token_placeholder_stored": "Jeton enregistré {hint}. Laissez vide pour le conserver.",
+      "token_required": "CYBERNETICS_APITOKEN est requis.",
+      "token_required_url_change": "Saisissez à nouveau le token lorsque vous modifiez l’URL.",
+      "token_prefix_warning": "Ce jeton ne commence pas par « cybernetics_ ». Vérifiez que vous avez copié un jeton d’accès personnel Cybernetics Data.",
+      "delegation_warning": "Tous les membres du projet parcourront Cybernetics Data avec les autorisations de ce jeton.",
+      "show_token": "Afficher le jeton",
+      "hide_token": "Masquer le jeton",
+      "enabled_label": "Activé",
+      "enabled_description": "Lorsqu’il est désactivé, les membres ne peuvent ni parcourir ni rattacher d’enregistrements. Les enregistrements rattachés conservent leurs instantanés enregistrés.",
+      "test_button": "Tester la connexion",
+      "testing": "Test en cours",
+      "save_button": "Enregistrer",
+      "saving": "Enregistrement",
+      "save_anyway": "Enregistrer quand même (ignorer la vérification)",
+      "verified_ago": "Vérifié {time}",
+      "status": {
+        "ok": "Connecté",
+        "unauthorized": "Jeton invalide ou expiré",
+        "forbidden": "Accès limité pour ce jeton",
+        "unreachable": "Impossible de joindre le serveur",
+        "error": "Erreur de connexion",
+        "never": "Pas encore vérifié",
+        "not_configured": "Non connecté",
+        "disabled": "Désactivé"
+      },
+      "bases_visible": "{count, plural, one {Jeton accepté · # base de données visible} many {Jeton accepté · # bases de données visibles} other {Jeton accepté · # bases de données visibles}}",
+      "disconnect": {
+        "heading": "Zone de danger",
+        "title": "Déconnecter Cybernetics Data",
+        "description": "Supprime l’URL et le jeton de ce projet. Les enregistrements rattachés conservent leurs instantanés enregistrés.",
+        "confirm": "Voulez-vous vraiment déconnecter Cybernetics Data de ce projet ? Les membres ne pourront plus parcourir ni rattacher d’enregistrements. Les enregistrements rattachés conservent leurs instantanés enregistrés.",
+        "button": "Déconnecter",
+        "loading": "Déconnexion en cours"
+      },
+      "toast": {
+        "saved": "Paramètres Cybernetics Data enregistrés.",
+        "enabled": "Cybernetics Data activé.",
+        "disabled": "Cybernetics Data désactivé.",
+        "disconnected": "Cybernetics Data déconnecté.",
+        "test_ok": "Connexion réussie.",
+        "test_failed": "Échec de la connexion.",
+        "error": "Une erreur s’est produite. Veuillez réessayer."
+      }
     }
   }
 }

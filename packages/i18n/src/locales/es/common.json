@@ -717,7 +717,8 @@
     "developer": "Developer",
     "work_structure": "Work structure",
     "execution": "Execution",
-    "administration": "Administration"
+    "administration": "Administration",
+    "integrations": "Integraciones"
   },
   "chart": {
     "x_axis": "Eje X",

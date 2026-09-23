@@ -521,6 +521,62 @@
           }
         }
       }
+    },
+    "cybernetics_data": {
+      "label": "Cybernetics Data",
+      "heading": "Cybernetics Data",
+      "description": "Kết nối dự án này với một không gian làm việc Cybernetics Data để các thành viên có thể duyệt cơ sở dữ liệu và đính kèm bản ghi vào mục công việc.",
+      "url_label": "CYBERNETICS_DATA_URL",
+      "url_helper": "Nguồn gốc (origin) của bản triển khai Cybernetics Data của bạn, không bao gồm /api.",
+      "url_placeholder": "https://data.example.com",
+      "url_required": "CYBERNETICS_DATA_URL là bắt buộc.",
+      "url_invalid": "Nhập một URL http(s) hợp lệ.",
+      "token_label": "CYBERNETICS_APITOKEN",
+      "token_helper": "Một personal access token có phạm vi đọc: space, base (bao gồm đọc tất cả), table, field, view và record. Nên dùng một tài khoản dịch vụ riêng, giới hạn ở các space cụ thể.",
+      "token_placeholder_new": "Dán token API của bạn",
+      "token_placeholder_stored": "Token đã lưu {hint}. Để trống nếu muốn giữ nguyên.",
+      "token_required": "CYBERNETICS_APITOKEN là bắt buộc.",
+      "token_required_url_change": "Nhập lại token khi thay đổi URL.",
+      "token_prefix_warning": "Token này không bắt đầu bằng \"cybernetics_\". Hãy kiểm tra xem bạn đã sao chép đúng personal access token của Cybernetics Data chưa.",
+      "delegation_warning": "Tất cả thành viên dự án sẽ duyệt Cybernetics Data với quyền của token này.",
+      "show_token": "Hiện token",
+      "hide_token": "Ẩn token",
+      "enabled_label": "Bật",
+      "enabled_description": "Khi tắt, thành viên không thể duyệt hoặc đính kèm bản ghi. Các bản ghi đã đính kèm vẫn giữ nguyên ảnh chụp đã lưu.",
+      "test_button": "Kiểm tra kết nối",
+      "testing": "Đang kiểm tra",
+      "save_button": "Lưu",
+      "saving": "Đang lưu",
+      "save_anyway": "Vẫn lưu (bỏ qua xác minh)",
+      "verified_ago": "Đã xác minh {time}",
+      "status": {
+        "ok": "Đã kết nối",
+        "unauthorized": "Token không hợp lệ hoặc đã hết hạn",
+        "forbidden": "Token có quyền truy cập hạn chế",
+        "unreachable": "Không thể kết nối đến máy chủ",
+        "error": "Lỗi kết nối",
+        "never": "Chưa được xác minh",
+        "not_configured": "Chưa kết nối",
+        "disabled": "Đã tắt"
+      },
+      "bases_visible": "{count, plural, one {Token đã được chấp nhận · # cơ sở dữ liệu hiển thị} other {Token đã được chấp nhận · # cơ sở dữ liệu hiển thị}}",
+      "disconnect": {
+        "heading": "Vùng nguy hiểm",
+        "title": "Ngắt kết nối Cybernetics Data",
+        "description": "Xóa URL và token khỏi dự án này. Các bản ghi đã đính kèm vẫn giữ nguyên ảnh chụp đã lưu.",
+        "confirm": "Bạn có chắc chắn muốn ngắt kết nối Cybernetics Data khỏi dự án này không? Thành viên sẽ không thể duyệt hoặc đính kèm bản ghi nữa. Các bản ghi đã đính kèm vẫn giữ nguyên ảnh chụp đã lưu.",
+        "button": "Ngắt kết nối",
+        "loading": "Đang ngắt kết nối"
+      },
+      "toast": {
+        "saved": "Đã lưu cài đặt Cybernetics Data.",
+        "enabled": "Đã bật Cybernetics Data.",
+        "disabled": "Đã tắt Cybernetics Data.",
+        "disconnected": "Đã ngắt kết nối Cybernetics Data.",
+        "test_ok": "Kết nối thành công.",
+        "test_failed": "Kết nối thất bại.",
+        "error": "Đã xảy ra lỗi. Vui lòng thử lại."
+      }
     }
   }
 }

@@ -1,0 +1,119 @@
+{
+  "cybernetics_data": {
+    "widget": {
+      "button": "Cơ sở dữ liệu",
+      "title": "Bản ghi cơ sở dữ liệu",
+      "empty": "Chưa có bản ghi cơ sở dữ liệu nào được đính kèm."
+    },
+    "browser": {
+      "title": "Cơ sở dữ liệu",
+      "subtitle": "Đính kèm bản ghi vào {identifier}",
+      "view_subtitle": "Xem bản ghi",
+      "filter_databases": "Lọc cơ sở dữ liệu",
+      "no_databases": "Không có cơ sở dữ liệu nào hiển thị với token của dự án.",
+      "no_tables": "Cơ sở dữ liệu này không có bảng nào.",
+      "select_table": "Chọn một bảng để xem các bản ghi của bảng đó.",
+      "search_placeholder": "Tìm kiếm bản ghi",
+      "all_fields": "Tất cả các trường",
+      "filter": "Bộ lọc",
+      "sort": "Sắp xếp",
+      "view": "Xem",
+      "default_view": "Không có chế độ xem",
+      "no_records": "Không có bản ghi nào khớp với tìm kiếm của bạn.",
+      "table_empty": "Bảng này trống.",
+      "no_access": "Không có quyền truy cập",
+      "no_access_description": "Token của dự án không thể đọc cơ sở dữ liệu này.",
+      "already_attached": "Đã đính kèm",
+      "selected": "Đã chọn ({count})",
+      "max_selected": "Bạn có thể đính kèm tối đa {count} bản ghi cùng lúc.",
+      "remove_selected": "Xóa {name}",
+      "attach_n": "{count, plural, one {Đính kèm # bản ghi} other {Đính kèm # bản ghi}}",
+      "attaching": "Đang đính kèm",
+      "cancel": "Hủy",
+      "back": "Quay lại danh sách",
+      "open_external": "Mở trong Cybernetics Data",
+      "view_record": "Xem bản ghi",
+      "retry": "Thử lại",
+      "pagination": "{from}–{to} trên {total}",
+      "pagination_no_total": "{from}–{to}",
+      "previous": "Trước",
+      "next": "Tiếp theo",
+      "not_configured": {
+        "title": "Cybernetics Data chưa được kết nối",
+        "description": "Kết nối dự án này với Cybernetics Data để duyệt và đính kèm bản ghi cơ sở dữ liệu.",
+        "description_member": "Hãy yêu cầu quản trị viên dự án kết nối dự án này với Cybernetics Data.",
+        "cta": "Định cấu hình Cybernetics Data"
+      }
+    },
+    "filter": {
+      "add_condition": "Thêm điều kiện",
+      "remove_condition": "Xóa điều kiện",
+      "clear": "Xóa",
+      "apply": "Áp dụng",
+      "field": "Trường",
+      "operator": "Toán tử",
+      "value": "Giá trị",
+      "true": "Đã chọn",
+      "false": "Chưa chọn",
+      "operators": {
+        "is": "là",
+        "isNot": "không phải là",
+        "contains": "chứa",
+        "doesNotContain": "không chứa",
+        "isEmpty": "trống",
+        "isNotEmpty": "không trống",
+        "isGreater": "lớn hơn",
+        "isLess": "nhỏ hơn",
+        "isBefore": "trước",
+        "isAfter": "sau"
+      }
+    },
+    "sort": {
+      "none": "Không sắp xếp",
+      "asc": "Tăng dần",
+      "desc": "Giảm dần",
+      "clear": "Xóa sắp xếp"
+    },
+    "errors": {
+      "not_configured": "Cybernetics Data chưa được định cấu hình cho dự án này.",
+      "unauthorized": "Token Cybernetics Data của dự án không hợp lệ hoặc đã hết hạn.",
+      "forbidden": "Token của dự án không có quyền truy cập tài nguyên này.",
+      "not_found": "Bản ghi hoặc bảng được yêu cầu không còn tồn tại.",
+      "unreachable": "Không thể kết nối đến Cybernetics Data. Vui lòng thử lại sau ít phút.",
+      "rate_limited": "Quá nhiều yêu cầu đến Cybernetics Data. Vui lòng đợi một chút rồi thử lại.",
+      "unreadable_token": "Không thể đọc token đã lưu. Quản trị viên dự án cần nhập lại token.",
+      "bad_request": "Cybernetics Data đã từ chối yêu cầu này.",
+      "attach_failed": "Không thể đính kèm một số bản ghi. Có thể chúng đã bị xóa hoặc token của dự án không thể đọc chúng.",
+      "generic": "Đã xảy ra lỗi. Vui lòng thử lại.",
+      "open_settings": "Mở cài đặt"
+    },
+    "viewer": {
+      "fields": "Các trường",
+      "show_more": "Xem thêm",
+      "show_less": "Thu gọn",
+      "empty_value": "Trống",
+      "select": "Chọn bản ghi này"
+    },
+    "item": {
+      "view": "Xem",
+      "open_external": "Mở trong Cybernetics Data",
+      "refresh": "Làm mới",
+      "copy_link": "Sao chép liên kết",
+      "remove": "Xóa",
+      "missing": "Bản ghi không còn tồn tại",
+      "forbidden": "Không có quyền truy cập với token hiện tại",
+      "disconnected": "Cybernetics Data đã ngắt kết nối. Đang hiển thị ảnh chụp đã lưu."
+    },
+    "activity": {
+      "attached": "đã đính kèm bản ghi cơ sở dữ liệu",
+      "removed": "đã xóa bản ghi cơ sở dữ liệu"
+    },
+    "toast": {
+      "attached": "{count, plural, one {Đã đính kèm # bản ghi} other {Đã đính kèm # bản ghi}}",
+      "skipped": "{count, plural, one {# bản ghi đã được đính kèm từ trước} other {# bản ghi đã được đính kèm từ trước}}",
+      "removed": "Đã xóa bản ghi cơ sở dữ liệu",
+      "refreshed": "Đã làm mới các bản ghi cơ sở dữ liệu",
+      "attach_failed": "{count, plural, one {Không thể đính kèm # bản ghi} other {Không thể đính kèm # bản ghi}}"
+    }
+  }
+}

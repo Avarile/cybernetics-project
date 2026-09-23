@@ -1,0 +1,290 @@
+# Cybernetics Data Integration — Backend Test Design
+
+> Scope: every backend module added for the Cybernetics-Data integration (see [`./design`](./design)).
+> Status: design + implementation (2026-09-23).
+> Paths are relative to `apps/api/plane/`.
+
+## 1. Goals
+
+1. **Every branch of the new code has a test.** That covers the client, service, filters, secrets, serializers, views,
+   throttle, models, activity handlers and settings parsing.
+2. **The security properties are pinned by tests:**
+   - the token is never returned or logged;
+   - the token is never sent to a host other than the one it was saved for;
+   - disconnect purges the secret;
+   - SSRF blocking;
+   - guests can't browse;
+   - projects and workspaces are isolated from each other.
+3. **The contract the frontend relies on is locked:**
+   - URLs, request bodies and response shapes;
+   - the error envelope `{error, error_code, error_message}` (`utils/error_codes.py` 4801–4812);
+   - HTTP 424 for an upstream 401;
+   - the cap of 10 records per request.
+4. **No network access in the default suite.** Cybernetics-Data is simulated. An optional smoke test exercises the real
+   `pinned_fetch` against a local fake server.
+
+## 2. How the suite runs
+
+| Where | Command | What runs |
+|---|---|---|
+| CI / Docker (authoritative) | `docker compose -f docker-compose-test.yml run --rm api-tests pytest -k cybernetics` | everything (Postgres, Valkey/Redis and RabbitMQ are provided) |
+| Local, no database | `./bin/run-host.sh python -m pytest plane/tests/unit/cybernetics_data plane/tests/unit/settings -p no:cacheprovider` | the pure unit tests |
+| Local, collect only | `./bin/run-host.sh python -m pytest -k cybernetics --collect-only -p no:cacheprovider` | import and syntax check of the database tests |
+
+Notes that constrain the design:
+- **Tables come from the models.** `pytest.ini` uses `--nomigrations --reuse-db`.
+- **`plane.settings.test` sets `DEBUG=True`,** so `normalize_base_url` does not require https by default. The https
+  tests pass `require_https=True` explicitly.
+- **Throttles use the Redis cache.** Contract tests that pass through a throttled view therefore need Redis (present in
+  Docker). Throttle *behaviour* is unit-tested with the cache patched.
+- **DRF copies `THROTTLE_RATES` at import time.** Rate tests patch `CyberneticsDataProxyThrottle.get_rate`; the
+  `settings` fixture has no effect on rates.
+- **Celery is not eager.** Always patch `issue_activity.delay` and `plane.db.mixins.soft_delete_related_objects.delay`.
+- **No HTTP-mocking library is installed,** and none would help: `pinned_fetch` rewrites URLs to IP literals.
+
+## 3. Test doubles and fixtures
+
+| Double | Location | Purpose |
+|---|---|---|
+| `_response(status, body, raw)` | unit client tests | `MagicMock` response with `status_code`, `iter_content`, `close` |
+| `FakeTeable` router | `tests/unit/cybernetics_data/fakes.py` | Patched in place of `client.pinned_fetch`. Routes on the URL path to canned Teable JSON, records every call (path + query), and can inject status codes and exceptions per route. Exercises the real client, service and view code. |
+| `fake_client` | contract tests | `MagicMock` client patched at `service.client_for` and `config.CyberneticsDataClient`, for view-level branch tests |
+| `DictCache` | `fakes.py` | Replaces `service.cache`, so the cache is deterministic and needs no Redis |
+| `isolate` (autouse, contract) | contract files | Settings (`CYBERNETICS_DATA_ENABLED`, allowlists), cache patch, Celery `.delay` patches |
+| `project`, `issue`, `archived_issue`, `other_project`, `integration`, `make_member(role)` | `tests/contract/app/conftest_cybernetics.py`, imported via `pytest_plugins` | Shared across the split contract files |
+| Factories | `tests/factories.py` | `StateFactory`, `IssueFactory`, `ProjectCyberneticsDataIntegrationFactory`, `IssueCyberneticsRecordFactory` |
+
+## 4. Test inventory
+
+Markers: `unit` = no database, unless also marked `django_db`; `contract` = HTTP through the app URLs; `smoke` = network
+via a local fake server.
+
+### 4.1 `tests/unit/cybernetics_data/test_client.py` (unit)
+| Area | Cases |
+|---|---|
+| `normalize_base_url` | valid forms (trailing `/`, `/api`, `/api/`, a sub-path, a port); invalid (empty, no scheme, ftp, userinfo, query, fragment, `https://` with no host); `require_https` on and off; the default reads `CYBERNETICS_DATA_REQUIRE_HTTPS` and `DEBUG` |
+| transport | Bearer, Accept and User-Agent headers; timeout; `stream=True`; allowlists passed from settings; URL built without `?` when there are no params |
+| error mapping | 400, 401, 403, 404, 422 and 429 each map to their exception class; 500 and 503 map to Unreachable; the upstream `message` is carried over; the message is cut at 300 characters; `_extract_message` handles non-JSON, a JSON list, and an empty or missing message |
+| redirects | 301, 302, 307 and 308 all become Unreachable |
+| transport failures | a `ValueError` from the SSRF guard, a Timeout and a ConnectionError each become Unreachable; a RequestException while streaming becomes Unreachable; `log_exception` is called for network errors |
+| body | size cap; several chunks joined; invalid JSON; an empty body yields the empty defaults; `response.close()` is called on success, redirect and the size-cap path |
+| shape guards | `_expect_list` and `_expect_dict` reject the wrong type, reject non-object list items, and treat None as empty |
+| endpoints | the exact paths for spaces, bases, base, tables, table, fields (with and without `viewId`), views, records, row-count and record; path segments are URL-quoted |
+| query serialisation | always `fieldKeyType=id`; `take` clamped to 1..200; `skip` clamped at 0 or above; `search[]` sent as a 3-tuple, and as `""` for all fields; no search means no `search[]`; `filter` and `orderBy` sent as compact JSON; repeated `projection[]`; `cellFormat` |
+| `row_count` | a missing or null `rowCount` gives 0 |
+| repr | the token is absent |
+
+### 4.2 `tests/unit/cybernetics_data/test_filters.py` (unit)
+| Area | Cases |
+|---|---|
+| `validate_id` | all six kinds; the wrong prefix; body length 7 is rejected, 8 and 32 are accepted, 33 is rejected; a non-alphanumeric body; None; path traversal |
+| values | scalar types; a string over 1000 characters; a list over 50 items; a list containing a non-scalar; a dict over 6 keys; a nested dict; an unsupported type |
+| filter sets | default conjunction; an invalid conjunction; `filterSet` missing or not a list; a non-dict item; an unknown operator; unknown keys are stripped; depth 3 is accepted and depth 4 rejected; the 20-condition limit counts across nested sets; a dict passed in directly; an empty set gives None |
+| `parse_order_by` | `field_id` and camelCase `fieldId`; default asc; an invalid order; invalid JSON; not a list; more than 5 items; a non-dict item; `[]` gives None |
+| `parse_search` | trimming; blank gives None; 200 characters is accepted and 201 rejected; non-string input |
+| `parse_int` | None and `""` give the default; values are clamped; `"abc"` and `"1.5"` raise an error |
+
+### 4.3 `tests/unit/cybernetics_data/test_secrets.py` (unit)
+- Round trip.
+- `encrypt_token("")` returns `""`.
+- An encryption failure raises `ValueError`.
+- `decrypt_token("")` returns `""`.
+- Garbage input raises `TokenDecryptionError`.
+- **Rotated `SECRET_KEY`** (via `settings`) raises `TokenDecryptionError`.
+- Hint at the boundaries: 8 characters gives `••••`, 9 characters gives a masked value.
+- Fingerprint is stable and unique per token.
+
+### 4.4 `tests/unit/cybernetics_data/test_service.py` (unit)
+| Area | Cases |
+|---|---|
+| `client_for` | happy path (decrypted token and base_url); integration disabled; instance flag off; unreadable token gives `TokenUnreadable` |
+| `verify_connection` | ok; no bases gives ok with 0; bases but no tables never calls `list_records`; Unauthorized from `list_bases`; Forbidden after bases keeps `bases_visible` and the message prefix; Unreachable; NotFound, BadRequest and RateLimited give "error" |
+| cache | a hit skips the loader; the key changes with the token fingerprint and with `base_url`; the key is isolated per project; the TTL comes from `CACHE_TTL`; `[]` is cached but None is not |
+| shaping | `_shape_field` (choices capped at 100, `foreign_table_id`, formatting, options None, boolean coercion); `_shape_record` defaults |
+| browse | `list_databases` grouping, spaces Forbidden or NotFound, a base with no `spaceId`, other errors propagated; `list_tables` shaping; `get_schema` checks table ownership, forwards `view_id`, and caches per view; `list_records` with and without a total and passes every parameter through; `get_record` forwards `cell_format` and builds the deep link |
+| snapshot | preview uses text format only; attachment, button and link fields excluded; at most 4 preview fields; empty values dropped; 256-character value cut; record name cut at 512 and base/table names at 255; primary field missing; `space_id` fallback; `view_id` passed through; falls back to the primary value when `name` is missing |
+| deep link | with and without a view; no record; quoting; trailing slash stripped |
+
+### 4.5 `tests/unit/cybernetics_data/test_error_mixin.py` (unit)
+Pattern: `unit/views/test_base_dispatch.py`, using `APIRequestFactory` and a dummy view.
+- Each exception class gives the right status and body, with `error_code` equal to `ERROR_CODES[key]`. The classes are:
+  NotConfigured 404, TokenUnreadable 409, Unauthorized 424, Forbidden 403, NotFound 404, BadRequest 400,
+  RateLimited 429, Unreachable 502, and the base error 502.
+- `Throttled` gives 429, with `Retry-After` when `wait` is set and without it otherwise.
+- `QueryValidationError` gives 400 `CYBERNETICS_BAD_REQUEST`.
+- Other exceptions fall through to the `BaseAPIView` handling.
+- Every `CYBERNETICS_*` key used anywhere in the code exists in `ERROR_CODES`.
+
+### 4.6 `tests/unit/cybernetics_data/test_throttle.py` (unit)
+- An anonymous user gives a None key.
+- The key contains the scope, the user pk and the project id.
+- Two projects get two buckets.
+- With the rate patched to `2/min`, the third request is throttled.
+
+### 4.7 `tests/unit/cybernetics_data/test_serializers.py` (unit; database where noted)
+- **URL validator:** normalises the URL; an allowlisted host skips DNS; `CYBERNETICS_DATA_ALLOWED_IPS` allows a private IP;
+  a private IP (patched `socket.getaddrinfo`) is rejected with the "Invalid or disallowed URL." message.
+- **Write serializer:** `skip_verification` defaults to False; the token is trimmed; a blank token is allowed; the
+  length limits hold.
+- **Test serializer:** a blank URL passes through.
+- **Reference serializer:** each id kind is checked; `view_id` may be blank but not invalid, and defaults to `""`.
+- **Attach serializer:** 0 records is rejected, 10 is accepted, 11 is rejected.
+- **Read serializer:** exact field set; `is_configured` is True; no token fields.
+- **Record serializer:** `deep_link` is built from the context `base_url`, falling back to `source_url`.
+
+### 4.8 `tests/unit/models/test_cybernetics_data_models.py` (unit, django_db)
+- A second active integration for the same project raises `IntegrityError` (wrapped in `transaction.atomic`).
+- A new integration is allowed after a soft delete.
+- The same pair of rules for records, keyed on (issue, table, record).
+- The same record on another issue is allowed.
+- `workspace` is filled from the project.
+- Defaults: `is_enabled`, `status`, `preview`.
+- `__str__`.
+- Ordering.
+- Soft-deleting the issue cascades.
+
+### 4.9 `tests/unit/bg_tasks/test_cybernetics_record_activity.py` (unit, django_db)
+- `_cybernetics_record_label` variants: table + record gives `"T / R"`; no table gives the record; no record falls back
+  to `record_id`; None gives `""`.
+- The create and delete handlers append an `IssueActivity` with the right field, verb, comment, identifiers and values.
+- End to end, `issue_activity(type="cybernetics_record.activity.created", …)` writes one row.
+  - Patch `notifications.delay` and `redis_instance`.
+  - Assert on database state, because the task swallows exceptions.
+
+### 4.10 `tests/unit/settings/test_cybernetics_settings.py` (unit)
+- `_parse_allowed_ips`: empty input; a mix of CIDRs and single IPs; an invalid entry is skipped with a warning (`caplog`).
+- `_parse_allowed_hosts`: case folded, whitespace and trailing dots stripped, empty entries dropped.
+
+### 4.11 Contract tests (contract, django_db): split by resource
+
+**`tests/contract/app/test_cybernetics_data_config_app.py`**
+
+Role matrix: GET is allowed for admin, member and guest (guests get the reduced body), and gives 403 to a non-member and
+401/403 to an unauthenticated user. PUT, DELETE and TEST are admin-only; member and guest get 403.
+
+PUT branches:
+1. Create without a token gives 400 `CYBERNETICS_BAD_REQUEST`.
+2. Create without a URL gives 400.
+3. Create ok: the URL is normalised, the hint and fingerprint are stored, the token is encrypted and absent from the
+   response.
+4. `unauthorized`, `unreachable` and `error` block the save and return 400 `CYBERNETICS_VERIFICATION_FAILED` with the
+   `verification` payload.
+5. An empty verification message falls back to the default.
+6. `forbidden` saves the row with a warning status.
+7. `skip_verification` never verifies and clears `last_verified_*`.
+8. A new token on the same URL re-verifies and updates the hint.
+9. A URL change without a token gives 400 `CYBERNETICS_TOKEN_REQUIRED`.
+10. A URL change with a token verifies against the new URL.
+11. `is_enabled`-only never verifies, never decrypts, and leaves `last_verified_*` untouched.
+12. Sending the same URL again is not treated as a change.
+13. A blank token counts as no token.
+14. An SSRF-blocked URL gives a field error.
+15. Updating never creates a second row.
+16. PUT after a disconnect creates a fresh row.
+
+TEST branches:
+- With no body, it uses the stored URL and token and records the result.
+- An explicit token verifies without saving.
+- The same URL with no token uses the stored token.
+- **Another URL with no token never uses the stored token**, returns 400, and makes no client call.
+- No integration and no data gives 400.
+- An unreadable stored token gives 409.
+- An unauthorized result is still returned with 200.
+
+DELETE:
+- Returns 204.
+- **`all_objects` still holds the row, but `api_token_encrypted`, `token_hint` and `token_fingerprint` are empty.**
+- Deleting when nothing is configured gives 204.
+
+Throttling: PUT and TEST are throttled; GET and DELETE use the default throttles.
+
+**`tests/contract/app/test_cybernetics_data_browse_app.py`**
+- **Role matrix:** admin and member get 200; guest and non-member get 403.
+- **Configuration states:** not configured, disabled, instance flag off, and unreadable token give 404 / 404 / 404 / 409.
+- **Upstream errors:** each exception class, raised by `fake_client`, gives the documented status and `error_code`.
+- **Isolation:** an integration in project A is invisible from project B, and from the same project id under another
+  workspace slug.
+- **tables:** an invalid `base_id` gives 400.
+- **schema:** `base_id` missing or invalid, invalid `view_id`, and `view_id` forwarded.
+- **records:** invalid `table_id`, `base_id`, `view_id` or `search_field`; `take`/`skip` clamps; invalid ints; search
+  over 200 characters; invalid filter or order JSON gives 400; `with_total` truthy variants; filter and order passed
+  through.
+- **record detail:** invalid `cell_format`; invalid ids; `cell_format=text` forwarded; deep link present.
+
+**`tests/contract/app/test_cybernetics_data_records_app.py`**
+- **list:**
+  - guest sees snapshots;
+  - `deep_link` uses the current `base_url`, and falls back to `source_url` after disconnect;
+  - rows from other issues, other projects and soft-deleted rows are excluded;
+  - ordered by `-created_at`;
+  - a non-member gets 403.
+- **create:**
+  - happy path writes `snapshot_at` and `status=ok` and calls the activity once per row;
+  - duplicates are skipped both against existing rows and within the same payload;
+  - `NotFound` and `Forbidden` each end up in `failed` with an `error_message`;
+  - a mix of success and failure creates nothing;
+  - 0 records is rejected, 10 is accepted, 11 is rejected;
+  - a bad id format gives 400;
+  - an archived issue, or an issue from another project, gives 404;
+  - no integration or a disabled integration gives 404;
+  - an Unreachable error gives 502;
+  - **re-attach after a soft delete succeeds**;
+  - a concurrent duplicate (an `IntegrityError` forced through a patched `objects.create`) is reported as skipped;
+  - guest gets 403.
+- **destroy:**
+  - admin can remove any row; the member who created a row can remove it; another member gets 403; guest gets 403;
+  - an unknown pk, or a pk from another issue, gives 404;
+  - an archived issue gives 404;
+  - the activity's `current_instance` carries the names;
+  - it is a soft delete.
+- **refresh:**
+  - an ok result updates the snapshot, and a missing record recovers;
+  - NotFound sets `missing`; Forbidden sets `forbidden`;
+  - `ids` that is not a list, or longer than 10, gives 400;
+  - `ids` limits which rows are refreshed; with no ids at most 10 rows are refreshed;
+  - an invalid UUID gives 400;
+  - an Unreachable error part-way through gives 502;
+  - guest gets 403;
+  - an archived issue gives 404.
+- **Throttling:** POST is throttled; GET is not.
+
+**`tests/contract/app/test_cybernetics_data_e2e_app.py`**
+
+Uses `FakeTeable` with the real client, service and views:
+1. configure;
+2. list databases, then tables, then records with search, filter and order;
+3. attach two records;
+4. list;
+5. refresh after the fake deletes one record, which becomes `missing`;
+6. remove;
+7. disconnect.
+
+It checks the exact upstream query strings (`search[]`, compact `filter`, `projection[]`, `fieldKeyType=id`), and that
+the Bearer token only ever went to the configured host.
+
+### 4.12 `tests/smoke/test_cybernetics_data_live.py` (smoke, slow): optional
+- A threaded `http.server` on 127.0.0.1 serves canned Teable JSON.
+- The settings are `CYBERNETICS_DATA_ALLOWED_IPS=[127.0.0.0/8]` and `http://`.
+- It runs `verify_connection` and `list_records` through the real `pinned_fetch`, including a redirect-rejection route.
+
+## 5. Traceability: requirement → tests
+
+| Requirement | Tests |
+|---|---|
+| Token never exposed | 4.7 read serializer · config PUT create/update · `repr` · e2e |
+| Token only sent to its own host | config PUT (URL change) · TEST (other URL) · e2e |
+| Secret purged on disconnect | config DELETE |
+| SSRF protection | 4.1 transport and redirects · 4.7 URL validator · config PUT SSRF · smoke redirect |
+| Guests: snapshots only | browse role matrix · records list/create guest · config GET guest body |
+| Project/workspace isolation | browse isolation · records list exclusion |
+| Error envelope | 4.5 · every contract error assertion checks `error_code`/`error_message` |
+| Cap of 10 records | 4.7 attach · records create/refresh |
+| Activity feed | 4.9 · records create/destroy |
+| Rate limiting | 4.6 · throttling per method |
+
+## 6. Conventions followed
+- Copyright/SPDX header; `@pytest.mark.unit` on classes or `pytestmark = [contract, django_db]` per module.
+- Plain `assert`, fixtures over setUp, factories for models, `session_client` for app endpoints.
+- Hard-coded `/api/...` URLs, like `contract/app/test_project_app.py`, because `reverse()` names are duplicated between
+  the app and API URL sets.
+- No new dependencies.

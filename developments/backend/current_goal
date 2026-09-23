@@ -1,2 +1,14 @@
-Resume this session with:
-claude --resume 743a279c-edb2-4f61-856c-6aaa807565e4
+Goal: Create an integration to the Cybernetics-data project.
+
+Feature: 
+
+1. Setup: Create a new side-nav in /<workspaceID>/settings/projects/<project-id> page for Cybernetics-data project integration, required fields are: CYBERNETICS_DATA_URL and CYBERNETICS_APITOKEN
+2. Select: In /workspaceID/<project-id>/ page, when select a work item, create a new component "Database" along side "Add sub-work item", "Add relation", "Add link", and "Attach". Click this "Database" component will open a new popup where database, table and exact records can be queried and selected, or viewed. 
+
+References: the code of Cybernetics-data is in /home/avarile/Documents/codeRepo/TypeScript/cybernetics-group/cybernetics-data-centre
+
+Output expected: 
+
+1. Comprehensive design of backend and frontend.
+2. Analysis of the existing code in both projects, so the design can be comprehensive and correct.
+3. output to developments/backend/design

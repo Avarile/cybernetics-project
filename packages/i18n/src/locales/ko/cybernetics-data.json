@@ -1,0 +1,119 @@
+{
+  "cybernetics_data": {
+    "widget": {
+      "button": "데이터베이스",
+      "title": "데이터베이스 레코드",
+      "empty": "아직 첨부된 데이터베이스 레코드가 없습니다."
+    },
+    "browser": {
+      "title": "데이터베이스",
+      "subtitle": "{identifier}에 레코드 첨부",
+      "view_subtitle": "레코드 보기",
+      "filter_databases": "데이터베이스 필터링",
+      "no_databases": "프로젝트 토큰으로 볼 수 있는 데이터베이스가 없습니다.",
+      "no_tables": "이 데이터베이스에는 테이블이 없습니다.",
+      "select_table": "테이블을 선택하여 레코드를 확인하세요.",
+      "search_placeholder": "레코드 검색",
+      "all_fields": "모든 필드",
+      "filter": "필터",
+      "sort": "정렬",
+      "view": "보기",
+      "default_view": "뷰 없음",
+      "no_records": "검색과 일치하는 레코드가 없습니다.",
+      "table_empty": "이 테이블은 비어 있습니다.",
+      "no_access": "액세스 권한 없음",
+      "no_access_description": "프로젝트의 토큰으로는 이 데이터베이스를 읽을 수 없습니다.",
+      "already_attached": "이미 첨부됨",
+      "selected": "선택됨 ({count})",
+      "max_selected": "한 번에 최대 {count}개의 레코드를 첨부할 수 있습니다.",
+      "remove_selected": "{name} 제거",
+      "attach_n": "{count, plural, one {# 레코드 첨부} other {# 레코드 첨부}}",
+      "attaching": "첨부 중",
+      "cancel": "취소",
+      "back": "목록으로 돌아가기",
+      "open_external": "Cybernetics Data에서 열기",
+      "view_record": "레코드 보기",
+      "retry": "다시 시도",
+      "pagination": "{total}개 중 {from}–{to}",
+      "pagination_no_total": "{from}–{to}",
+      "previous": "이전",
+      "next": "다음",
+      "not_configured": {
+        "title": "Cybernetics Data가 연결되어 있지 않습니다",
+        "description": "데이터베이스 레코드를 탐색하고 첨부하려면 이 프로젝트를 Cybernetics Data에 연결하세요.",
+        "description_member": "프로젝트 관리자에게 이 프로젝트를 Cybernetics Data에 연결하도록 요청하세요.",
+        "cta": "Cybernetics Data 설정"
+      }
+    },
+    "filter": {
+      "add_condition": "조건 추가",
+      "remove_condition": "조건 제거",
+      "clear": "지우기",
+      "apply": "적용",
+      "field": "필드",
+      "operator": "연산자",
+      "value": "값",
+      "true": "선택됨",
+      "false": "선택 안 됨",
+      "operators": {
+        "is": "다음과 같음",
+        "isNot": "다음과 같지 않음",
+        "contains": "다음을 포함함",
+        "doesNotContain": "다음을 포함하지 않음",
+        "isEmpty": "비어 있음",
+        "isNotEmpty": "비어 있지 않음",
+        "isGreater": "다음보다 큼",
+        "isLess": "다음보다 작음",
+        "isBefore": "다음보다 이전",
+        "isAfter": "다음보다 이후"
+      }
+    },
+    "sort": {
+      "none": "정렬 없음",
+      "asc": "오름차순",
+      "desc": "내림차순",
+      "clear": "정렬 지우기"
+    },
+    "errors": {
+      "not_configured": "이 프로젝트에는 Cybernetics Data가 설정되어 있지 않습니다.",
+      "unauthorized": "프로젝트의 Cybernetics Data 토큰이 유효하지 않거나 만료되었습니다.",
+      "forbidden": "프로젝트의 토큰에는 이 리소스에 대한 액세스 권한이 없습니다.",
+      "not_found": "요청한 레코드 또는 테이블이 더 이상 존재하지 않습니다.",
+      "unreachable": "Cybernetics Data에 연결할 수 없습니다. 잠시 후 다시 시도하세요.",
+      "rate_limited": "Cybernetics Data에 대한 요청이 너무 많습니다. 잠시 기다렸다가 다시 시도하세요.",
+      "unreadable_token": "저장된 토큰을 읽을 수 없습니다. 프로젝트 관리자가 다시 입력해야 합니다.",
+      "bad_request": "Cybernetics Data가 요청을 거부했습니다.",
+      "attach_failed": "일부 레코드를 첨부할 수 없습니다. 삭제되었거나 프로젝트 토큰으로 읽을 수 없는 레코드일 수 있습니다.",
+      "generic": "문제가 발생했습니다. 다시 시도해 주세요.",
+      "open_settings": "설정 열기"
+    },
+    "viewer": {
+      "fields": "필드",
+      "show_more": "더 보기",
+      "show_less": "간략히 보기",
+      "empty_value": "비어 있음",
+      "select": "이 레코드 선택"
+    },
+    "item": {
+      "view": "보기",
+      "open_external": "Cybernetics Data에서 열기",
+      "refresh": "새로 고침",
+      "copy_link": "링크 복사",
+      "remove": "제거",
+      "missing": "레코드가 더 이상 존재하지 않습니다",
+      "forbidden": "현재 토큰으로는 액세스할 수 없습니다",
+      "disconnected": "Cybernetics Data 연결이 끊어졌습니다. 저장된 스냅샷을 표시합니다."
+    },
+    "activity": {
+      "attached": "데이터베이스 레코드를 첨부함",
+      "removed": "데이터베이스 레코드를 제거함"
+    },
+    "toast": {
+      "attached": "{count, plural, one {레코드 #개를 첨부했습니다} other {레코드 #개를 첨부했습니다}}",
+      "skipped": "{count, plural, one {레코드 #개가 이미 첨부되어 있습니다} other {레코드 #개가 이미 첨부되어 있습니다}}",
+      "removed": "데이터베이스 레코드가 제거되었습니다",
+      "refreshed": "데이터베이스 레코드가 새로 고침되었습니다",
+      "attach_failed": "{count, plural, one {레코드 #개를 첨부하지 못했습니다} other {레코드 #개를 첨부하지 못했습니다}}"
+    }
+  }
+}

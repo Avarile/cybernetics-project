@@ -1,0 +1,119 @@
+{
+  "cybernetics_data": {
+    "widget": {
+      "button": "Database",
+      "title": "Database records",
+      "empty": "No database records attached yet."
+    },
+    "browser": {
+      "title": "Database",
+      "subtitle": "Attach records to {identifier}",
+      "view_subtitle": "View record",
+      "filter_databases": "Filter databases",
+      "no_databases": "No databases are visible with the project's token.",
+      "no_tables": "This database has no tables.",
+      "select_table": "Select a table to browse its records.",
+      "search_placeholder": "Search records",
+      "all_fields": "All fields",
+      "filter": "Filter",
+      "sort": "Sort",
+      "view": "View",
+      "default_view": "No view",
+      "no_records": "No records match your search.",
+      "table_empty": "This table is empty.",
+      "no_access": "No access",
+      "no_access_description": "The project's token can't read this database.",
+      "already_attached": "Already attached",
+      "selected": "Selected ({count})",
+      "max_selected": "You can attach up to {count} records at a time.",
+      "remove_selected": "Remove {name}",
+      "attach_n": "{count, plural, one {Attach # record} other {Attach # records}}",
+      "attaching": "Attaching",
+      "cancel": "Cancel",
+      "back": "Back to list",
+      "open_external": "Open in Cybernetics Data",
+      "view_record": "View record",
+      "retry": "Retry",
+      "pagination": "{from}–{to} of {total}",
+      "pagination_no_total": "{from}–{to}",
+      "previous": "Previous",
+      "next": "Next",
+      "not_configured": {
+        "title": "Cybernetics Data isn't connected",
+        "description": "Connect this project to Cybernetics Data to browse and attach database records.",
+        "description_member": "Ask a project admin to connect this project to Cybernetics Data.",
+        "cta": "Configure Cybernetics Data"
+      }
+    },
+    "filter": {
+      "add_condition": "Add condition",
+      "remove_condition": "Remove condition",
+      "clear": "Clear",
+      "apply": "Apply",
+      "field": "Field",
+      "operator": "Operator",
+      "value": "Value",
+      "true": "Checked",
+      "false": "Unchecked",
+      "operators": {
+        "is": "is",
+        "isNot": "is not",
+        "contains": "contains",
+        "doesNotContain": "does not contain",
+        "isEmpty": "is empty",
+        "isNotEmpty": "is not empty",
+        "isGreater": "is greater than",
+        "isLess": "is less than",
+        "isBefore": "is before",
+        "isAfter": "is after"
+      }
+    },
+    "sort": {
+      "none": "No sorting",
+      "asc": "Ascending",
+      "desc": "Descending",
+      "clear": "Clear sort"
+    },
+    "errors": {
+      "not_configured": "Cybernetics Data isn't configured for this project.",
+      "unauthorized": "The project's Cybernetics Data token is invalid or expired.",
+      "forbidden": "The project's token doesn't have access to this resource.",
+      "not_found": "The requested record or table no longer exists.",
+      "unreachable": "Cybernetics Data couldn't be reached. Try again in a moment.",
+      "rate_limited": "Too many requests to Cybernetics Data. Wait a moment and try again.",
+      "unreadable_token": "The stored token can't be read. A project admin needs to enter it again.",
+      "bad_request": "Cybernetics Data rejected the request.",
+      "attach_failed": "Some records couldn't be attached. They may have been deleted, or the project's token can't read them.",
+      "generic": "Something went wrong. Please try again.",
+      "open_settings": "Open settings"
+    },
+    "viewer": {
+      "fields": "Fields",
+      "show_more": "Show more",
+      "show_less": "Show less",
+      "empty_value": "Empty",
+      "select": "Select this record"
+    },
+    "item": {
+      "view": "View",
+      "open_external": "Open in Cybernetics Data",
+      "refresh": "Refresh",
+      "copy_link": "Copy link",
+      "remove": "Remove",
+      "missing": "Record no longer exists",
+      "forbidden": "No access with current token",
+      "disconnected": "Cybernetics Data is disconnected. Showing saved snapshots."
+    },
+    "activity": {
+      "attached": "attached database record",
+      "removed": "removed database record"
+    },
+    "toast": {
+      "attached": "{count, plural, one {# record attached} other {# records attached}}",
+      "skipped": "{count, plural, one {# record was already attached} other {# records were already attached}}",
+      "removed": "Database record removed",
+      "refreshed": "Database records refreshed",
+      "attach_failed": "{count, plural, one {# record couldn't be attached} other {# records couldn't be attached}}"
+    }
+  }
+}

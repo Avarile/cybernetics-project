@@ -521,6 +521,62 @@
           }
         }
       }
+    },
+    "cybernetics_data": {
+      "label": "Cybernetics Data",
+      "heading": "Cybernetics Data",
+      "description": "Conecte este proyecto a un espacio de trabajo de Cybernetics Data para que los miembros puedan explorar bases de datos y adjuntar registros a los elementos de trabajo.",
+      "url_label": "CYBERNETICS_DATA_URL",
+      "url_helper": "El origen de su implementación de Cybernetics Data, sin /api.",
+      "url_placeholder": "https://data.example.com",
+      "url_required": "CYBERNETICS_DATA_URL es obligatorio.",
+      "url_invalid": "Introduzca una URL http(s) válida.",
+      "token_label": "CYBERNETICS_APITOKEN",
+      "token_helper": "Un token de acceso personal con los siguientes ámbitos de lectura: espacio de trabajo, base (incluye «leer todo»), tabla, campo, vista y registro. Prefiera una cuenta de servicio dedicada y restringida a espacios de trabajo específicos.",
+      "token_placeholder_new": "Pegue su token de API",
+      "token_placeholder_stored": "Token guardado {hint}. Déjelo vacío para conservarlo.",
+      "token_required": "CYBERNETICS_APITOKEN es obligatorio.",
+      "token_required_url_change": "Vuelva a introducir el token al cambiar la URL.",
+      "token_prefix_warning": "Este token no empieza por «cybernetics_». Compruebe que copió un token de acceso personal de Cybernetics Data.",
+      "delegation_warning": "Todos los miembros del proyecto explorarán Cybernetics Data con los permisos de este token.",
+      "show_token": "Mostrar token",
+      "hide_token": "Ocultar token",
+      "enabled_label": "Habilitado",
+      "enabled_description": "Cuando está deshabilitado, los miembros no pueden explorar ni adjuntar registros. Los registros adjuntados conservan sus instantáneas guardadas.",
+      "test_button": "Probar conexión",
+      "testing": "Probando",
+      "save_button": "Guardar",
+      "saving": "Guardando",
+      "save_anyway": "Guardar de todos modos (omitir verificación)",
+      "verified_ago": "Verificado {time}",
+      "status": {
+        "ok": "Conectado",
+        "unauthorized": "Token no válido o expirado",
+        "forbidden": "El token tiene acceso limitado",
+        "unreachable": "No se puede contactar con el servidor",
+        "error": "Error de conexión",
+        "never": "Aún no verificado",
+        "not_configured": "No conectado",
+        "disabled": "Deshabilitado"
+      },
+      "bases_visible": "{count, plural, one {Token aceptado · # base de datos visible} other {Token aceptado · # bases de datos visibles}}",
+      "disconnect": {
+        "heading": "Zona de peligro",
+        "title": "Desconectar Cybernetics Data",
+        "description": "Elimina la URL y el token de este proyecto. Los registros adjuntados conservan sus instantáneas guardadas.",
+        "confirm": "¿Seguro que desea desconectar Cybernetics Data de este proyecto? Los miembros ya no podrán explorar ni adjuntar registros. Los registros adjuntados conservarán sus instantáneas guardadas.",
+        "button": "Desconectar",
+        "loading": "Desconectando"
+      },
+      "toast": {
+        "saved": "Configuración de Cybernetics Data guardada.",
+        "enabled": "Cybernetics Data habilitado.",
+        "disabled": "Cybernetics Data deshabilitado.",
+        "disconnected": "Cybernetics Data desconectado.",
+        "test_ok": "Conexión correcta.",
+        "test_failed": "Error de conexión.",
+        "error": "Algo salió mal. Inténtelo de nuevo."
+      }
     }
   }
 }

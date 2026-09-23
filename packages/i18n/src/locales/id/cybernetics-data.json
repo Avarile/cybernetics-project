@@ -1,0 +1,119 @@
+{
+  "cybernetics_data": {
+    "widget": {
+      "button": "Database",
+      "title": "Rekaman database",
+      "empty": "Belum ada rekaman database yang dilampirkan."
+    },
+    "browser": {
+      "title": "Database",
+      "subtitle": "Lampirkan rekaman ke {identifier}",
+      "view_subtitle": "Lihat rekaman",
+      "filter_databases": "Filter database",
+      "no_databases": "Tidak ada database yang terlihat dengan token proyek ini.",
+      "no_tables": "Database ini tidak memiliki tabel.",
+      "select_table": "Pilih tabel untuk menelusuri rekamannya.",
+      "search_placeholder": "Cari rekaman",
+      "all_fields": "Semua kolom",
+      "filter": "Filter",
+      "sort": "Urutkan",
+      "view": "Tampilan",
+      "default_view": "Tidak ada tampilan",
+      "no_records": "Tidak ada rekaman yang cocok dengan pencarian Anda.",
+      "table_empty": "Tabel ini kosong.",
+      "no_access": "Tidak ada akses",
+      "no_access_description": "Token proyek ini tidak dapat membaca database ini.",
+      "already_attached": "Sudah dilampirkan",
+      "selected": "Dipilih ({count})",
+      "max_selected": "Anda dapat melampirkan hingga {count} rekaman sekaligus.",
+      "remove_selected": "Hapus {name}",
+      "attach_n": "{count, plural, one {Lampirkan # rekaman} other {Lampirkan # rekaman}}",
+      "attaching": "Melampirkan",
+      "cancel": "Batalkan",
+      "back": "Kembali ke daftar",
+      "open_external": "Buka di Cybernetics Data",
+      "view_record": "Lihat rekaman",
+      "retry": "Coba lagi",
+      "pagination": "{from}–{to} dari {total}",
+      "pagination_no_total": "{from}–{to}",
+      "previous": "Sebelumnya",
+      "next": "Berikutnya",
+      "not_configured": {
+        "title": "Cybernetics Data belum terhubung",
+        "description": "Hubungkan proyek ini ke Cybernetics Data untuk menelusuri dan melampirkan rekaman database.",
+        "description_member": "Minta admin proyek untuk menghubungkan proyek ini ke Cybernetics Data.",
+        "cta": "Konfigurasikan Cybernetics Data"
+      }
+    },
+    "filter": {
+      "add_condition": "Tambah kondisi",
+      "remove_condition": "Hapus kondisi",
+      "clear": "Hapus",
+      "apply": "Terapkan",
+      "field": "Kolom",
+      "operator": "Operator",
+      "value": "Nilai",
+      "true": "Dicentang",
+      "false": "Tidak dicentang",
+      "operators": {
+        "is": "adalah",
+        "isNot": "bukan",
+        "contains": "berisi",
+        "doesNotContain": "tidak berisi",
+        "isEmpty": "kosong",
+        "isNotEmpty": "tidak kosong",
+        "isGreater": "lebih besar dari",
+        "isLess": "lebih kecil dari",
+        "isBefore": "sebelum",
+        "isAfter": "setelah"
+      }
+    },
+    "sort": {
+      "none": "Tanpa pengurutan",
+      "asc": "Menaik",
+      "desc": "Menurun",
+      "clear": "Hapus pengurutan"
+    },
+    "errors": {
+      "not_configured": "Cybernetics Data belum dikonfigurasi untuk proyek ini.",
+      "unauthorized": "Token Cybernetics Data proyek ini tidak valid atau sudah kedaluwarsa.",
+      "forbidden": "Token proyek ini tidak memiliki akses ke sumber daya ini.",
+      "not_found": "Rekaman atau tabel yang diminta sudah tidak ada.",
+      "unreachable": "Cybernetics Data tidak dapat dijangkau. Coba lagi sesaat lagi.",
+      "rate_limited": "Terlalu banyak permintaan ke Cybernetics Data. Tunggu sesaat lalu coba lagi.",
+      "unreadable_token": "Token yang tersimpan tidak dapat dibaca. Admin proyek perlu memasukkannya kembali.",
+      "bad_request": "Cybernetics Data menolak permintaan ini.",
+      "attach_failed": "Beberapa rekaman tidak dapat dilampirkan. Rekaman tersebut mungkin telah dihapus, atau token proyek tidak dapat membacanya.",
+      "generic": "Terjadi kesalahan. Silakan coba lagi.",
+      "open_settings": "Buka pengaturan"
+    },
+    "viewer": {
+      "fields": "Kolom",
+      "show_more": "Tampilkan lebih banyak",
+      "show_less": "Tampilkan lebih sedikit",
+      "empty_value": "Kosong",
+      "select": "Pilih rekaman ini"
+    },
+    "item": {
+      "view": "Lihat",
+      "open_external": "Buka di Cybernetics Data",
+      "refresh": "Segarkan",
+      "copy_link": "Salin tautan",
+      "remove": "Hapus",
+      "missing": "Rekaman sudah tidak ada",
+      "forbidden": "Tidak ada akses dengan token saat ini",
+      "disconnected": "Cybernetics Data terputus. Menampilkan snapshot tersimpan."
+    },
+    "activity": {
+      "attached": "melampirkan rekaman database",
+      "removed": "menghapus rekaman database"
+    },
+    "toast": {
+      "attached": "{count, plural, one {# rekaman dilampirkan} other {# rekaman dilampirkan}}",
+      "skipped": "{count, plural, one {# rekaman sudah dilampirkan sebelumnya} other {# rekaman sudah dilampirkan sebelumnya}}",
+      "removed": "Rekaman database dihapus",
+      "refreshed": "Rekaman database disegarkan",
+      "attach_failed": "{count, plural, one {# rekaman gagal dilampirkan} other {# rekaman gagal dilampirkan}}"
+    }
+  }
+}

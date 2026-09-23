@@ -521,6 +521,62 @@
           }
         }
       }
+    },
+    "cybernetics_data": {
+      "label": "Cybernetics Data",
+      "heading": "Cybernetics Data",
+      "description": "Verbinden Sie dieses Projekt mit einem Cybernetics-Data-Arbeitsbereich, damit Mitglieder Datenbanken durchsuchen und Einträge an Arbeitselemente anhängen können.",
+      "url_label": "CYBERNETICS_DATA_URL",
+      "url_helper": "Der Ursprung Ihrer Cybernetics-Data-Bereitstellung, ohne /api.",
+      "url_placeholder": "https://data.example.com",
+      "url_required": "CYBERNETICS_DATA_URL ist erforderlich.",
+      "url_invalid": "Geben Sie eine gültige http(s)-URL ein.",
+      "token_label": "CYBERNETICS_APITOKEN",
+      "token_helper": "Ein persönlicher Zugriffstoken mit den Lesebereichen: Arbeitsbereich, Datenbank (einschließlich „alle lesen“), Tabelle, Feld, Ansicht und Eintrag. Bevorzugen Sie ein dediziertes Dienstkonto, das auf bestimmte Arbeitsbereiche beschränkt ist.",
+      "token_placeholder_new": "Fügen Sie Ihr API-Token ein",
+      "token_placeholder_stored": "Gespeichertes Token {hint}. Leer lassen, um es beizubehalten.",
+      "token_required": "CYBERNETICS_APITOKEN ist erforderlich.",
+      "token_required_url_change": "Geben Sie das Token erneut ein, wenn Sie die URL ändern.",
+      "token_prefix_warning": "Dieses Token beginnt nicht mit „cybernetics_“. Prüfen Sie, ob Sie ein persönliches Cybernetics-Data-Zugriffstoken kopiert haben.",
+      "delegation_warning": "Alle Projektmitglieder durchsuchen Cybernetics Data mit den Berechtigungen dieses Tokens.",
+      "show_token": "Token anzeigen",
+      "hide_token": "Token verbergen",
+      "enabled_label": "Aktiviert",
+      "enabled_description": "Bei Deaktivierung können Mitglieder keine Einträge durchsuchen oder anhängen. Angehängte Einträge behalten ihre gespeicherten Snapshots.",
+      "test_button": "Verbindung testen",
+      "testing": "Wird getestet",
+      "save_button": "Speichern",
+      "saving": "Wird gespeichert",
+      "save_anyway": "Trotzdem speichern (Überprüfung überspringen)",
+      "verified_ago": "Verifiziert {time}",
+      "status": {
+        "ok": "Verbunden",
+        "unauthorized": "Ungültiges oder abgelaufenes Token",
+        "forbidden": "Token hat eingeschränkten Zugriff",
+        "unreachable": "Server nicht erreichbar",
+        "error": "Verbindungsfehler",
+        "never": "Noch nicht verifiziert",
+        "not_configured": "Nicht verbunden",
+        "disabled": "Deaktiviert"
+      },
+      "bases_visible": "{count, plural, one {Token akzeptiert · # Datenbank sichtbar} other {Token akzeptiert · # Datenbanken sichtbar}}",
+      "disconnect": {
+        "heading": "Gefahrenzone",
+        "title": "Cybernetics Data trennen",
+        "description": "Entfernt die URL und das Token aus diesem Projekt. Angehängte Einträge behalten ihre gespeicherten Snapshots.",
+        "confirm": "Möchten Sie Cybernetics Data wirklich von diesem Projekt trennen? Mitglieder können danach keine Einträge mehr durchsuchen oder anhängen. Angehängte Einträge behalten ihre gespeicherten Snapshots.",
+        "button": "Trennen",
+        "loading": "Wird getrennt"
+      },
+      "toast": {
+        "saved": "Cybernetics-Data-Einstellungen gespeichert.",
+        "enabled": "Cybernetics Data aktiviert.",
+        "disabled": "Cybernetics Data deaktiviert.",
+        "disconnected": "Cybernetics Data getrennt.",
+        "test_ok": "Verbindung erfolgreich.",
+        "test_failed": "Verbindung fehlgeschlagen.",
+        "error": "Etwas ist schiefgelaufen. Bitte versuchen Sie es erneut."
+      }
     }
   }
 }

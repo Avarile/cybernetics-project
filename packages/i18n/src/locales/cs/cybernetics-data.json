@@ -1,0 +1,119 @@
+{
+  "cybernetics_data": {
+    "widget": {
+      "button": "Databáze",
+      "title": "Databázové záznamy",
+      "empty": "Zatím nejsou připojeny žádné databázové záznamy."
+    },
+    "browser": {
+      "title": "Databáze",
+      "subtitle": "Připojit záznamy k {identifier}",
+      "view_subtitle": "Zobrazit záznam",
+      "filter_databases": "Filtrovat databáze",
+      "no_databases": "S tokenem projektu není viditelná žádná databáze.",
+      "no_tables": "Tato databáze nemá žádné tabulky.",
+      "select_table": "Vyberte tabulku pro procházení jejích záznamů.",
+      "search_placeholder": "Hledat záznamy",
+      "all_fields": "Všechna pole",
+      "filter": "Filtrovat",
+      "sort": "Seřadit",
+      "view": "Pohled",
+      "default_view": "Žádný pohled",
+      "no_records": "Žádný záznam neodpovídá vašemu hledání.",
+      "table_empty": "Tato tabulka je prázdná.",
+      "no_access": "Bez přístupu",
+      "no_access_description": "Token projektu nemůže tuto databázi číst.",
+      "already_attached": "Již připojeno",
+      "selected": "Vybráno ({count})",
+      "max_selected": "Najednou můžete připojit maximálně {count} záznamů.",
+      "remove_selected": "Odebrat {name}",
+      "attach_n": "{count, plural, one {Připojit # záznam} few {Připojit # záznamy} many {Připojit # záznamu} other {Připojit # záznamů}}",
+      "attaching": "Připojování",
+      "cancel": "Zrušit",
+      "back": "Zpět na seznam",
+      "open_external": "Otevřít v Cybernetics Data",
+      "view_record": "Zobrazit záznam",
+      "retry": "Zkusit znovu",
+      "pagination": "{from}–{to} z {total}",
+      "pagination_no_total": "{from}–{to}",
+      "previous": "Zpět",
+      "next": "Další",
+      "not_configured": {
+        "title": "Cybernetics Data není připojeno",
+        "description": "Připojte tento projekt k Cybernetics Data pro procházení a připojování databázových záznamů.",
+        "description_member": "Požádejte administrátora projektu, aby připojil tento projekt k Cybernetics Data.",
+        "cta": "Nakonfigurovat Cybernetics Data"
+      }
+    },
+    "filter": {
+      "add_condition": "Přidat podmínku",
+      "remove_condition": "Odebrat podmínku",
+      "clear": "Vymazat",
+      "apply": "Použít",
+      "field": "Pole",
+      "operator": "Operátor",
+      "value": "Hodnota",
+      "true": "Zaškrtnuto",
+      "false": "Nezaškrtnuto",
+      "operators": {
+        "is": "je",
+        "isNot": "není",
+        "contains": "obsahuje",
+        "doesNotContain": "neobsahuje",
+        "isEmpty": "je prázdné",
+        "isNotEmpty": "není prázdné",
+        "isGreater": "je větší než",
+        "isLess": "je menší než",
+        "isBefore": "je před",
+        "isAfter": "je po"
+      }
+    },
+    "sort": {
+      "none": "Bez řazení",
+      "asc": "Vzestupně",
+      "desc": "Sestupně",
+      "clear": "Vymazat řazení"
+    },
+    "errors": {
+      "not_configured": "Cybernetics Data není pro tento projekt nakonfigurováno.",
+      "unauthorized": "Token Cybernetics Data tohoto projektu je neplatný nebo vypršel.",
+      "forbidden": "Token projektu nemá přístup k tomuto zdroji.",
+      "not_found": "Požadovaný záznam nebo tabulka již neexistuje.",
+      "unreachable": "Cybernetics Data se nepodařilo dosáhnout. Zkuste to prosím za chvíli znovu.",
+      "rate_limited": "Příliš mnoho požadavků na Cybernetics Data. Chvíli počkejte a zkuste to znovu.",
+      "unreadable_token": "Uložený token nelze přečíst. Administrátor projektu jej musí zadat znovu.",
+      "bad_request": "Cybernetics Data požadavek odmítlo.",
+      "attach_failed": "Některé záznamy nebylo možné připojit. Mohly být odstraněny nebo je token projektu nemůže číst.",
+      "generic": "Něco se pokazilo. Zkuste to prosím znovu.",
+      "open_settings": "Otevřít nastavení"
+    },
+    "viewer": {
+      "fields": "Pole",
+      "show_more": "Zobrazit více",
+      "show_less": "Zobrazit méně",
+      "empty_value": "Prázdné",
+      "select": "Vybrat tento záznam"
+    },
+    "item": {
+      "view": "Zobrazit",
+      "open_external": "Otevřít v Cybernetics Data",
+      "refresh": "Obnovit",
+      "copy_link": "Kopírovat odkaz",
+      "remove": "Odebrat",
+      "missing": "Záznam již neexistuje",
+      "forbidden": "Bez přístupu s aktuálním tokenem",
+      "disconnected": "Cybernetics Data je odpojeno. Zobrazují se uložené snapshoty."
+    },
+    "activity": {
+      "attached": "připojení databázového záznamu",
+      "removed": "odebrání databázového záznamu"
+    },
+    "toast": {
+      "attached": "{count, plural, one {# záznam byl připojen} few {# záznamy byly připojeny} many {# záznamu bylo připojeno} other {# záznamů bylo připojeno}}",
+      "skipped": "{count, plural, one {# záznam byl již připojen} few {# záznamy byly již připojeny} many {# záznamu bylo již připojeno} other {# záznamů bylo již připojeno}}",
+      "removed": "Databázový záznam byl odebrán",
+      "refreshed": "Databázové záznamy byly obnoveny",
+      "attach_failed": "Nepodařilo se připojit {count, plural, one {# záznam} few {# záznamy} many {# záznamu} other {# záznamů}}"
+    }
+  }
+}

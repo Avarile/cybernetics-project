@@ -4,8 +4,11 @@
  * See the LICENSE file for details.
  */
 
-// plane types
+// plane imports
+import { EIssueServiceType } from "@plane/types";
 import type { TIssueServiceType, TWorkItemWidgets } from "@plane/types";
+// plane web imports
+import { CyberneticsRecordsCollapsible } from "@/plane-web/components/cybernetics-data/widget/root";
 
 export type TWorkItemAdditionalWidgetCollapsiblesProps = {
   disabled: boolean;
@@ -16,6 +19,18 @@ export type TWorkItemAdditionalWidgetCollapsiblesProps = {
   workspaceSlug: string;
 };
 
-export function WorkItemAdditionalWidgetCollapsibles(_props: TWorkItemAdditionalWidgetCollapsiblesProps) {
-  return null;
+export function WorkItemAdditionalWidgetCollapsibles(props: TWorkItemAdditionalWidgetCollapsiblesProps) {
+  const { disabled, hideWidgets, issueServiceType, projectId, workItemId, workspaceSlug } = props;
+
+  if (issueServiceType !== EIssueServiceType.ISSUES || hideWidgets.includes("cybernetics-records")) return null;
+
+  return (
+    <CyberneticsRecordsCollapsible
+      workspaceSlug={workspaceSlug}
+      projectId={projectId}
+      issueId={workItemId}
+      disabled={disabled}
+      issueServiceType={issueServiceType}
+    />
+  );
 }

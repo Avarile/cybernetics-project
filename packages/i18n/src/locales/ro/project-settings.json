@@ -521,6 +521,62 @@
           }
         }
       }
+    },
+    "cybernetics_data": {
+      "label": "Cybernetics Data",
+      "heading": "Cybernetics Data",
+      "description": "Conectează acest proiect la un spațiu de lucru Cybernetics Data pentru ca membrii să poată răsfoi bazele de date și să atașeze înregistrări la activități.",
+      "url_label": "CYBERNETICS_DATA_URL",
+      "url_helper": "Originea instanței tale Cybernetics Data, fără /api.",
+      "url_placeholder": "https://data.example.com",
+      "url_required": "CYBERNETICS_DATA_URL este obligatoriu.",
+      "url_invalid": "Introdu un URL http(s) valid.",
+      "token_label": "CYBERNETICS_APITOKEN",
+      "token_helper": "Un token de acces personal cu drepturi de citire pentru: spațiu, bază de date (inclusiv citire completă), tabel, câmp, vizualizare și înregistrare. Preferă un cont de serviciu dedicat, limitat la spații specifice.",
+      "token_placeholder_new": "Inserează tokenul API",
+      "token_placeholder_stored": "Token stocat {hint}. Lasă necompletat pentru a-l păstra.",
+      "token_required": "CYBERNETICS_APITOKEN este obligatoriu.",
+      "token_required_url_change": "Introdu din nou tokenul când schimbi URL-ul.",
+      "token_prefix_warning": "Acest token nu începe cu \"cybernetics_\". Verifică dacă ai copiat un token de acces personal Cybernetics Data.",
+      "delegation_warning": "Toți membrii proiectului vor răsfoi Cybernetics Data cu permisiunile acestui token.",
+      "show_token": "Arată tokenul",
+      "hide_token": "Ascunde tokenul",
+      "enabled_label": "Activat",
+      "enabled_description": "Când este dezactivat, membrii nu pot răsfoi sau atașa înregistrări. Înregistrările atașate își păstrează instantaneele salvate.",
+      "test_button": "Testează conexiunea",
+      "testing": "Se testează",
+      "save_button": "Salvează",
+      "saving": "Se salvează",
+      "save_anyway": "Salvează oricum (omite verificarea)",
+      "verified_ago": "Verificat {time}",
+      "status": {
+        "ok": "Conectat",
+        "unauthorized": "Token nevalid sau expirat",
+        "forbidden": "Tokenul are acces limitat",
+        "unreachable": "Serverul nu poate fi contactat",
+        "error": "Eroare de conexiune",
+        "never": "Neverificat încă",
+        "not_configured": "Neconectat",
+        "disabled": "Dezactivat"
+      },
+      "bases_visible": "{count, plural, one {Token acceptat · # bază de date vizibilă} few {Token acceptat · # baze de date vizibile} other {Token acceptat · # de baze de date vizibile}}",
+      "disconnect": {
+        "heading": "Zonă de pericol",
+        "title": "Deconectează Cybernetics Data",
+        "description": "Elimină URL-ul și tokenul din acest proiect. Înregistrările atașate își păstrează instantaneele salvate.",
+        "confirm": "Ești sigur că vrei să deconectezi Cybernetics Data de la acest proiect? Membrii nu vor mai putea răsfoi sau atașa înregistrări. Înregistrările atașate își păstrează instantaneele salvate.",
+        "button": "Deconectează",
+        "loading": "Se deconectează"
+      },
+      "toast": {
+        "saved": "Setările Cybernetics Data au fost salvate.",
+        "enabled": "Cybernetics Data a fost activat.",
+        "disabled": "Cybernetics Data a fost dezactivat.",
+        "disconnected": "Cybernetics Data a fost deconectat.",
+        "test_ok": "Conexiune reușită.",
+        "test_failed": "Conexiune eșuată.",
+        "error": "Ceva nu a funcționat. Te rugăm să încerci din nou."
+      }
     }
   }
 }

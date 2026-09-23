@@ -1,0 +1,119 @@
+{
+  "cybernetics_data": {
+    "widget": {
+      "button": "Datenbank",
+      "title": "Datenbankeinträge",
+      "empty": "Noch keine Datenbankeinträge angehängt."
+    },
+    "browser": {
+      "title": "Datenbank",
+      "subtitle": "Einträge an {identifier} anhängen",
+      "view_subtitle": "Eintrag anzeigen",
+      "filter_databases": "Datenbanken filtern",
+      "no_databases": "Mit dem Token des Projekts sind keine Datenbanken sichtbar.",
+      "no_tables": "Diese Datenbank enthält keine Tabellen.",
+      "select_table": "Wählen Sie eine Tabelle aus, um deren Einträge zu durchsuchen.",
+      "search_placeholder": "Einträge durchsuchen",
+      "all_fields": "Alle Felder",
+      "filter": "Filter",
+      "sort": "Sortieren",
+      "view": "Ansicht",
+      "default_view": "Keine Ansicht",
+      "no_records": "Keine Einträge entsprechen Ihrer Suche.",
+      "table_empty": "Diese Tabelle ist leer.",
+      "no_access": "Kein Zugriff",
+      "no_access_description": "Das Token des Projekts kann diese Datenbank nicht lesen.",
+      "already_attached": "Bereits angehängt",
+      "selected": "Ausgewählt ({count})",
+      "max_selected": "Sie können jeweils bis zu {count} Einträge anhängen.",
+      "remove_selected": "{name} entfernen",
+      "attach_n": "{count, plural, one {# Eintrag anhängen} other {# Einträge anhängen}}",
+      "attaching": "Wird angehängt",
+      "cancel": "Abbrechen",
+      "back": "Zurück zur Liste",
+      "open_external": "In Cybernetics Data öffnen",
+      "view_record": "Eintrag anzeigen",
+      "retry": "Erneut versuchen",
+      "pagination": "{from}–{to} von {total}",
+      "pagination_no_total": "{from}–{to}",
+      "previous": "Zurück",
+      "next": "Weiter",
+      "not_configured": {
+        "title": "Cybernetics Data ist nicht verbunden",
+        "description": "Verbinden Sie dieses Projekt mit Cybernetics Data, um Datenbankeinträge zu durchsuchen und anzuhängen.",
+        "description_member": "Bitten Sie einen Projektadministrator, dieses Projekt mit Cybernetics Data zu verbinden.",
+        "cta": "Cybernetics Data konfigurieren"
+      }
+    },
+    "filter": {
+      "add_condition": "Bedingung hinzufügen",
+      "remove_condition": "Bedingung entfernen",
+      "clear": "Löschen",
+      "apply": "Anwenden",
+      "field": "Feld",
+      "operator": "Operator",
+      "value": "Wert",
+      "true": "Aktiviert",
+      "false": "Deaktiviert",
+      "operators": {
+        "is": "ist",
+        "isNot": "ist nicht",
+        "contains": "enthält",
+        "doesNotContain": "enthält nicht",
+        "isEmpty": "ist leer",
+        "isNotEmpty": "ist nicht leer",
+        "isGreater": "ist größer als",
+        "isLess": "ist kleiner als",
+        "isBefore": "liegt vor",
+        "isAfter": "liegt nach"
+      }
+    },
+    "sort": {
+      "none": "Keine Sortierung",
+      "asc": "Aufsteigend",
+      "desc": "Absteigend",
+      "clear": "Sortierung zurücksetzen"
+    },
+    "errors": {
+      "not_configured": "Cybernetics Data ist für dieses Projekt nicht konfiguriert.",
+      "unauthorized": "Das Cybernetics-Data-Token des Projekts ist ungültig oder abgelaufen.",
+      "forbidden": "Das Token des Projekts hat keinen Zugriff auf diese Ressource.",
+      "not_found": "Der angeforderte Eintrag oder die Tabelle existiert nicht mehr.",
+      "unreachable": "Cybernetics Data konnte nicht erreicht werden. Versuchen Sie es in Kürze erneut.",
+      "rate_limited": "Zu viele Anfragen an Cybernetics Data. Warten Sie einen Moment und versuchen Sie es erneut.",
+      "unreadable_token": "Das gespeicherte Token kann nicht gelesen werden. Ein Projektadministrator muss es erneut eingeben.",
+      "bad_request": "Cybernetics Data hat die Anfrage abgelehnt.",
+      "attach_failed": "Einige Einträge konnten nicht angehängt werden. Sie wurden möglicherweise gelöscht, oder das Token des Projekts kann sie nicht lesen.",
+      "generic": "Etwas ist schiefgelaufen. Bitte versuchen Sie es erneut.",
+      "open_settings": "Einstellungen öffnen"
+    },
+    "viewer": {
+      "fields": "Felder",
+      "show_more": "Mehr anzeigen",
+      "show_less": "Weniger anzeigen",
+      "empty_value": "Leer",
+      "select": "Diesen Eintrag auswählen"
+    },
+    "item": {
+      "view": "Anzeigen",
+      "open_external": "In Cybernetics Data öffnen",
+      "refresh": "Aktualisieren",
+      "copy_link": "Link kopieren",
+      "remove": "Entfernen",
+      "missing": "Eintrag existiert nicht mehr",
+      "forbidden": "Kein Zugriff mit aktuellem Token",
+      "disconnected": "Cybernetics Data ist getrennt. Gespeicherte Snapshots werden angezeigt."
+    },
+    "activity": {
+      "attached": "hat einen Datenbankeintrag angehängt",
+      "removed": "hat einen Datenbankeintrag entfernt"
+    },
+    "toast": {
+      "attached": "{count, plural, one {# Eintrag angehängt} other {# Einträge angehängt}}",
+      "skipped": "{count, plural, one {# Eintrag war bereits angehängt} other {# Einträge waren bereits angehängt}}",
+      "removed": "Datenbankeintrag entfernt",
+      "refreshed": "Datenbankeinträge aktualisiert",
+      "attach_failed": "{count, plural, one {# Eintrag konnte nicht angehängt werden} other {# Einträge konnten nicht angehängt werden}}"
+    }
+  }
+}

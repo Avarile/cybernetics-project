@@ -521,6 +521,62 @@
           }
         }
       }
+    },
+    "cybernetics_data": {
+      "label": "Cybernetics Data",
+      "heading": "Cybernetics Data",
+      "description": "Connetti questo progetto a uno spazio di lavoro Cybernetics Data in modo che i membri possano sfogliare i database e allegare record agli elementi di lavoro.",
+      "url_label": "CYBERNETICS_DATA_URL",
+      "url_helper": "L'origine della tua istanza Cybernetics Data, senza /api.",
+      "url_placeholder": "https://data.example.com",
+      "url_required": "CYBERNETICS_DATA_URL è obbligatorio.",
+      "url_invalid": "Inserisci un URL http(s) valido.",
+      "token_label": "CYBERNETICS_APITOKEN",
+      "token_helper": "Un token di accesso personale con permessi di lettura per: spazio, database (inclusa la lettura completa), tabella, campo, visualizzazione e record. Preferisci un account di servizio dedicato limitato a spazi specifici.",
+      "token_placeholder_new": "Incolla il tuo token API",
+      "token_placeholder_stored": "Token salvato {hint}. Lascia vuoto per mantenerlo.",
+      "token_required": "CYBERNETICS_APITOKEN è obbligatorio.",
+      "token_required_url_change": "Inserisci di nuovo il token quando modifichi l'URL.",
+      "token_prefix_warning": "Questo token non inizia con \"cybernetics_\". Verifica di aver copiato un token di accesso personale di Cybernetics Data.",
+      "delegation_warning": "Tutti i membri del progetto sfoglieranno Cybernetics Data con i permessi di questo token.",
+      "show_token": "Mostra token",
+      "hide_token": "Nascondi token",
+      "enabled_label": "Abilitato",
+      "enabled_description": "Quando disabilitato, i membri non possono sfogliare o allegare record. I record allegati mantengono i loro snapshot salvati.",
+      "test_button": "Testa connessione",
+      "testing": "Test in corso",
+      "save_button": "Salva",
+      "saving": "Salvataggio in corso",
+      "save_anyway": "Salva comunque (salta la verifica)",
+      "verified_ago": "Verificato {time}",
+      "status": {
+        "ok": "Connesso",
+        "unauthorized": "Token non valido o scaduto",
+        "forbidden": "Il token ha accesso limitato",
+        "unreachable": "Impossibile raggiungere il server",
+        "error": "Errore di connessione",
+        "never": "Non ancora verificato",
+        "not_configured": "Non connesso",
+        "disabled": "Disabilitato"
+      },
+      "bases_visible": "{count, plural, one {Token accettato · # database visibile} other {Token accettato · # database visibili}}",
+      "disconnect": {
+        "heading": "Zona pericolosa",
+        "title": "Disconnetti Cybernetics Data",
+        "description": "Rimuove l'URL e il token da questo progetto. I record allegati mantengono i loro snapshot salvati.",
+        "confirm": "Sei sicuro di voler disconnettere Cybernetics Data da questo progetto? I membri non potranno più sfogliare o allegare record. I record allegati mantengono i loro snapshot salvati.",
+        "button": "Disconnetti",
+        "loading": "Disconnessione in corso"
+      },
+      "toast": {
+        "saved": "Impostazioni di Cybernetics Data salvate.",
+        "enabled": "Cybernetics Data abilitato.",
+        "disabled": "Cybernetics Data disabilitato.",
+        "disconnected": "Cybernetics Data disconnesso.",
+        "test_ok": "Connessione riuscita.",
+        "test_failed": "Connessione non riuscita.",
+        "error": "Qualcosa è andato storto. Per favore, riprova."
+      }
     }
   }
 }

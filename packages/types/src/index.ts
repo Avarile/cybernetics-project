@@ -14,6 +14,7 @@ export * from "./charts";
 export * from "./command-palette";
 export * from "./common";
 export * from "./cycle";
+export * from "./cybernetics-data";
 export * from "./dashboard";
 export * from "./de-dupe";
 export * from "./description_version";

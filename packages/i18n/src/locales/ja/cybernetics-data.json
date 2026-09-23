@@ -1,0 +1,119 @@
+{
+  "cybernetics_data": {
+    "widget": {
+      "button": "データベース",
+      "title": "データベースレコード",
+      "empty": "データベースレコードはまだ添付されていません。"
+    },
+    "browser": {
+      "title": "データベース",
+      "subtitle": "{identifier}にレコードを添付",
+      "view_subtitle": "レコードを表示",
+      "filter_databases": "データベースを絞り込み",
+      "no_databases": "プロジェクトのトークンで表示できるデータベースがありません。",
+      "no_tables": "このデータベースにはテーブルがありません。",
+      "select_table": "テーブルを選択してレコードを閲覧してください。",
+      "search_placeholder": "レコードを検索",
+      "all_fields": "すべてのフィールド",
+      "filter": "フィルター",
+      "sort": "並べ替え",
+      "view": "ビュー",
+      "default_view": "ビューなし",
+      "no_records": "検索条件に一致するレコードがありません。",
+      "table_empty": "このテーブルは空です。",
+      "no_access": "アクセスなし",
+      "no_access_description": "プロジェクトのトークンではこのデータベースを読み取れません。",
+      "already_attached": "添付済み",
+      "selected": "選択済み（{count}）",
+      "max_selected": "一度に添付できるレコードは最大{count}件です。",
+      "remove_selected": "{name} を削除",
+      "attach_n": "{count, plural, one {#件のレコードを添付} other {#件のレコードを添付}}",
+      "attaching": "添付中",
+      "cancel": "キャンセル",
+      "back": "一覧に戻る",
+      "open_external": "Cybernetics Dataで開く",
+      "view_record": "レコードを表示",
+      "retry": "再試行",
+      "pagination": "{total}件中{from}–{to}件",
+      "pagination_no_total": "{from}–{to}",
+      "previous": "前へ",
+      "next": "次へ",
+      "not_configured": {
+        "title": "Cybernetics Dataが接続されていません",
+        "description": "データベースレコードを閲覧・添付するには、このプロジェクトをCybernetics Dataに接続してください。",
+        "description_member": "プロジェクト管理者にこのプロジェクトをCybernetics Dataに接続するよう依頼してください。",
+        "cta": "Cybernetics Dataを設定"
+      }
+    },
+    "filter": {
+      "add_condition": "条件を追加",
+      "remove_condition": "条件を削除",
+      "clear": "クリア",
+      "apply": "適用",
+      "field": "フィールド",
+      "operator": "演算子",
+      "value": "値",
+      "true": "チェック済み",
+      "false": "未チェック",
+      "operators": {
+        "is": "が次と一致する",
+        "isNot": "が次と一致しない",
+        "contains": "が次を含む",
+        "doesNotContain": "が次を含まない",
+        "isEmpty": "が空である",
+        "isNotEmpty": "が空でない",
+        "isGreater": "が次より大きい",
+        "isLess": "が次より小さい",
+        "isBefore": "が次より前",
+        "isAfter": "が次より後"
+      }
+    },
+    "sort": {
+      "none": "並べ替えなし",
+      "asc": "昇順",
+      "desc": "降順",
+      "clear": "並べ替えをクリア"
+    },
+    "errors": {
+      "not_configured": "このプロジェクトではCybernetics Dataが設定されていません。",
+      "unauthorized": "プロジェクトのCybernetics Dataトークンが無効または期限切れです。",
+      "forbidden": "プロジェクトのトークンにはこのリソースへのアクセス権がありません。",
+      "not_found": "要求されたレコードまたはテーブルは既に存在しません。",
+      "unreachable": "Cybernetics Dataに接続できませんでした。しばらくしてからもう一度お試しください。",
+      "rate_limited": "Cybernetics Dataへのリクエストが多すぎます。しばらく待ってからもう一度お試しください。",
+      "unreadable_token": "保存されたトークンを読み取れません。プロジェクト管理者が再入力する必要があります。",
+      "bad_request": "Cybernetics Dataがリクエストを拒否しました。",
+      "attach_failed": "一部のレコードを添付できませんでした。削除されたか、プロジェクトのトークンで読み取れない可能性があります。",
+      "generic": "問題が発生しました。もう一度お試しください。",
+      "open_settings": "設定を開く"
+    },
+    "viewer": {
+      "fields": "フィールド",
+      "show_more": "もっと見る",
+      "show_less": "表示を減らす",
+      "empty_value": "空",
+      "select": "このレコードを選択"
+    },
+    "item": {
+      "view": "表示",
+      "open_external": "Cybernetics Dataで開く",
+      "refresh": "更新",
+      "copy_link": "リンクをコピー",
+      "remove": "削除",
+      "missing": "レコードは既に存在しません",
+      "forbidden": "現在のトークンではアクセスできません",
+      "disconnected": "Cybernetics Dataが切断されています。保存済みのスナップショットを表示しています。"
+    },
+    "activity": {
+      "attached": "データベースレコードを添付",
+      "removed": "データベースレコードを削除"
+    },
+    "toast": {
+      "attached": "{count, plural, one {#件のレコードを添付しました} other {#件のレコードを添付しました}}",
+      "skipped": "{count, plural, one {#件のレコードは既に添付されていました} other {#件のレコードは既に添付されていました}}",
+      "removed": "データベースレコードを削除しました",
+      "refreshed": "データベースレコードを更新しました",
+      "attach_failed": "{count, plural, one {#件のレコードを添付できませんでした} other {#件のレコードを添付できませんでした}}"
+    }
+  }
+}

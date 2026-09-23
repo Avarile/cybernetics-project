@@ -521,6 +521,62 @@
           }
         }
       }
+    },
+    "cybernetics_data": {
+      "label": "Cybernetics Data",
+      "heading": "Cybernetics Data",
+      "description": "Üyelerin veritabanlarına göz atabilmesi ve kayıtları iş öğelerine ekleyebilmesi için bu projeyi bir Cybernetics Data çalışma alanına bağlayın.",
+      "url_label": "CYBERNETICS_DATA_URL",
+      "url_helper": "Cybernetics Data dağıtımınızın kaynağı, /api olmadan.",
+      "url_placeholder": "https://data.example.com",
+      "url_required": "CYBERNETICS_DATA_URL gereklidir.",
+      "url_invalid": "Geçerli bir http(s) URL'si girin.",
+      "token_label": "CYBERNETICS_APITOKEN",
+      "token_helper": "Şu okuma kapsamlarına sahip kişisel erişim tokenı: space, base (read all dahil), table, field, view ve record. Belirli alanlarla sınırlı, özel bir hizmet hesabı kullanmanız önerilir.",
+      "token_placeholder_new": "API tokenınızı yapıştırın",
+      "token_placeholder_stored": "Kayıtlı token {hint}. Değiştirmemek için boş bırakın.",
+      "token_required": "CYBERNETICS_APITOKEN gereklidir.",
+      "token_required_url_change": "URL'yi değiştirdiğinizde tokenı yeniden girin.",
+      "token_prefix_warning": "Bu token \"cybernetics_\" ile başlamıyor. Bir Cybernetics Data kişisel erişim tokenı kopyaladığınızdan emin olun.",
+      "delegation_warning": "Tüm proje üyeleri Cybernetics Data'ya bu tokenın izinleriyle göz atacak.",
+      "show_token": "Tokenı göster",
+      "hide_token": "Tokenı gizle",
+      "enabled_label": "Etkin",
+      "enabled_description": "Devre dışı bırakıldığında üyeler kayıtlara göz atamaz veya kayıt ekleyemez. Eklenen kayıtlar kaydedilmiş anlık görüntülerini korur.",
+      "test_button": "Bağlantıyı test et",
+      "testing": "Test ediliyor",
+      "save_button": "Kaydet",
+      "saving": "Kaydediliyor",
+      "save_anyway": "Yine de kaydet (doğrulamayı atla)",
+      "verified_ago": "{time} doğrulandı",
+      "status": {
+        "ok": "Bağlandı",
+        "unauthorized": "Geçersiz veya süresi dolmuş token",
+        "forbidden": "Tokenın erişimi sınırlı",
+        "unreachable": "Sunucuya ulaşılamıyor",
+        "error": "Bağlantı hatası",
+        "never": "Henüz doğrulanmadı",
+        "not_configured": "Bağlı değil",
+        "disabled": "Devre dışı"
+      },
+      "bases_visible": "{count, plural, one {Token kabul edildi · # veritabanı görünür} other {Token kabul edildi · # veritabanı görünür}}",
+      "disconnect": {
+        "heading": "Tehlikeli alan",
+        "title": "Cybernetics Data bağlantısını kes",
+        "description": "URL'yi ve tokenı bu projeden kaldırır. Eklenen kayıtlar kaydedilmiş anlık görüntülerini korur.",
+        "confirm": "Cybernetics Data'yı bu projeden bağlantısını kesmek istediğinizden emin misiniz? Üyeler artık kayıtlara göz atamayacak veya kayıt ekleyemeyecek. Eklenen kayıtlar kaydedilmiş anlık görüntülerini korur.",
+        "button": "Bağlantıyı kes",
+        "loading": "Bağlantı kesiliyor"
+      },
+      "toast": {
+        "saved": "Cybernetics Data ayarları kaydedildi.",
+        "enabled": "Cybernetics Data etkinleştirildi.",
+        "disabled": "Cybernetics Data devre dışı bırakıldı.",
+        "disconnected": "Cybernetics Data bağlantısı kesildi.",
+        "test_ok": "Bağlantı başarılı.",
+        "test_failed": "Bağlantı başarısız oldu.",
+        "error": "Bir şeyler ters gitti. Lütfen tekrar deneyin."
+      }
     }
   }
 }

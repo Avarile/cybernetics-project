@@ -521,6 +521,62 @@
           }
         }
       }
+    },
+    "cybernetics_data": {
+      "label": "Cybernetics Data",
+      "heading": "Cybernetics Data",
+      "description": "Подключите этот проект к рабочему пространству Cybernetics Data, чтобы участники могли просматривать базы данных и прикреплять записи к рабочим элементам.",
+      "url_label": "CYBERNETICS_DATA_URL",
+      "url_helper": "Источник вашего развёртывания Cybernetics Data, без /api.",
+      "url_placeholder": "https://data.example.com",
+      "url_required": "CYBERNETICS_DATA_URL обязателен.",
+      "url_invalid": "Введите корректный URL-адрес http(s).",
+      "token_label": "CYBERNETICS_APITOKEN",
+      "token_helper": "Персональный токен доступа с правами на чтение: space, base (включая read all), table, field, view и record. Рекомендуется использовать выделенную сервисную учётную запись, ограниченную определёнными пространствами.",
+      "token_placeholder_new": "Вставьте свой API-токен",
+      "token_placeholder_stored": "Сохранённый токен {hint}. Оставьте пустым, чтобы сохранить его.",
+      "token_required": "CYBERNETICS_APITOKEN обязателен.",
+      "token_required_url_change": "При изменении URL введите токен заново.",
+      "token_prefix_warning": "Этот токен не начинается с «cybernetics_». Убедитесь, что вы скопировали персональный токен доступа Cybernetics Data.",
+      "delegation_warning": "Все участники проекта будут просматривать Cybernetics Data с правами этого токена.",
+      "show_token": "Показать токен",
+      "hide_token": "Скрыть токен",
+      "enabled_label": "Включён",
+      "enabled_description": "Когда отключено, участники не могут просматривать или прикреплять записи. Прикреплённые записи сохраняют свои снимки.",
+      "test_button": "Проверить подключение",
+      "testing": "Проверка",
+      "save_button": "Сохранить",
+      "saving": "Сохранение",
+      "save_anyway": "Всё равно сохранить (пропустить проверку)",
+      "verified_ago": "Проверено {time}",
+      "status": {
+        "ok": "Подключено",
+        "unauthorized": "Недействительный или истёкший токен",
+        "forbidden": "Токен имеет ограниченный доступ",
+        "unreachable": "Не удаётся подключиться к серверу",
+        "error": "Ошибка подключения",
+        "never": "Ещё не проверено",
+        "not_configured": "Не подключено",
+        "disabled": "Отключено"
+      },
+      "bases_visible": "{count, plural, one {Токен принят · доступна # база данных} few {Токен принят · доступны # базы данных} many {Токен принят · доступно # баз данных} other {Токен принят · доступно # базы данных}}",
+      "disconnect": {
+        "heading": "Опасная зона",
+        "title": "Отключить Cybernetics Data",
+        "description": "Удаляет URL и токен из этого проекта. Прикреплённые записи сохраняют свои снимки.",
+        "confirm": "Вы уверены, что хотите отключить Cybernetics Data от этого проекта? Участники больше не смогут просматривать или прикреплять записи. Прикреплённые записи сохраняют свои снимки.",
+        "button": "Отключить",
+        "loading": "Отключение"
+      },
+      "toast": {
+        "saved": "Настройки Cybernetics Data сохранены.",
+        "enabled": "Cybernetics Data включён.",
+        "disabled": "Cybernetics Data отключён.",
+        "disconnected": "Cybernetics Data отключён.",
+        "test_ok": "Подключение успешно установлено.",
+        "test_failed": "Не удалось подключиться.",
+        "error": "Что-то пошло не так. Пожалуйста, попробуйте снова."
+      }
     }
   }
 }

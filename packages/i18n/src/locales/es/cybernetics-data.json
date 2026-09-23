@@ -1,0 +1,119 @@
+{
+  "cybernetics_data": {
+    "widget": {
+      "button": "Base de datos",
+      "title": "Registros de la base de datos",
+      "empty": "Aún no se han adjuntado registros de la base de datos."
+    },
+    "browser": {
+      "title": "Base de datos",
+      "subtitle": "Adjuntar registros a {identifier}",
+      "view_subtitle": "Ver registro",
+      "filter_databases": "Filtrar bases de datos",
+      "no_databases": "No hay bases de datos visibles con el token del proyecto.",
+      "no_tables": "Esta base de datos no tiene tablas.",
+      "select_table": "Seleccione una tabla para explorar sus registros.",
+      "search_placeholder": "Buscar registros",
+      "all_fields": "Todos los campos",
+      "filter": "Filtrar",
+      "sort": "Ordenar",
+      "view": "Vista",
+      "default_view": "Sin vista",
+      "no_records": "Ningún registro coincide con su búsqueda.",
+      "table_empty": "Esta tabla está vacía.",
+      "no_access": "Sin acceso",
+      "no_access_description": "El token del proyecto no puede leer esta base de datos.",
+      "already_attached": "Ya adjuntado",
+      "selected": "Seleccionado(s) ({count})",
+      "max_selected": "Puede adjuntar hasta {count} registros a la vez.",
+      "remove_selected": "Quitar {name}",
+      "attach_n": "{count, plural, one {Adjuntar # registro} other {Adjuntar # registros}}",
+      "attaching": "Adjuntando",
+      "cancel": "Cancelar",
+      "back": "Volver a la lista",
+      "open_external": "Abrir en Cybernetics Data",
+      "view_record": "Ver registro",
+      "retry": "Reintentar",
+      "pagination": "{from}–{to} de {total}",
+      "pagination_no_total": "{from}–{to}",
+      "previous": "Anterior",
+      "next": "Siguiente",
+      "not_configured": {
+        "title": "Cybernetics Data no está conectado",
+        "description": "Conecte este proyecto a Cybernetics Data para explorar y adjuntar registros de la base de datos.",
+        "description_member": "Pida a un administrador del proyecto que conecte este proyecto a Cybernetics Data.",
+        "cta": "Configurar Cybernetics Data"
+      }
+    },
+    "filter": {
+      "add_condition": "Agregar condición",
+      "remove_condition": "Quitar condición",
+      "clear": "Limpiar",
+      "apply": "Aplicar",
+      "field": "Campo",
+      "operator": "Operador",
+      "value": "Valor",
+      "true": "Marcado",
+      "false": "Sin marcar",
+      "operators": {
+        "is": "es",
+        "isNot": "no es",
+        "contains": "contiene",
+        "doesNotContain": "no contiene",
+        "isEmpty": "está vacío",
+        "isNotEmpty": "no está vacío",
+        "isGreater": "es mayor que",
+        "isLess": "es menor que",
+        "isBefore": "es anterior a",
+        "isAfter": "es posterior a"
+      }
+    },
+    "sort": {
+      "none": "Sin ordenar",
+      "asc": "Ascendente",
+      "desc": "Descendente",
+      "clear": "Borrar orden"
+    },
+    "errors": {
+      "not_configured": "Cybernetics Data no está configurado para este proyecto.",
+      "unauthorized": "El token de Cybernetics Data del proyecto no es válido o ha expirado.",
+      "forbidden": "El token del proyecto no tiene acceso a este recurso.",
+      "not_found": "El registro o la tabla solicitados ya no existen.",
+      "unreachable": "No se pudo contactar con Cybernetics Data. Inténtelo de nuevo en un momento.",
+      "rate_limited": "Demasiadas solicitudes a Cybernetics Data. Espere un momento e inténtelo de nuevo.",
+      "unreadable_token": "No se puede leer el token guardado. Un administrador del proyecto debe introducirlo de nuevo.",
+      "bad_request": "Cybernetics Data rechazó la solicitud.",
+      "attach_failed": "No se pudieron adjuntar algunos registros. Es posible que se hayan eliminado o que el token del proyecto no pueda leerlos.",
+      "generic": "Algo salió mal. Inténtelo de nuevo.",
+      "open_settings": "Abrir configuración"
+    },
+    "viewer": {
+      "fields": "Campos",
+      "show_more": "Mostrar más",
+      "show_less": "Mostrar menos",
+      "empty_value": "Vacío",
+      "select": "Seleccionar este registro"
+    },
+    "item": {
+      "view": "Ver",
+      "open_external": "Abrir en Cybernetics Data",
+      "refresh": "Actualizar",
+      "copy_link": "Copiar enlace",
+      "remove": "Eliminar",
+      "missing": "El registro ya no existe",
+      "forbidden": "Sin acceso con el token actual",
+      "disconnected": "Cybernetics Data está desconectado. Mostrando instantáneas guardadas."
+    },
+    "activity": {
+      "attached": "adjuntó un registro de base de datos",
+      "removed": "eliminó un registro de base de datos"
+    },
+    "toast": {
+      "attached": "{count, plural, one {# registro adjuntado} other {# registros adjuntados}}",
+      "skipped": "{count, plural, one {# registro ya estaba adjuntado} other {# registros ya estaban adjuntados}}",
+      "removed": "Registro de base de datos eliminado",
+      "refreshed": "Registros de base de datos actualizados",
+      "attach_failed": "{count, plural, one {# registro no se pudo adjuntar} other {# registros no se pudieron adjuntar}}"
+    }
+  }
+}
