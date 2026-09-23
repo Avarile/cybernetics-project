@@ -2,6 +2,13 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 # See the LICENSE file for details.
 
+"""Celery tasks that maintain IssueVersion snapshots (full issue property history).
+
+- ``issue_task``: records/amends a version after an issue update.
+- ``sync_issue_version`` / ``schedule_issue_version``: batched backfill used by the
+  ``sync_issue_version`` management command to create an initial version per issue.
+"""
+
 # Python imports
 import json
 from typing import Optional, List, Dict
@@ -32,6 +39,13 @@ from plane.utils.exception_logger import log_exception
 
 @shared_task
 def issue_task(updated_issue, issue_id, user_id):
+    """Record an IssueVersion for an issue update.
+
+    ``updated_issue`` is a JSON string of issue field values; only the fields whose
+    values differ from the current issue are applied. If the latest
+    version is owned by the same user and was saved in the last 10 minutes it is
+    amended in place; otherwise a new version snapshot is logged.
+    """
     try:
         current_issue = json.loads(updated_issue) if updated_issue else {}
         issue = Issue.objects.get(id=issue_id)
@@ -47,6 +61,7 @@ def issue_task(updated_issue, issue_id, user_id):
             if (
                 issue_version
                 and str(issue_version.owned_by) == str(user_id)
+                # Merge edits by the same user within a 10-minute window
                 and (timezone.now() - issue_version.last_saved_at).total_seconds() <= 600
             ):
                 for key, value in updated_current_issue.items():
@@ -65,7 +80,11 @@ def issue_task(updated_issue, issue_id, user_id):
 
 
 def get_owner_id(issue: Issue) -> Optional[int]:
-    """Get the owner ID of the issue"""
+    """Get the owner ID of the issue.
+
+    Prefers the last updater, then the creator, and finally falls back to any
+    project admin. Returns None when no candidate owner can be found.
+    """
 
     if issue.updated_by_id:
         return issue.updated_by_id
@@ -83,11 +102,16 @@ def get_owner_id(issue: Issue) -> Optional[int]:
 
 
 def get_related_data(issue_ids: List[UUID]) -> Dict:
-    """Get related data for the given issue IDs"""
+    """Get related data for the given issue IDs.
+
+    Returns dicts keyed by issue_id for cycle, assignees, labels, modules and the
+    latest activity id, fetched with one query each to avoid N+1 lookups.
+    """
 
     cycle_issues = {ci.issue_id: ci.cycle_id for ci in CycleIssue.objects.filter(issue_id__in=issue_ids)}
 
     # Get assignees with proper grouping
+    # groupby requires the records to be sorted by issue_id (see order_by)
     assignee_records = list(
         IssueAssignee.objects.filter(issue_id__in=issue_ids).values_list("issue_id", "assignee_id").order_by("issue_id")
     )
@@ -113,6 +137,7 @@ def get_related_data(issue_ids: List[UUID]) -> Dict:
 
     # Get latest activities
     latest_activities = {}
+    # Ordered newest-first per issue, so the first item of each group is the latest activity
     activities = IssueActivity.objects.filter(issue_id__in=issue_ids).order_by("issue_id", "-created_at")
     for issue_id, activities_group in groupby(activities, key=lambda x: x.issue_id):
         first_activity = next(activities_group, None)
@@ -129,7 +154,11 @@ def get_related_data(issue_ids: List[UUID]) -> Dict:
 
 
 def create_issue_version(issue: Issue, related_data: Dict) -> Optional[IssueVersion]:
-    """Create IssueVersion object from the given issue and related data"""
+    """Create an unsaved IssueVersion object from the given issue and related data.
+
+    Returns None (and logs) when the issue lacks a workspace/project or no owner
+    can be determined.
+    """
 
     try:
         if not issue.workspace_id or not issue.project_id:
@@ -179,7 +208,12 @@ def create_issue_version(issue: Issue, related_data: Dict) -> Optional[IssueVers
 
 @shared_task
 def sync_issue_version(batch_size=5000, offset=0, countdown=300):
-    """Task to create IssueVersion records for existing Issues in batches"""
+    """Task to create IssueVersion records for existing Issues in batches.
+
+    Processes Issues ``[offset, offset + batch_size)`` ordered by creation time,
+    bulk-creates versions, and re-enqueues itself after ``countdown`` seconds for
+    the next batch until all issues are processed.
+    """
 
     try:
         with transaction.atomic():
@@ -233,4 +267,5 @@ def sync_issue_version(batch_size=5000, offset=0, countdown=300):
 
 @shared_task
 def schedule_issue_version(batch_size=5000, countdown=300):
+    """Entry point that kicks off the batched IssueVersion backfill from offset 0."""
     sync_issue_version.delay(batch_size=int(batch_size), countdown=countdown)

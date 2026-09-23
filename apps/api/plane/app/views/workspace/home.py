@@ -2,6 +2,12 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 # See the LICENSE file for details.
 
+"""Per-user workspace home page widget preferences.
+
+Each user has one WorkspaceHomePreference row per home widget key, controlling whether the
+widget is enabled, its config and its sort order.
+"""
+
 # Module imports
 from ..base import BaseAPIView
 from plane.db.models.workspace import WorkspaceHomePreference
@@ -15,6 +21,8 @@ from rest_framework import status
 
 
 class WorkspaceHomePreferenceViewSet(BaseAPIView):
+    """Read and update the current user's home widget preferences in a workspace."""
+
     model = WorkspaceHomePreference
 
     def get_serializer_class(self):
@@ -22,12 +30,14 @@ class WorkspaceHomePreferenceViewSet(BaseAPIView):
 
     @allow_permission([ROLE.ADMIN, ROLE.MEMBER, ROLE.GUEST], level="WORKSPACE")
     def get(self, request, slug):
+        """Return all widget preferences, lazily creating rows for any widget keys the user lacks."""
         workspace = Workspace.objects.get(slug=slug)
 
         get_preference = WorkspaceHomePreference.objects.filter(user=request.user, workspace_id=workspace.id)
 
         create_preference_keys = []
 
+        # "quick_tutorial" and "new_at_plane" widgets are never auto-created.
         keys = [
             key
             for key, _ in WorkspaceHomePreference.HomeWidgetKeys.choices
@@ -40,7 +50,11 @@ class WorkspaceHomePreferenceViewSet(BaseAPIView):
             if preference not in get_preference.values_list("key", flat=True):
                 create_preference_keys.append(preference)
 
+                # Newly created widgets get descending sort orders starting just below 1000.
                 sort_order = 1000 - sort_order_counter
+
+                # Note: re-inserts all keys collected so far on each iteration;
+                # ignore_conflicts=True makes the repeated inserts harmless.
 
                 preference = WorkspaceHomePreference.objects.bulk_create(
                     [
@@ -66,6 +80,7 @@ class WorkspaceHomePreferenceViewSet(BaseAPIView):
 
     @allow_permission([ROLE.ADMIN, ROLE.MEMBER, ROLE.GUEST], level="WORKSPACE")
     def patch(self, request, slug, key):
+        """Partially update the preference for widget `key`; 400 if it does not exist yet."""
         preference = WorkspaceHomePreference.objects.filter(key=key, workspace__slug=slug, user=request.user).first()
 
         if preference:

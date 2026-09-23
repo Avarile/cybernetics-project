@@ -2,6 +2,15 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 # See the LICENSE file for details.
 
+"""
+Gitea OAuth2 provider.
+
+Reads GITEA_CLIENT_ID/GITEA_CLIENT_SECRET/GITEA_HOST from instance config (or
+env), builds the authorize/token/user URLs for the self-hosted Gitea instance
+and maps the Gitea user payload into Plane's ``user_data`` shape. Used by the
+``/auth/gitea/`` (app) and ``/auth/spaces/gitea/`` (space) views.
+"""
+
 import os
 from datetime import datetime, timedelta
 from urllib.parse import urlencode, urlparse
@@ -18,10 +27,16 @@ from plane.authentication.adapter.error import (
 
 
 class GiteaOAuthProvider(OauthAdapter):
+    """OAuth2 adapter for a self-hosted Gitea instance."""
+
     provider = "gitea"
     scope = "openid email profile"
 
     def __init__(self, request, code=None, state=None, callback=None):
+        """Validate Gitea config and build the authorize URL.
+
+        ``state`` is echoed back to the callback, which compares it with the session (CSRF check).
+        """
         (GITEA_CLIENT_ID, GITEA_CLIENT_SECRET, GITEA_HOST) = get_configuration_value(
             [
                 {
@@ -86,6 +101,7 @@ class GiteaOAuthProvider(OauthAdapter):
         )
 
     def set_token_data(self):
+        """Exchange the authorization code for tokens and store them with computed expiry timestamps."""
         data = {
             "code": self.code,
             "client_id": self.client_id,
@@ -114,6 +130,7 @@ class GiteaOAuthProvider(OauthAdapter):
         )
 
     def __get_email(self, headers):
+        """Fetch the user's email list from Gitea and pick the best candidate (primary/verified first)."""
         try:
             # Gitea may not provide email in user response, so fetch it separately
             emails_url = f"{self.userinfo_url}/emails"
@@ -147,6 +164,7 @@ class GiteaOAuthProvider(OauthAdapter):
             )
 
     def set_user_data(self):
+        """Load the Gitea profile (falling back to the emails API for the address) into ``user_data``."""
         user_info_response = self.get_user_response()
         headers = {
             "Authorization": f"Bearer {self.token_data.get('access_token')}",

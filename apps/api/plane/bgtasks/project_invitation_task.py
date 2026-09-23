@@ -2,6 +2,12 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 # See the LICENSE file for details.
 
+"""Celery task that emails a project invitation to a (possibly non-registered) email address.
+
+Enqueued when a ProjectMemberInvite is created; SMTP settings come from the
+instance configuration.
+"""
+
 # Python imports
 import logging
 
@@ -22,6 +28,11 @@ from plane.utils.exception_logger import log_exception
 
 @shared_task
 def project_invitation(email, project_id, token, current_site, invitor):
+    """Render and send the project invitation email.
+
+    ``invitor`` is the inviting user's email. Side effect: stores the rendered
+    plain-text body on ``ProjectMemberInvite.message``. Missing project/invite is ignored.
+    """
     try:
         user = User.objects.get(email=invitor)
         project = Project.objects.get(pk=project_id)

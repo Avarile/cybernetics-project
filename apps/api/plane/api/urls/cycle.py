@@ -2,6 +2,8 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 # See the LICENSE file for details.
 
+"""Public API routes for cycles, cycle work items, transfers and archiving (/api/v1/)."""
+
 from django.urls import path
 
 from plane.api.views.cycle import (

@@ -2,6 +2,14 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 # See the LICENSE file for details.
 
+"""Work item <-> Cybernetics-Data record links.
+
+Lets project members attach external database records to a work item. Each
+attachment stores a reference (base/table/record/view ids) plus a snapshot
+of the record, which can be refreshed later. Attach/remove actions are
+recorded in the work item activity feed.
+"""
+
 # Python imports
 import json
 
@@ -34,12 +42,14 @@ class IssueCyberneticsRecordViewSet(CyberneticsDataErrorMixin, BaseViewSet):
     serializer_class = IssueCyberneticsRecordSerializer
 
     def get_throttles(self):
+        """Throttle only POST actions (create/refresh), which call Cybernetics-Data."""
         # Only the actions that call Cybernetics-Data are throttled.
         if self.request.method == "POST":
             return [CyberneticsDataProxyThrottle()]
         return super().get_throttles()
 
     def get_queryset(self):
+        """Records of the URL's work item, limited to active members of non-archived projects."""
         return (
             super()
             .get_queryset()
@@ -56,12 +66,14 @@ class IssueCyberneticsRecordViewSet(CyberneticsDataErrorMixin, BaseViewSet):
         )
 
     def _serializer_context(self, slug, project_id):
+        """Serializer context carrying the integration ``base_url`` (used to build record links)."""
         integration = ProjectCyberneticsDataIntegration.objects.filter(
             workspace__slug=slug, project_id=project_id
         ).first()
         return {"base_url": integration.base_url if integration else None}
 
     def _get_editable_issue(self, slug, project_id, issue_id):
+        """Fetch the work item, raising DoesNotExist if it or its project is archived."""
         return Issue.objects.get(
             workspace__slug=slug,
             project_id=project_id,
@@ -71,6 +83,7 @@ class IssueCyberneticsRecordViewSet(CyberneticsDataErrorMixin, BaseViewSet):
         )
 
     def _log_activity(self, request, activity_type, issue_id, project_id, requested_data, current_instance=None):
+        """Queue an ``issue_activity`` Celery task for an attach/remove event."""
         issue_activity.delay(
             type=activity_type,
             requested_data=json.dumps(requested_data, cls=DjangoJSONEncoder),
@@ -87,6 +100,7 @@ class IssueCyberneticsRecordViewSet(CyberneticsDataErrorMixin, BaseViewSet):
 
     @allow_permission([ROLE.ADMIN, ROLE.MEMBER, ROLE.GUEST])
     def list(self, request, slug, project_id, issue_id):
+        """List records attached to the work item (any project role)."""
         serializer = IssueCyberneticsRecordSerializer(
             self.get_queryset(), many=True, context=self._serializer_context(slug, project_id)
         )
@@ -94,6 +108,12 @@ class IssueCyberneticsRecordViewSet(CyberneticsDataErrorMixin, BaseViewSet):
 
     @allow_permission([ROLE.ADMIN, ROLE.MEMBER])
     def create(self, request, slug, project_id, issue_id):
+        """Attach one or more records to the work item.
+
+        Duplicates (already attached or repeated in the payload) are skipped. All
+        snapshots are fetched first; if any record is missing/forbidden nothing is
+        saved and a 400 lists the failures. Returns ``{"created", "skipped"}``.
+        """
         payload = CyberneticsRecordAttachSerializer(data=request.data)
         payload.is_valid(raise_exception=True)
         issue = self._get_editable_issue(slug, project_id, issue_id)
@@ -129,6 +149,7 @@ class IssueCyberneticsRecordViewSet(CyberneticsDataErrorMixin, BaseViewSet):
 
         now = timezone.now()
         created = []
+        # Each insert gets its own savepoint so a unique-constraint race skips just that row.
         with transaction.atomic():
             for snapshot in snapshots:
                 try:
@@ -156,6 +177,7 @@ class IssueCyberneticsRecordViewSet(CyberneticsDataErrorMixin, BaseViewSet):
 
     @allow_permission([ROLE.ADMIN], creator=True, model=IssueCyberneticsRecord)
     def destroy(self, request, slug, project_id, issue_id, pk):
+        """Detach a record (project admin or the record's creator) and log the activity."""
         self._get_editable_issue(slug, project_id, issue_id)
         record = self.get_queryset().get(pk=pk)
         current = IssueCyberneticsRecordSerializer(record, context={"base_url": None}).data
@@ -172,6 +194,11 @@ class IssueCyberneticsRecordViewSet(CyberneticsDataErrorMixin, BaseViewSet):
 
     @allow_permission([ROLE.ADMIN, ROLE.MEMBER])
     def refresh(self, request, slug, project_id, issue_id):
+        """Re-fetch snapshots for attached records (all, or the given ``ids``).
+
+        Records that disappeared or became inaccessible are kept but flagged
+        ``missing`` / ``forbidden``; at most ``MAX_RECORDS_PER_REQUEST`` are processed.
+        """
         self._get_editable_issue(slug, project_id, issue_id)
         ids = request.data.get("ids") if isinstance(request.data, dict) else None
         queryset = self.get_queryset()

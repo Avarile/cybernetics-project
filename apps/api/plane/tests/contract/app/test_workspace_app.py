@@ -2,6 +2,8 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 # See the LICENSE file for details.
 
+"""Contract tests for workspace creation via the app ``workspace`` route (``/api/workspaces/``)."""
+
 import pytest
 from django.urls import reverse
 from rest_framework import status
@@ -55,7 +57,7 @@ class TestWorkspaceAPI:
         assert workspace.owner == user
         assert workspace_member.role == 20
 
-        # Verify the workspace_seed task was called
+        # Verify the workspace_seed task was called (patched so no Celery worker is needed)
         mock_workspace_seed.assert_called_once_with(response.data["id"])
 
     @pytest.mark.django_db

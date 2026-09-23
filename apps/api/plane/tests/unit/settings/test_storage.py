@@ -2,6 +2,13 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 # See the LICENSE file for details.
 
+"""Unit tests for S3Storage signed-URL expiry.
+
+boto3 is mocked; the tests check that SIGNED_URL_EXPIRATION (default 3600s) is read from
+the environment and passed as ExpiresIn to presigned POST/URL generation, and that an
+explicit expiration argument takes precedence.
+"""
+
 import os
 from unittest.mock import Mock, patch
 import pytest

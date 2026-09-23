@@ -2,6 +2,14 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 # See the LICENSE file for details.
 
+"""
+Forgot/reset password views for the space (public project) frontend.
+
+Routes: ``POST /auth/spaces/forgot-password/`` emails a reset link pointing at
+the space host, and ``POST /auth/spaces/reset-password/<uidb64>/<token>/`` sets
+the new password; errors redirect to the space ``accounts/reset-password`` page.
+"""
+
 # Python imports
 import os
 from urllib.parse import urlencode
@@ -36,6 +44,7 @@ from plane.authentication.rate_limit import AuthenticationThrottle
 
 
 def generate_password_token(user):
+    """Return ``(uidb64, token)`` for a password reset link for ``user``."""
     uidb64 = urlsafe_base64_encode(smart_bytes(user.id))
     token = PasswordResetTokenGenerator().make_token(user)
 
@@ -43,11 +52,14 @@ def generate_password_token(user):
 
 
 class ForgotPasswordSpaceEndpoint(APIView):
+    """Public, throttled endpoint that sends a password reset email linking to the space frontend."""
+
     permission_classes = [AllowAny]
 
     throttle_classes = [AuthenticationThrottle]
 
     def post(self, request):
+        """Send a reset link if SMTP is configured and the user exists; otherwise return 400 with an auth error."""
         email = request.data.get("email")
 
         # Check instance configuration
@@ -109,7 +121,10 @@ class ForgotPasswordSpaceEndpoint(APIView):
 
 
 class ResetPasswordSpaceEndpoint(View):
+    """Form POST target of the space reset-password page."""
+
     def post(self, request, uidb64, token):
+        """Validate the uid/token and password strength, save the new password and redirect to the space root."""
         try:
             # Decode the id from the uidb64
             id = smart_str(urlsafe_base64_decode(uidb64))

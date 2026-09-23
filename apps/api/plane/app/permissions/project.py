@@ -2,6 +2,13 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 # See the LICENSE file for details.
 
+"""DRF permission classes for project-scoped endpoints.
+
+Each class reads ``view.workspace_slug`` / ``view.project_id`` (set from URL
+kwargs by the base views) and checks the user's active WorkspaceMember or
+ProjectMember role. Role values: ADMIN=20, MEMBER=15, GUEST=5.
+"""
+
 # Third Party imports
 from rest_framework.permissions import SAFE_METHODS, BasePermission
 
@@ -11,6 +18,13 @@ from plane.db.models.project import ROLE
 
 
 class ProjectBasePermission(BasePermission):
+    """Permission for project CRUD (the project resource itself).
+
+    Reads require workspace membership, creation requires workspace admin/member,
+    and updates/deletes require project admin (or workspace admin who is also a
+    project member).
+    """
+
     def has_permission(self, request, view):
         if request.user.is_anonymous:
             return False
@@ -54,6 +68,12 @@ class ProjectBasePermission(BasePermission):
 
 
 class ProjectMemberPermission(BasePermission):
+    """Permission for project membership endpoints.
+
+    Reads require membership in any project of the workspace, creation requires
+    workspace admin/member, other writes require project admin/member.
+    """
+
     def has_permission(self, request, view):
         if request.user.is_anonymous:
             return False
@@ -83,6 +103,12 @@ class ProjectMemberPermission(BasePermission):
 
 
 class ProjectEntityPermission(BasePermission):
+    """Permission for entities inside a project (issues, cycles, modules, ...).
+
+    Reads are open to any active project member (by ``project_id`` or, when the
+    view exposes it, ``project_identifier``); writes require admin/member role.
+    """
+
     def has_permission(self, request, view):
         if request.user.is_anonymous:
             return False
@@ -117,6 +143,8 @@ class ProjectEntityPermission(BasePermission):
 
 
 class ProjectAdminPermission(BasePermission):
+    """Allow only project admins."""
+
     def has_permission(self, request, view):
         if request.user.is_anonymous:
             return False
@@ -131,6 +159,8 @@ class ProjectAdminPermission(BasePermission):
 
 
 class ProjectLitePermission(BasePermission):
+    """Allow any active project member regardless of role."""
+
     def has_permission(self, request, view):
         if request.user.is_anonymous:
             return False

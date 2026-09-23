@@ -2,6 +2,12 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 # See the LICENSE file for details.
 
+"""Instance info endpoints (``/api/instances/``).
+
+The public GET is what every frontend (web, space, admin) calls on boot to learn how the
+instance is configured: enabled auth providers, feature flags and base URLs.
+"""
+
 # Python imports
 import os
 
@@ -26,7 +32,10 @@ from django.views.decorators.cache import cache_control
 
 
 class InstanceEndpoint(BaseAPIView):
+    """Public instance info (GET) and instance-admin-only instance updates (PATCH)."""
+
     def get_permissions(self):
+        """Anyone may read instance info; only instance admins may PATCH it."""
         if self.request.method == "PATCH":
             return [InstanceAdminPermission()]
         return [AllowAny()]
@@ -34,6 +43,13 @@ class InstanceEndpoint(BaseAPIView):
     @cache_response(60 * 60 * 2, user=False)
     @method_decorator(cache_control(private=True, max_age=12))
     def get(self, request):
+        """Return ``{"config": ..., "instance": ...}`` describing the instance's public configuration.
+
+        Config values come from InstanceConfiguration with environment-variable fallbacks and are
+        converted to booleans where they are "0"/"1" flags. Cached server-side for 2 hours
+        (invalidated on instance/config changes) and client-side privately for 12 seconds.
+        If the instance is not registered yet, returns ``is_activated``/``is_setup_done`` = False.
+        """
         instance = Instance.objects.first()
 
         # get the instance
@@ -153,6 +169,7 @@ class InstanceEndpoint(BaseAPIView):
         data["has_llm_configured"] = bool(LLM_API_KEY)
 
         # File size settings
+        # Upload size limit in bytes (default 5 MiB).
         data["file_size_limit"] = float(os.environ.get("FILE_SIZE_LIMIT", 5242880))
 
         # is smtp configured
@@ -174,6 +191,7 @@ class InstanceEndpoint(BaseAPIView):
 
     @invalidate_cache(path="/api/instances/", user=False)
     def patch(self, request):
+        """Partially update the instance record (e.g. name, telemetry) and clear the cached instance response."""
         # Get the instance
         instance = Instance.objects.first()
         serializer = InstanceSerializer(instance, data=request.data, partial=True)
@@ -184,10 +202,13 @@ class InstanceEndpoint(BaseAPIView):
 
 
 class SignUpScreenVisitedEndpoint(BaseAPIView):
+    """Record that the admin sign-up screen has been shown (public endpoint)."""
+
     permission_classes = [AllowAny]
 
     @invalidate_cache(path="/api/instances/", user=False)
     def post(self, request):
+        """Set ``is_signup_screen_visited`` on the instance."""
         instance = Instance.objects.first()
         if instance is None:
             return Response(

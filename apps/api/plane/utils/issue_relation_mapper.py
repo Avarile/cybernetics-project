@@ -2,7 +2,14 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 # See the LICENSE file for details.
 
+"""Mapping helpers for issue relation types (blocking, start/finish before/after...).
+
+Only one direction of each relation pair is persisted in IssueRelation; these
+helpers translate between the direction a user asked for and the stored one.
+"""
+
 def get_inverse_relation(relation_type):
+    """Return the opposite direction of ``relation_type`` (unknown types pass through)."""
     relation_mapping = {
         "start_after": "start_before",
         "finish_after": "finish_before",
@@ -17,6 +24,7 @@ def get_inverse_relation(relation_type):
 
 
 def get_actual_relation(relation_type):
+    """Return the canonical relation type stored in the DB for ``relation_type``."""
     # This function is used to get the actual relation type which is stored in database
     actual_relation = {
         "start_after": "start_before",

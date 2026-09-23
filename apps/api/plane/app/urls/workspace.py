@@ -2,6 +2,15 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 # See the LICENSE file for details.
 
+"""URL routes for workspaces and workspace-scoped resources.
+
+Covers slug availability, workspace CRUD, invitations and joining, members,
+themes, user profile pages/stats/activity, workspace-wide labels/states/
+estimates/modules/cycles, favorites, draft issues (incl. converting a draft to
+an issue), quick links, home widgets, recent visits, stickies and sidebar
+preferences.
+"""
+
 from django.urls import path
 
 

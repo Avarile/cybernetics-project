@@ -2,6 +2,8 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 # See the LICENSE file for details.
 
+"""Public asset routes for published boards (``/api/public/assets/v2/anchor/<anchor>/...``)."""
+
 # Django imports
 from django.urls import path
 

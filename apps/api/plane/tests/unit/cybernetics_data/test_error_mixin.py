@@ -2,6 +2,13 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 # See the LICENSE file for details.
 
+"""Unit tests for ``CyberneticsDataErrorMixin`` / ``error_response`` and the CYBERNETICS_* error codes.
+
+Checks that integration exceptions are rendered as ``{error, error_code, error_message}``
+responses with the right HTTP status, and that every code used in the source is registered
+in ``plane.utils.error_codes.ERROR_CODES``.
+"""
+
 import re
 from pathlib import Path
 
@@ -20,6 +27,8 @@ from plane.utils.error_codes import ERROR_CODES
 
 
 class _RaisingView(CyberneticsDataErrorMixin, BaseAPIView):
+    """Minimal unauthenticated view that raises ``exc`` on GET, to exercise the mixin's handler."""
+
     authentication_classes = []
     permission_classes = []
     throttle_classes = []
@@ -30,12 +39,15 @@ class _RaisingView(CyberneticsDataErrorMixin, BaseAPIView):
 
 
 def _call(exc):
+    """Dispatch a GET to ``_RaisingView`` configured to raise ``exc`` and return the response."""
     request = APIRequestFactory().get("/api/cybernetics-test/")
     return _RaisingView.as_view(exc=exc)(request)
 
 
 @pytest.mark.unit
 class TestErrorMixin:
+    """Mapping of integration/DRF exceptions to HTTP responses by the error mixin."""
+
     @pytest.mark.parametrize(
         "exc_class,status_code,key",
         [
@@ -62,9 +74,11 @@ class TestErrorMixin:
         assert "enter it again" in _call(service.TokenUnreadable()).data["error"]
 
     def test_upstream_401_is_never_401(self):
+        """Upstream auth failures use 424 so the web client does not log the Plane user out."""
         assert _call(client_module.CyberneticsUnauthorized("expired")).status_code == 424
 
     def test_throttled_with_wait(self):
+        """DRF ``Throttled`` becomes a CYBERNETICS_RATE_LIMITED 429 with ``Retry-After``."""
         response = _call(Throttled(wait=12.7))
         assert response.status_code == 429
         assert response.data["error_message"] == "CYBERNETICS_RATE_LIMITED"
@@ -88,6 +102,7 @@ class TestErrorMixin:
         }
 
     def test_object_does_not_exist_falls_through(self):
+        """Non-integration exceptions are left to the base view's default handling."""
         response = _call(ObjectDoesNotExist())
         assert response.status_code == 404
         assert response.data == {"error": "The required object does not exist."}
@@ -98,6 +113,7 @@ class TestErrorMixin:
         assert response.data == {"base_url": ["bad"]}
 
     def test_error_response_extra_fields(self):
+        """Extra keyword args are merged into the error payload."""
         response = error_response("CYBERNETICS_ATTACH_FAILED", "Some failed", 400, failed=[{"record_id": "x"}])
         assert response.status_code == 400
         assert response.data == {
@@ -109,6 +125,7 @@ class TestErrorMixin:
 
 
 def _all_subclasses(cls):
+    """Recursively yield all subclasses of ``cls``."""
     for sub in cls.__subclasses__():
         yield sub
         yield from _all_subclasses(sub)
@@ -116,7 +133,10 @@ def _all_subclasses(cls):
 
 @pytest.mark.unit
 class TestErrorCodes:
+    """The CYBERNETICS_* block of ``ERROR_CODES`` stays stable and complete."""
+
     def test_codes_block(self):
+        """Pin the numeric codes (4801-4812); the frontend relies on them."""
         cybernetics = {k: v for k, v in ERROR_CODES.items() if k.startswith("CYBERNETICS_")}
         assert cybernetics == {
             "CYBERNETICS_NOT_CONFIGURED": 4801,
@@ -140,6 +160,8 @@ class TestErrorCodes:
             assert exc_class.code in ERROR_CODES, exc_class
 
     def test_every_code_used_in_source_is_registered(self):
+        """Scan integration source files for quoted CYBERNETICS_* literals and require each to be registered."""
+        # parents[2] of plane/utils/cybernetics_data/client.py is the ``plane`` package root.
         root = Path(client_module.__file__).resolve().parents[2]
         sources = [
             *(root / "utils" / "cybernetics_data").glob("*.py"),

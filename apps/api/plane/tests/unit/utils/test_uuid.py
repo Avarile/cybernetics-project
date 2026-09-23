@@ -2,6 +2,8 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 # See the LICENSE file for details.
 
+"""Unit tests for plane.utils.uuid helpers (UUID validation and UUID-to-integer conversion)."""
+
 import uuid
 import pytest
 from plane.utils.uuid import is_valid_uuid, convert_uuid_to_integer

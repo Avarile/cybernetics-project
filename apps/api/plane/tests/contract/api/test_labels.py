@@ -2,6 +2,14 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 # See the LICENSE file for details.
 
+"""
+Contract tests for the public Label API.
+
+Covers ``/api/v1/workspaces/<slug>/projects/<project_id>/labels/`` (list/create,
+external-id conflict detection) and ``.../labels/<label_id>/`` (retrieve/update/delete),
+exercised through an API key client.
+"""
+
 import pytest
 from rest_framework import status
 from uuid import uuid4

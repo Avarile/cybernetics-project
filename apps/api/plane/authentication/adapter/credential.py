@@ -2,6 +2,13 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 # See the LICENSE file for details.
 
+"""
+Base adapter for credential-based sign-in (email/password and magic code).
+
+Concrete providers in ``plane.authentication.provider.credentials`` subclass
+this and implement ``set_user_data``.
+"""
+
 from plane.authentication.adapter.base import Adapter
 
 
@@ -14,5 +21,6 @@ class CredentialAdapter(Adapter):
         self.provider = provider
 
     def authenticate(self):
+        """Populate user data from the provider, then log the user in or sign them up."""
         self.set_user_data()
         return self.complete_login_or_signup()

@@ -2,6 +2,14 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 # See the LICENSE file for details.
 
+"""
+ASGI entry point for the Plane API.
+
+Boots Django with production settings by default, wraps the Django app in a
+Channels ``ProtocolTypeRouter`` (HTTP only) and mounts the optional MCP server
+alongside it via ``plane.mcp.asgi.with_mcp``.
+"""
+
 import os
 
 os.environ.setdefault("DJANGO_SETTINGS_MODULE", "plane.settings.production")

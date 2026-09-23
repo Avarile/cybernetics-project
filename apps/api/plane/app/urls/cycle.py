@@ -2,6 +2,9 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 # See the LICENSE file for details.
 
+"""URL routes for project cycles: CRUD, cycle work items, favorites, date checks,
+transferring issues between cycles, per-user properties, archiving, progress and analytics."""
+
 from django.urls import path
 
 

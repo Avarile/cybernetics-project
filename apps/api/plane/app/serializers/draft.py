@@ -2,6 +2,13 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 # See the LICENSE file for details.
 
+"""Serializers for workspace draft issues (``DraftIssue``).
+
+Draft issues are unsaved work items; their assignees, labels, cycle and
+modules are stored in dedicated ``DraftIssue*`` through tables that these
+serializers create/replace.
+"""
+
 # Django imports
 from django.utils import timezone
 
@@ -31,6 +38,13 @@ from plane.app.permissions import ROLE
 
 
 class DraftIssueCreateSerializer(BaseSerializer):
+    """Create/update serializer for draft issues.
+
+    Validates that state, parent, estimate point, assignees and labels belong to
+    ``context["project_id"]`` and sanitizes description content. Requires
+    ``workspace_id`` and ``project_id`` in the serializer context on create.
+    """
+
     # ids
     state_id = serializers.PrimaryKeyRelatedField(
         source="state", queryset=State.objects.all(), required=False, allow_null=True
@@ -61,6 +75,7 @@ class DraftIssueCreateSerializer(BaseSerializer):
         ]
 
     def to_representation(self, instance):
+        """Echo back the submitted ``assignee_ids``/``label_ids`` (from the raw request data)."""
         data = super().to_representation(instance)
         assignee_ids = self.initial_data.get("assignee_ids")
         data["assignee_ids"] = assignee_ids if assignee_ids else []
@@ -69,6 +84,7 @@ class DraftIssueCreateSerializer(BaseSerializer):
         return data
 
     def validate(self, attrs):
+        """Validate dates, sanitize description content and scope related ids to the project."""
         if (
             attrs.get("start_date", None) is not None
             and attrs.get("target_date", None) is not None
@@ -91,6 +107,7 @@ class DraftIssueCreateSerializer(BaseSerializer):
                 raise serializers.ValidationError({"description_binary": "Invalid binary data"})
 
         # Validate assignees are from project
+        # Silently drop assignees who are not active project members with at least MEMBER role
         if attrs.get("assignee_ids", []):
             attrs["assignee_ids"] = ProjectMember.objects.filter(
                 project_id=self.context["project_id"],
@@ -100,6 +117,7 @@ class DraftIssueCreateSerializer(BaseSerializer):
             ).values_list("member_id", flat=True)
 
         # Validate labels are from project
+        # Silently drop labels that don't belong to the project
         if attrs.get("label_ids"):
             label_ids = [label.id for label in attrs["label_ids"]]
             attrs["label_ids"] = list(
@@ -140,9 +158,11 @@ class DraftIssueCreateSerializer(BaseSerializer):
         return attrs
 
     def create(self, validated_data):
+        """Create the draft issue and its assignee, label, cycle and module links."""
         assignees = validated_data.pop("assignee_ids", None)
         labels = validated_data.pop("label_ids", None)
         modules = validated_data.pop("module_ids", None)
+        # module_ids/cycle_id are not declared fields, so they are read from the raw request data
         cycle_id = self.initial_data.get("cycle_id", None)
         modules = self.initial_data.get("module_ids", None)
 
@@ -217,6 +237,11 @@ class DraftIssueCreateSerializer(BaseSerializer):
         return issue
 
     def update(self, instance, validated_data):
+        """Update the draft; each relation provided in the payload fully replaces the existing links.
+
+        ``context["cycle_id"]`` must be ``"not_provided"`` to leave the cycle unchanged;
+        a falsy value removes the cycle.
+        """
         assignees = validated_data.pop("assignee_ids", None)
         labels = validated_data.pop("label_ids", None)
         cycle_id = self.context.get("cycle_id", None)
@@ -298,6 +323,8 @@ class DraftIssueCreateSerializer(BaseSerializer):
 
 
 class DraftIssueSerializer(BaseSerializer):
+    """Read-only list representation of a draft issue with related ids (expected to be annotated by the view)."""
+
     # ids
     cycle_id = serializers.PrimaryKeyRelatedField(read_only=True)
     module_ids = serializers.ListField(child=serializers.UUIDField(), required=False)
@@ -335,6 +362,8 @@ class DraftIssueSerializer(BaseSerializer):
 
 
 class DraftIssueDetailSerializer(DraftIssueSerializer):
+    """Draft issue representation including ``description_html`` (detail view)."""
+
     description_html = serializers.CharField()
 
     class Meta(DraftIssueSerializer.Meta):

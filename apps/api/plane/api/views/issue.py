@@ -2,6 +2,16 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 # See the LICENSE file for details.
 
+"""Public API endpoints for work items and their sub-resources (routes in plane/api/urls/work_item.py).
+
+Covers work items (list/create/retrieve/upsert/update/delete, lookup by
+``<PROJECT>-<sequence>`` identifier, search), labels, links, comments,
+activities, attachments and relations. Mutations enqueue ``issue_activity``
+(activity feed / notifications) and ``model_activity`` (webhooks) Celery tasks.
+``Issue.issue_objects`` excludes triage, archived, draft and soft-deleted items;
+``Issue.objects`` does not. Project roles: 20 Admin, 15 Member, 5 Guest.
+"""
+
 # Python imports
 import json
 import uuid
@@ -158,6 +168,12 @@ from plane.bgtasks.work_item_link_task import crawl_work_item_link_title
 
 
 def user_has_issue_permission(user_id, project_id, issue=None, allowed_roles=None, allow_creator=True):
+    """Return True if the user may act on a work item in the project.
+
+    The work item's creator always passes when ``allow_creator`` is set; otherwise
+    the user must be an active project member, optionally with a role in
+    ``allowed_roles``.
+    """
     if allow_creator and issue is not None and user_id == issue.created_by_id:
         return True
 
@@ -186,11 +202,14 @@ class WorkspaceIssueAPIEndpoint(BaseAPIView):
 
     @property
     def project_identifier(self):
+        """Project identifier (e.g. ``PROJ``) from the URL."""
         return self.kwargs.get("project_identifier", None)
 
     def get_queryset(self):
+        """Live work items of the project matched by identifier, with sub-issue counts."""
         return (
             Issue.issue_objects.annotate(
+                # Correlated subquery: number of child work items of each issue.
                 sub_issues_count=Issue.issue_objects.filter(parent=OuterRef("id"))
                 .order_by()
                 .annotate(count=Func(F("id"), function="Count"))
@@ -233,6 +252,7 @@ class WorkspaceIssueAPIEndpoint(BaseAPIView):
         This endpoint provides workspace-level access to work items.
         """
         if issue_identifier and project_identifier:
+            # issue_identifier is the per-project sequence number (the N in PROJ-N).
             issue = Issue.issue_objects.annotate(
                 sub_issues_count=Issue.issue_objects.filter(parent=OuterRef("id"))
                 .order_by()
@@ -261,6 +281,7 @@ class IssueListCreateAPIEndpoint(BaseAPIView):
     use_read_replica = True
 
     def get_queryset(self):
+        """Live work items of the project, annotated with sub-issue counts."""
         return (
             Issue.issue_objects.annotate(
                 sub_issues_count=Issue.issue_objects.filter(parent=OuterRef("id"))
@@ -313,6 +334,7 @@ class IssueListCreateAPIEndpoint(BaseAPIView):
         external_id = request.GET.get("external_id")
         external_source = request.GET.get("external_source")
 
+        # Lookup mode: an external_id/external_source pair returns that single work item.
         if external_id and external_source:
             issue = Issue.objects.get(
                 external_id=external_id,
@@ -325,6 +347,7 @@ class IssueListCreateAPIEndpoint(BaseAPIView):
                 status=status.HTTP_200_OK,
             )
 
+        # priority / state group need explicit rank orders instead of alphabetical sorting.
         # Custom ordering for priority and state
         priority_order = ["urgent", "high", "medium", "low", "none"]
         state_order = ["backlog", "unstarted", "started", "completed", "cancelled"]
@@ -334,6 +357,7 @@ class IssueListCreateAPIEndpoint(BaseAPIView):
         issue_queryset = (
             self.get_queryset()
             .annotate(
+                # Attach the active cycle id and link/attachment counts as correlated subqueries.
                 cycle_id=Subquery(
                     CycleIssue.objects.filter(issue=OuterRef("id"), deleted_at__isnull=True).values("cycle_id")[:1]
                 )
@@ -355,6 +379,7 @@ class IssueListCreateAPIEndpoint(BaseAPIView):
             )
         )
 
+        # Pagination total counts all live work items in the project.
         total_issue_queryset = Issue.issue_objects.filter(project_id=project_id, workspace__slug=slug)
 
         # Priority Ordering
@@ -383,6 +408,7 @@ class IssueListCreateAPIEndpoint(BaseAPIView):
                 )
             ).order_by("state_order")
         # assignee and label ordering
+        # Multi-valued relations: order by the max related value to get one row per work item.
         elif order_by_param in [
             "labels__name",
             "-labels__name",
@@ -439,6 +465,7 @@ class IssueListCreateAPIEndpoint(BaseAPIView):
         )
 
         if serializer.is_valid():
+            # Idempotency for integrations: 409 if external_source/external_id already used.
             if (
                 request.data.get("external_id")
                 and request.data.get("external_source")
@@ -466,6 +493,7 @@ class IssueListCreateAPIEndpoint(BaseAPIView):
             serializer.save()
             # Refetch the issue
             issue = Issue.objects.filter(workspace__slug=slug, project_id=project_id, pk=serializer.data["id"]).first()
+            # Importers may override created_at / created_by; defaults are now / the caller.
             issue.created_at = request.data.get("created_at", timezone.now())
             issue.created_by_id = request.data.get("created_by", request.user.id)
             issue.save(update_fields=["created_at", "created_by"])
@@ -505,6 +533,7 @@ class IssueDetailAPIEndpoint(BaseAPIView):
     use_read_replica = True
 
     def get_queryset(self):
+        """Live work items of the project, annotated with sub-issue counts."""
         return (
             Issue.issue_objects.annotate(
                 sub_issues_count=Issue.issue_objects.filter(parent=OuterRef("id"))
@@ -815,6 +844,7 @@ class IssueDetailAPIEndpoint(BaseAPIView):
         Only admins or the item creator can perform this action.
         """
         issue = Issue.objects.get(workspace__slug=slug, project_id=project_id, pk=pk)
+        # Only the creator or a project Admin (role 20) may delete.
         if issue.created_by_id != request.user.id and (
             not ProjectMember.objects.filter(
                 workspace__slug=slug,
@@ -828,6 +858,7 @@ class IssueDetailAPIEndpoint(BaseAPIView):
                 {"error": "Only admin or creator can delete the work item"},
                 status=status.HTTP_403_FORBIDDEN,
             )
+        # Snapshot the work item before deletion for the activity log.
         current_instance = json.dumps(IssueSerializer(issue).data, cls=DjangoJSONEncoder)
         issue.delete()
         issue_activity.delay(
@@ -851,6 +882,7 @@ class LabelListCreateAPIEndpoint(BaseAPIView):
     use_read_replica = True
 
     def get_queryset(self):
+        """Labels of a non-archived project the caller is an active member of."""
         return (
             Label.objects.filter(workspace__slug=self.kwargs.get("slug"))
             .filter(project_id=self.kwargs.get("project_id"))
@@ -921,6 +953,7 @@ class LabelListCreateAPIEndpoint(BaseAPIView):
                 serializer = LabelSerializer(label)
                 return Response(serializer.data, status=status.HTTP_201_CREATED)
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        # Unique (project, name) constraint violated: return the existing label's id.
         except IntegrityError:
             label = Label.objects.filter(
                 workspace__slug=slug,
@@ -1039,6 +1072,7 @@ class LabelDetailAPIEndpoint(LabelListCreateAPIEndpoint):
                     external_source=request.data.get("external_source"),
                     external_id=request.data.get("external_id"),
                 )
+                # Ignore the label being updated when checking for external id collisions.
                 .exclude(id=pk)
                 .exists()
             ):
@@ -1086,6 +1120,7 @@ class IssueLinkListCreateAPIEndpoint(BaseAPIView):
     use_read_replica = True
 
     def get_queryset(self):
+        """Links of the work item in the URL (non-archived project, caller must be an active member)."""
         return (
             IssueLink.objects.filter(workspace__slug=self.kwargs.get("slug"))
             .filter(project_id=self.kwargs.get("project_id"))
@@ -1163,6 +1198,7 @@ class IssueLinkListCreateAPIEndpoint(BaseAPIView):
         serializer = IssueLinkCreateSerializer(data=request.data)
         if serializer.is_valid():
             serializer.save(project_id=project_id, issue_id=issue_id)
+            # Fetch the page title asynchronously; created_by may be overridden by importers.
             crawl_work_item_link_title.delay(serializer.instance.id, serializer.instance.url)
             link = IssueLink.objects.get(pk=serializer.instance.id)
             link.created_by_id = request.data.get("created_by", request.user.id)
@@ -1191,6 +1227,7 @@ class IssueLinkDetailAPIEndpoint(BaseAPIView):
     use_read_replica = True
 
     def get_queryset(self):
+        """Links of the work item in the URL (non-archived project, caller must be an active member)."""
         return (
             IssueLink.objects.filter(workspace__slug=self.kwargs.get("slug"))
             .filter(project_id=self.kwargs.get("project_id"))
@@ -1277,6 +1314,7 @@ class IssueLinkDetailAPIEndpoint(BaseAPIView):
         serializer = IssueLinkSerializer(issue_link, data=request.data, partial=True)
         if serializer.is_valid():
             serializer.save()
+            # Re-crawl the title in case the URL changed.
             crawl_work_item_link_title.delay(serializer.data.get("id"), serializer.data.get("url"))
             issue_activity.delay(
                 type="link.activity.updated",
@@ -1334,6 +1372,7 @@ class IssueCommentListCreateAPIEndpoint(BaseAPIView):
     use_read_replica = True
 
     def get_queryset(self):
+        """Comments of the work item in the URL, annotated with whether the caller is a project member."""
         return (
             IssueComment.objects.filter(workspace__slug=self.kwargs.get("slug"))
             .filter(project_id=self.kwargs.get("project_id"))
@@ -1449,6 +1488,8 @@ class IssueCommentListCreateAPIEndpoint(BaseAPIView):
             serializer.save(project_id=project_id, issue_id=issue_id, actor=request.user)
             issue_comment = IssueComment.objects.get(pk=serializer.instance.id)
             # Update the created_at and the created_by and save the comment
+            # Importers may override created_at / created_by (and the actor).
+            # NOTE: actor_id is assigned but not included in update_fields, so it is not persisted here.
             issue_comment.created_at = request.data.get("created_at", timezone.now())
             issue_comment.created_by_id = request.data.get("created_by", request.user.id)
             issue_comment.actor_id = request.data.get("created_by", request.user.id)
@@ -1490,6 +1531,7 @@ class IssueCommentDetailAPIEndpoint(BaseAPIView):
     use_read_replica = True
 
     def get_queryset(self):
+        """Comments of the work item in the URL, annotated with whether the caller is a project member."""
         return (
             IssueComment.objects.filter(workspace__slug=self.kwargs.get("slug"))
             .filter(project_id=self.kwargs.get("project_id"))
@@ -1653,6 +1695,8 @@ class IssueCommentDetailAPIEndpoint(BaseAPIView):
 
 
 class IssueActivityListAPIEndpoint(BaseAPIView):
+    """List the activity log of a work item."""
+
     permission_classes = [ProjectEntityPermission]
     use_read_replica = True
 
@@ -1687,6 +1731,7 @@ class IssueActivityListAPIEndpoint(BaseAPIView):
         issue_activities = (
             IssueActivity.objects.filter(issue_id=issue_id, workspace__slug=slug, project_id=project_id)
             .filter(
+                # Comment/vote/reaction/draft activity is excluded from this feed.
                 ~Q(field__in=["comment", "vote", "reaction", "draft"]),
                 project__project_projectmember__member=self.request.user,
                 project__project_projectmember__is_active=True,
@@ -1694,6 +1739,7 @@ class IssueActivityListAPIEndpoint(BaseAPIView):
             .filter(project__archived_at__isnull=True)
             .select_related("actor", "workspace", "issue", "project")
         ).order_by(
+            # order_by is restricted to an allowlist of activity fields.
             sanitize_order_by(request.GET.get("order_by", "created_at"), ACTIVITY_ORDER_BY_ALLOWLIST, "created_at")
         )
 
@@ -1770,6 +1816,8 @@ class IssueActivityDetailAPIEndpoint(BaseAPIView):
 class IssueAttachmentListCreateAPIEndpoint(BaseAPIView):
     """Issue Attachment List and Create Endpoint"""
 
+    # No permission_classes override: BaseAPIView's IsAuthenticated applies. post()
+    # checks project membership via user_has_issue_permission(); NOTE: get() does not.
     serializer_class = IssueAttachmentSerializer
     model = FileAsset
     use_read_replica = True
@@ -1852,6 +1900,7 @@ class IssueAttachmentListCreateAPIEndpoint(BaseAPIView):
         """
         issue = Issue.objects.get(pk=issue_id, workspace__slug=slug, project_id=project_id)
         # if the user is creator or admin,member then allow the upload
+        # allowed_roles lists every project role, so any active member (or the creator) passes.
         if not user_has_issue_permission(
             request.user.id,
             project_id=project_id,
@@ -1891,6 +1940,8 @@ class IssueAttachmentListCreateAPIEndpoint(BaseAPIView):
         # asset key
         asset_key = f"{workspace.id}/{uuid.uuid4().hex}-{name}"
 
+        # Idempotency for integrations: 409 if this work item already has an attachment
+        # with the same external_source/external_id.
         if (
             request.data.get("external_id")
             and request.data.get("external_source")
@@ -1985,6 +2036,8 @@ class IssueAttachmentListCreateAPIEndpoint(BaseAPIView):
 class IssueAttachmentDetailAPIEndpoint(BaseAPIView):
     """Issue Attachment Detail Endpoint"""
 
+    # No permission_classes override: each method checks project membership itself
+    # via user_has_issue_permission().
     serializer_class = IssueAttachmentSerializer
     model = FileAsset
     use_read_replica = True
@@ -2021,6 +2074,7 @@ class IssueAttachmentDetailAPIEndpoint(BaseAPIView):
             )
 
         issue_attachment = FileAsset.objects.get(pk=pk, workspace__slug=slug, project_id=project_id)
+        # Soft delete; storage metadata is fetched in the background if missing.
         issue_attachment.is_deleted = True
         issue_attachment.deleted_at = timezone.now()
         issue_attachment.save()
@@ -2104,6 +2158,7 @@ class IssueAttachmentDetailAPIEndpoint(BaseAPIView):
             )
 
         storage = S3Storage(request=request)
+        # Redirect the client to a presigned S3 URL (Content-Disposition: attachment).
         presigned_url = storage.generate_presigned_url(
             object_name=asset.asset.name,
             disposition="attachment",
@@ -2189,6 +2244,8 @@ class IssueAttachmentDetailAPIEndpoint(BaseAPIView):
 class IssueSearchEndpoint(BaseAPIView):
     """Endpoint to search across multiple fields in the issues"""
 
+    # No project permission class: results are limited to projects the caller is an
+    # active member of by the queryset filter below.
     use_read_replica = True
 
     @extend_schema(
@@ -2250,6 +2307,7 @@ class IssueSearchEndpoint(BaseAPIView):
         )
 
         # Apply project filter if not searching across workspace
+        # workspace_search is a string flag ("true"/"false") from the query string.
         if workspace_search == "false" and project_id:
             issues = issues.filter(project_id=project_id)
 
@@ -2340,6 +2398,8 @@ class IssueRelationListCreateAPIEndpoint(BaseAPIView):
         Retrieve all relationships for a work item organized by relation type.
         Returns a structured response with relations grouped by type.
         """
+        # Relations are stored in one direction only; fetch rows where the work item is on
+        # either side and project them into both directions below.
         relations = IssueRelation.objects.filter(
             Q(issue_id=issue_id) | Q(related_issue_id=issue_id),
             workspace__slug=slug,
@@ -2361,11 +2421,14 @@ class IssueRelationListCreateAPIEndpoint(BaseAPIView):
             "finish_after": [],
             "finish_before": [],
         }
+        # duplicate / relates_to are symmetric, so de-duplicate ids seen from both sides.
         seen_duplicate = set()
         seen_relates_to = set()
 
         for rel in relations:
             rt = rel["relation_type"]
+            # A row (A blocked_by B) means B is blocking A: report it from the perspective of
+            # issue_id. start_before/finish_before are mirrored the same way into *_after.
             if rt == "blocked_by":
                 if str(rel["related_issue_id"]) == str(issue_id):
                     response_data["blocking"].append(
@@ -2484,6 +2547,8 @@ class IssueRelationListCreateAPIEndpoint(BaseAPIView):
         issues = serializer.validated_data["issues"]
         project = Project.objects.get(pk=project_id, workspace__slug=slug)
 
+        # Only blocked_by / start_before / finish_before (plus symmetric types) are stored;
+        # the inverse types are saved by swapping the two sides of the relation.
         actual_relation = get_actual_relation(relation_type)
         is_reverse = relation_type in ["blocking", "start_after", "finish_after"]
 

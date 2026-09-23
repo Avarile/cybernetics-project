@@ -2,6 +2,12 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 # See the LICENSE file for details.
 
+"""SSRF-safety tests for work-item link unfurling (plane.bgtasks.work_item_link_task).
+
+Covers the ``validate_url_ip`` pre-check, the ``validate_url`` IP/host allowlists,
+and ``safe_get`` redirect handling. DNS and HTTP are mocked throughout.
+"""
+
 import ipaddress
 
 import pytest

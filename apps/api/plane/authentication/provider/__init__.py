@@ -2,3 +2,4 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 # See the LICENSE file for details.
 
+"""Auth providers: credential providers and OAuth providers (Google, GitHub, GitLab, Gitea)."""

@@ -2,6 +2,8 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 # See the LICENSE file for details.
 
+"""Helpers to compute the frontend base URL (app, space or admin) used for auth redirects."""
+
 # Django imports
 from django.conf import settings
 from django.http import HttpRequest
@@ -20,6 +22,7 @@ def base_host(
     is_app: bool = False,
 ) -> str:
     """Utility function to return host / origin from the request"""
+    # Admin/space paths default to "/god-mode/" and "/spaces/" and are normalized to start and end with "/".
     # Calculate the base origin from request
     base_origin = settings.WEB_URL or settings.APP_BASE_URL
 
@@ -64,4 +67,5 @@ def base_host(
 
 
 def user_ip(request: Request | HttpRequest) -> str:
+    """Return the client IP address for ``request``."""
     return get_client_ip(request=request)

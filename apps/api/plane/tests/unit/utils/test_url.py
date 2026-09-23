@@ -2,6 +2,12 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 # See the LICENSE file for details.
 
+"""Unit tests for plane.utils.url: contains_url, is_valid_url and normalize_url_path.
+
+contains_url is used to reject URLs in user-supplied names; the tests pin its ReDoS
+guards (inputs over 1000 chars return False, each line is scanned only up to 500 chars).
+"""
+
 import pytest
 from plane.utils.url import (
     contains_url,

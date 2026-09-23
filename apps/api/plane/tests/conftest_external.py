@@ -2,6 +2,8 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 # See the LICENSE file for details.
 
+"""Pytest fixtures that mock external services (Redis, Elasticsearch, Celery) so tests run without them."""
+
 import pytest
 from unittest.mock import MagicMock, patch
 

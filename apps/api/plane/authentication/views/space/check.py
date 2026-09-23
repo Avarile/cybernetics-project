@@ -2,6 +2,13 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 # See the LICENSE file for details.
 
+"""
+Email check endpoint for the space (public project) login screen (``POST /auth/spaces/email-check/``).
+
+Same contract as the app ``EmailCheckEndpoint``: returns whether the user exists
+and whether to show the "MAGIC_CODE" or "CREDENTIAL" step.
+"""
+
 # Python imports
 import os
 
@@ -27,11 +34,14 @@ from plane.license.utils.instance_value import get_configuration_value
 
 
 class EmailCheckSpaceEndpoint(APIView):
+    """Public, throttled endpoint that decides the next login step for an email on the space frontend."""
+
     permission_classes = [AllowAny]
 
     throttle_classes = [AuthenticationThrottle]
 
     def post(self, request):
+        """Validate ``email`` and return ``{"existing": bool, "status": "MAGIC_CODE" | "CREDENTIAL"}``."""
         # Check instance configuration
         instance = Instance.objects.first()
         if instance is None or not instance.is_setup_done:
@@ -78,6 +88,7 @@ class EmailCheckSpaceEndpoint(APIView):
         existing_user = User.objects.filter(email=email).first()
 
         # If existing user
+        # Existing users go to magic code only if they never set a password and magic login is available.
         if existing_user:
             # Return response
             return Response(

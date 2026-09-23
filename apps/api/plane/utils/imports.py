@@ -2,6 +2,9 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 # See the LICENSE file for details.
 
+"""Dynamic import helper used to auto-register all submodules of a package.
+"""
+
 import pkgutil
 import six
 

@@ -2,6 +2,8 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 # See the LICENSE file for details.
 
+"""Public API (``plane.api``) endpoint returning the currently authenticated user."""
+
 # Third party imports
 from rest_framework import status
 from rest_framework.response import Response
@@ -16,6 +18,8 @@ from plane.utils.openapi import USER_EXAMPLE
 
 
 class UserEndpoint(BaseAPIView):
+    """Return the profile of the user bound to the API key / session."""
+
     serializer_class = UserLiteSerializer
     model = User
 

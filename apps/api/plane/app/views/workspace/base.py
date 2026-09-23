@@ -2,6 +2,12 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 # See the LICENSE file for details.
 
+"""Core workspace views.
+
+Covers workspace CRUD, the list of workspaces the user belongs to, slug availability checks,
+the per-user workspace dashboard, workspace themes and CSV export of a member's issue activity.
+"""
+
 # Python imports
 import csv
 import io
@@ -53,6 +59,8 @@ from plane.utils.csv_utils import sanitize_csv_row
 
 
 class WorkSpaceViewSet(BaseViewSet):
+    """Create, list, update and delete workspaces (looked up by slug)."""
+
     model = Workspace
     serializer_class = WorkSpaceSerializer
     permission_classes = [WorkSpaceBasePermission]
@@ -63,6 +71,9 @@ class WorkSpaceViewSet(BaseViewSet):
     lookup_field = "slug"
 
     def get_queryset(self):
+        """Workspaces the user is an active member of, annotated with `total_members` (non-bot, active)."""
+        # Correlated subquery counting members per workspace; order_by() clears default
+        # ordering so the aggregate isn't grouped by extra columns.
         member_count = (
             WorkspaceMember.objects.filter(workspace=OuterRef("id"), member__is_bot=False, is_active=True)
             .order_by()
@@ -81,6 +92,11 @@ class WorkSpaceViewSet(BaseViewSet):
         )
 
     def create(self, request):
+        """Create a workspace and make the requester its admin member.
+
+        Honors the DISABLE_WORKSPACE_CREATION instance setting, validates name/slug, then
+        queues workspace seeding and an analytics event. Returns 409 if the slug is taken.
+        """
         try:
             (DISABLE_WORKSPACE_CREATION,) = get_configuration_value(
                 [
@@ -126,7 +142,7 @@ class WorkSpaceViewSet(BaseViewSet):
                 _ = WorkspaceMember.objects.create(
                     workspace_id=serializer.data["id"],
                     member=request.user,
-                    role=20,
+                    role=20,  # 20 = Admin
                     company_role=request.data.get("company_role", ""),
                 )
 
@@ -167,10 +183,12 @@ class WorkSpaceViewSet(BaseViewSet):
 
     @allow_permission([ROLE.ADMIN, ROLE.MEMBER, ROLE.GUEST], level="WORKSPACE")
     def list(self, request, *args, **kwargs):
+        """List the user's workspaces (any workspace role)."""
         return super().list(request, *args, **kwargs)
 
     @allow_permission([ROLE.ADMIN], level="WORKSPACE")
     def partial_update(self, request, *args, **kwargs):
+        """Update workspace settings; workspace admins only."""
         return super().partial_update(request, *args, **kwargs)
 
     def remove_last_workspace_ids_from_user_settings(self, id: uuid.UUID) -> None:
@@ -182,6 +200,7 @@ class WorkSpaceViewSet(BaseViewSet):
 
     @allow_permission([ROLE.ADMIN], level="WORKSPACE")
     def destroy(self, request, *args, **kwargs):
+        """Delete a workspace (admins only), clearing it from users' last-workspace setting and tracking the event."""
         # Get the workspace
         workspace = self.get_object()
         self.remove_last_workspace_ids_from_user_settings(workspace.id)
@@ -202,11 +221,14 @@ class WorkSpaceViewSet(BaseViewSet):
 
 
 class UserWorkSpacesEndpoint(BaseAPIView):
+    """List all workspaces the current user is an active member of."""
+
     search_fields = ["name"]
     filterset_fields = ["owner"]
     use_read_replica = True
 
     def get(self, request):
+        """Return workspaces with the user's `role` and `total_members`; `fields` query param limits serialized fields."""
         fields = [field for field in request.GET.get("fields", "").split(",") if field]
         member_count = (
             WorkspaceMember.objects.filter(workspace=OuterRef("id"), member__is_bot=False, is_active=True)
@@ -241,7 +263,10 @@ class UserWorkSpacesEndpoint(BaseAPIView):
 
 
 class WorkSpaceAvailabilityCheckEndpoint(BaseAPIView):
+    """Check whether a workspace slug is free to use."""
+
     def get(self, request):
+        """Return `{status: True}` if the slug is neither taken nor in RESTRICTED_WORKSPACE_SLUGS."""
         slug = request.GET.get("slug", False)
 
         if not slug or slug == "":
@@ -255,12 +280,17 @@ class WorkSpaceAvailabilityCheckEndpoint(BaseAPIView):
 
 
 class WeekInMonth(Func):
+    """SQL expression mapping a day-of-month (1-31) to its week number within the month (1-5)."""
+
     function = "FLOOR"
     template = "(((%(expressions)s - 1) / 7) + 1)::INTEGER"
 
 
 class UserWorkspaceDashboardEndpoint(BaseAPIView):
+    """Personal dashboard statistics for the current user within a workspace."""
+
     def get(self, request, slug):
+        """Return activity heatmap (last 3 months), weekly completions for `month`, and assigned-issue stats."""
         issue_activities = (
             IssueActivity.objects.filter(
                 actor=request.user,
@@ -301,6 +331,7 @@ class UserWorkspaceDashboardEndpoint(BaseAPIView):
             workspace__slug=slug, assignees__in=[request.user], state__group="completed"
         ).count()
 
+        # Compares ISO week numbers only (year is not checked).
         issues_due_week = (
             Issue.issue_objects.filter(workspace__slug=slug, assignees__in=[request.user])
             .annotate(target_week=ExtractWeek("target_date"))
@@ -349,14 +380,18 @@ class UserWorkspaceDashboardEndpoint(BaseAPIView):
 
 
 class WorkspaceThemeViewSet(BaseViewSet):
+    """Manage custom themes saved in a workspace; workspace admins only."""
+
     permission_classes = [WorkSpaceAdminPermission]
     model = WorkspaceTheme
     serializer_class = WorkspaceThemeSerializer
 
     def get_queryset(self):
+        """Themes belonging to the workspace in the URL."""
         return super().get_queryset().filter(workspace__slug=self.kwargs.get("slug"))
 
     def create(self, request, slug):
+        """Create a theme in the workspace, recording the requester as actor."""
         workspace = Workspace.objects.get(slug=slug)
         serializer = WorkspaceThemeSerializer(data=request.data)
         if serializer.is_valid():
@@ -366,17 +401,25 @@ class WorkspaceThemeViewSet(BaseViewSet):
 
 
 class ExportWorkspaceUserActivityEndpoint(BaseAPIView):
+    """Export a workspace member's issue activity for a given day as CSV."""
+
     permission_classes = [WorkspaceEntityPermission]
 
     def generate_csv_from_rows(self, rows):
         """Generate CSV buffer from rows."""
         csv_buffer = io.StringIO()
+        # QUOTE_ALL plus sanitize_csv_row guards against CSV/formula injection.
         writer = csv.writer(csv_buffer, delimiter=",", quoting=csv.QUOTE_ALL)
         [writer.writerow(sanitize_csv_row(row)) for row in rows]
         csv_buffer.seek(0)
         return csv_buffer
 
     def post(self, request, slug, user_id):
+        """Return a CSV download of `user_id`'s activities on `date` (body param).
+
+        Only activities in projects the requester is an active member of are included;
+        comment/vote/reaction/draft activities are excluded and output is capped at 10,000 rows.
+        """
         if not request.data.get("date"):
             return Response({"error": "Date is required"}, status=status.HTTP_400_BAD_REQUEST)
 

@@ -2,6 +2,12 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 # See the LICENSE file for details.
 
+"""Models for the public/external REST API.
+
+``APIToken`` holds the personal/bot access tokens used to authenticate against
+the ``/api/v1`` endpoints, and ``APIActivityLog`` records requests made with them.
+"""
+
 # Python imports
 from uuid import uuid4
 
@@ -13,14 +19,22 @@ from .base import BaseModel
 
 
 def generate_label_token():
+    """Default label for a token when the user does not provide one."""
     return uuid4().hex
 
 
 def generate_token():
+    """Generate a new random API token; the ``plane_api_`` prefix makes tokens easy to recognise."""
     return "plane_api_" + uuid4().hex
 
 
 class APIToken(BaseModel):
+    """An API key belonging to a user (human or bot), optionally scoped to a workspace.
+
+    ``allowed_rate_limit`` is a DRF-style throttle rate string (e.g. ``"60/min"``)
+    and ``is_service`` marks internal service tokens.
+    """
+
     # Meta information
     label = models.CharField(max_length=255, default=generate_label_token)
     description = models.TextField(blank=True)
@@ -49,6 +63,8 @@ class APIToken(BaseModel):
 
 
 class APIActivityLog(BaseModel):
+    """Audit log entry for a single request made with an API token (request and response details)."""
+
     token_identifier = models.CharField(max_length=255)
 
     # Request Info

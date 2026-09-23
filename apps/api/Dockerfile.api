@@ -1,3 +1,6 @@
+# Production image for the Plane API. The same image also runs the worker, beat and
+# migrator processes by overriding CMD with the matching bin/docker-entrypoint-*.sh script.
+
 FROM python:3.12.10-alpine
 
 # set environment variables
@@ -21,6 +24,8 @@ RUN apk add --no-cache --upgrade \
 COPY requirements.txt ./
 COPY requirements ./requirements
 RUN apk add --no-cache libffi-dev
+# Build toolchain is installed as a virtual package only for pip install (native
+# extensions such as psycopg/cryptography) and removed afterwards to keep the image small.
 RUN apk add --no-cache --virtual .build-deps \
     "bash~=5.2" \
     "g++" \

@@ -2,6 +2,11 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 # See the LICENSE file for details.
 
+"""Celery task that notifies a user by email when their account is deactivated.
+
+SMTP settings come from the instance configuration.
+"""
+
 # Python imports
 import logging
 
@@ -21,6 +26,7 @@ from plane.utils.exception_logger import log_exception
 
 @shared_task
 def user_deactivation_email(current_site, user_id):
+    """Send the account-deactivated email to ``user_id``; ``current_site`` builds the login link."""
     try:
         # Send email to user when account is deactivated
         user = User.objects.get(id=user_id)

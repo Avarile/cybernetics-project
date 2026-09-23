@@ -2,6 +2,15 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 # See the LICENSE file for details.
 
+"""
+Celery tasks that export workspace analytics as CSV and email them to the requester.
+
+``analytic_export_task`` rebuilds the analytics chart data (``build_graph_plot``)
+for the given x-axis / y-axis / segment, resolves IDs (assignees, labels, states,
+cycles, modules) to human-readable names and mails the CSV. ``export_analytics_to_csv_email``
+mails an already-prepared list of rows.
+"""
+
 # Python imports
 import csv
 import io
@@ -26,6 +35,7 @@ from plane.utils.exception_logger import log_exception
 from plane.utils.issue_filters import issue_filters
 from plane.utils.csv_utils import sanitize_csv_row
 
+# Human-readable CSV column headers for the analytics axis/segment keys.
 row_mapping = {
     "state__name": "State",
     "state__group": "State Group",
@@ -42,6 +52,7 @@ row_mapping = {
     "issue_module__module_id": "Module",
 }
 
+# Axis/segment keys whose values are IDs that must be resolved to names in the CSV.
 ASSIGNEE_ID = "assignees__id"
 LABEL_ID = "labels__id"
 STATE_ID = "state_id"
@@ -92,6 +103,7 @@ def get_assignee_details(slug, filters):
     """Fetch assignee details if required."""
     return (
         Issue.issue_objects.filter(
+            # Only issues that have at least one assignee with an avatar (URL or uploaded asset).
             Q(Q(assignees__avatar__isnull=False) | Q(assignees__avatar_asset__isnull=False)),
             workspace__slug=slug,
             **filters,
@@ -141,6 +153,7 @@ def get_label_details(slug, filters):
 
 
 def get_state_details(slug, filters):
+    """Fetch distinct state id/name/color for issues matching the filters."""
     return (
         Issue.issue_objects.filter(workspace__slug=slug, **filters)
         .distinct("state_id")
@@ -150,6 +163,7 @@ def get_state_details(slug, filters):
 
 
 def get_module_details(slug, filters):
+    """Fetch distinct module id/name for issues matching the filters (ignoring removed module links)."""
     return (
         Issue.issue_objects.filter(
             workspace__slug=slug,
@@ -164,6 +178,7 @@ def get_module_details(slug, filters):
 
 
 def get_cycle_details(slug, filters):
+    """Fetch distinct cycle id/name for issues matching the filters (ignoring removed cycle links)."""
     return (
         Issue.issue_objects.filter(
             workspace__slug=slug,
@@ -197,6 +212,13 @@ def generate_segmented_rows(
     cycle_details,
     module_details,
 ):
+    """Build CSV rows for a segmented chart.
+
+    The header row is ``[x label, y label, *segment values]``; each data row is
+    ``[x value, total, per-segment value...]``. ID values on the x-axis and in the
+    segment header are replaced with names.
+    """
+    # All distinct segment values across every x-axis bucket; they become the extra columns.
     segment_zero = list(set(item.get("segment") for sublist in distribution.values() for item in sublist))
 
     segmented = segment
@@ -275,6 +297,8 @@ def generate_segmented_rows(
             if state:
                 row_zero[index + 2] = state["state__name"]
 
+    # NOTE: this looks up modules in ``label_details`` (not ``module_details``), so module segment
+    # headers are not resolved to names.
     if segmented == MODULE_ID:
         for index, segm in enumerate(row_zero[2:]):
             module = next((mod for mod in label_details if str(mod[MODULE_ID]) == str(segm)), None)
@@ -301,6 +325,7 @@ def generate_non_segmented_rows(
     cycle_details,
     module_details,
 ):
+    """Build CSV rows (header + one ``[x value, count/estimate]`` row per bucket) for a non-segmented chart."""
     rows = []
     for item, data in distribution.items():
         row = [item, data[0].get("count" if y_axis == "issue_count" else "estimate")]
@@ -348,6 +373,10 @@ def generate_non_segmented_rows(
 
 @shared_task
 def analytic_export_task(email, data, slug):
+    """Build analytics CSV for the workspace ``slug`` from the request ``data`` filters/axes and email it to ``email``.
+
+    Errors are logged and swallowed.
+    """
     try:
         filters = issue_filters(data, "POST")
         queryset = Issue.issue_objects.filter(**filters, workspace__slug=slug)
@@ -357,8 +386,10 @@ def analytic_export_task(email, data, slug):
         segment = data.get("segment", False)
 
         distribution = build_graph_plot(queryset, x_axis=x_axis, y_axis=y_axis, segment=segment)
+        # The chart stores issue counts under "count" and estimate sums under "estimate".
         key = "count" if y_axis == "issue_count" else "estimate"
 
+        # Only fetch the lookup tables needed to translate IDs on the chosen axis/segment.
         assignee_details = (
             get_assignee_details(slug, filters) if x_axis == ASSIGNEE_ID or segment == ASSIGNEE_ID else {}
         )
@@ -408,6 +439,7 @@ def analytic_export_task(email, data, slug):
 
 @shared_task
 def export_analytics_to_csv_email(data, headers, keys, email, slug):
+    """Email ``data`` as a CSV attachment using ``headers``/``keys`` for the columns."""
     try:
         """
         Prepares a CSV from data and sends it as an email attachment.

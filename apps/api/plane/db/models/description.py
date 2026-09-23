@@ -2,12 +2,21 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 # See the LICENSE file for details.
 
+"""Generic rich-text description storage.
+
+``Description`` holds rich-text content in several representations (JSON,
+HTML, collaborative-editor binary, plain text), and ``DescriptionVersion``
+keeps its historical snapshots.
+"""
+
 from django.db import models
 from django.utils.html import strip_tags
 from .workspace import WorkspaceBaseModel
 
 
 class Description(WorkspaceBaseModel):
+    """Workspace-scoped rich-text content; ``description_stripped`` is derived on save for search."""
+
     description_json = models.JSONField(default=dict, blank=True)
     description_html = models.TextField(blank=True, default="<p></p>")
     description_binary = models.BinaryField(null=True)
@@ -20,6 +29,7 @@ class Description(WorkspaceBaseModel):
         ordering = ("-created_at",)
 
     def save(self, *args, **kwargs):
+        """Recompute the plain-text ``description_stripped`` from the HTML, then save."""
         # Strip the html tags using html parser
         self.description_stripped = (
             None
@@ -47,6 +57,7 @@ class DescriptionVersion(WorkspaceBaseModel):
         ordering = ("-created_at",)
 
     def save(self, *args, **kwargs):
+        """Recompute the plain-text ``description_stripped`` from the HTML, then save."""
         # Strip the html tags using html parser
         self.description_stripped = (
             None

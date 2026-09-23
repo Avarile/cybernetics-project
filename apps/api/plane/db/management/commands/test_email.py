@@ -2,6 +2,13 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 # See the LICENSE file for details.
 
+"""Management command ``test_email``: verify the instance's SMTP configuration.
+
+Usage: ``python manage.py test_email <to_email>``. Loads email settings via
+``get_email_configuration`` (instance config / env) and sends the
+``emails/test_email.html`` template to the given address.
+"""
+
 from django.core.mail import EmailMultiAlternatives, get_connection
 from django.core.management import BaseCommand, CommandError
 from django.template.loader import render_to_string
@@ -12,13 +19,14 @@ from plane.license.utils.instance_value import get_email_configuration
 
 
 class Command(BaseCommand):
-    """Django command to pause execution until db is available"""
+    """Django command to send a test email using the configured SMTP settings"""
 
     def add_arguments(self, parser):
         # Positional argument
         parser.add_argument("to_email", type=str, help="receiver's email")
 
     def handle(self, *args, **options):
+        """Build an SMTP connection from instance settings and send the test email; errors are printed."""
         receiver_email = options.get("to_email")
 
         if not receiver_email:
@@ -34,6 +42,7 @@ class Command(BaseCommand):
             EMAIL_FROM,
         ) = get_email_configuration()
 
+        # TLS/SSL flags are stored as "1"/"0" strings in the instance configuration
         connection = get_connection(
             host=EMAIL_HOST,
             port=int(EMAIL_PORT),

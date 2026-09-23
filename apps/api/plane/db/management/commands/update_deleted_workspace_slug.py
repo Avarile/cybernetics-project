@@ -2,12 +2,21 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 # See the LICENSE file for details.
 
+"""Management command ``update_deleted_workspace_slug``: free up a soft-deleted workspace's slug.
+
+Usage: ``python manage.py update_deleted_workspace_slug <slug> [--dry-run]``.
+Renames the slug of a soft-deleted workspace to ``<slug>__<deleted_at epoch>``
+so the original slug can be reused by a new workspace.
+"""
+
 from django.core.management.base import BaseCommand
 from django.db import transaction
 from plane.db.models import Workspace
 
 
 class Command(BaseCommand):
+    """Append the deletion timestamp to a soft-deleted workspace's slug."""
+
     help = "Updates the slug of a soft-deleted workspace by appending the epoch timestamp"
 
     def add_arguments(self, parser):
@@ -23,11 +32,13 @@ class Command(BaseCommand):
         )
 
     def handle(self, *args, **options):
+        """Validate the workspace is soft-deleted and not already renamed, then update (or preview) the slug."""
         slug = options["slug"]
         dry_run = options["dry_run"]
 
         # Get the workspace with the specified slug
         try:
+            # all_objects includes soft-deleted rows (the default manager excludes them)
             workspace = Workspace.all_objects.get(slug=slug)
         except Workspace.DoesNotExist:
             self.stdout.write(self.style.ERROR(f"Workspace with slug '{slug}' not found."))

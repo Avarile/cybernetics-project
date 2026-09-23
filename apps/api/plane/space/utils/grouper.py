@@ -2,6 +2,13 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 # See the LICENSE file for details.
 
+"""Queryset helpers for grouped issue listings on published (space) boards.
+
+Used by the public project issues endpoint together with the grouped/sub-grouped
+paginators: annotate issues with id arrays, project them to the fields the board needs,
+and list the possible group values for a given ``group_by`` field.
+"""
+
 # Django imports
 from django.contrib.postgres.aggregates import ArrayAgg
 from django.contrib.postgres.fields import ArrayField
@@ -27,6 +34,11 @@ from plane.db.models import (
 def issue_queryset_grouper(
     queryset: QuerySet[Issue], group_by: Optional[str], sub_group_by: Optional[str]
 ) -> QuerySet[Issue]:
+    """Annotate issues with ``assignee_ids``, ``label_ids`` and ``module_ids`` UUID arrays.
+
+    When grouping by a many-to-many field, soft-deleted relation rows are filtered out first
+    so an issue is not placed in a group it was removed from.
+    """
     FIELD_MAPPER = {
         "label_ids": "labels__id",
         "assignee_ids": "assignees__id",
@@ -57,6 +69,8 @@ def issue_queryset_grouper(
             ~Q(issue_module__module_id__isnull=True),
         ),
     }
+    # ArrayAgg over active relation rows, defaulting to [] when there are none.
+    # Note: the ``or`` condition only skips a key when it matches both group_by and sub_group_by.
     default_annotations = {
         key: Coalesce(
             ArrayAgg(field, distinct=True, filter=condition),
@@ -72,6 +86,12 @@ def issue_queryset_grouper(
 def issue_on_results(
     issues: QuerySet[Issue], group_by: Optional[str], sub_group_by: Optional[str]
 ) -> List[Dict[str, Any]]:
+    """Project issues to the fields rendered on the board (as ``.values()`` dicts).
+
+    Adds ``vote_items`` and ``reaction_items`` JSON arrays (with actor details). When grouping
+    by a many-to-many field, the raw join column (e.g. ``labels__id``) is selected instead of
+    the corresponding ``*_ids`` array.
+    """
     FIELD_MAPPER = {
         "labels__id": "label_ids",
         "assignees__id": "assignee_ids",
@@ -120,6 +140,7 @@ def issue_on_results(
                             first_name=F("votes__actor__first_name"),
                             last_name=F("votes__actor__last_name"),
                             avatar=F("votes__actor__avatar"),
+                            # Uploaded avatars are served via the static asset endpoint; fall back to the legacy avatar URL.
                             avatar_url=Case(
                                 When(
                                     votes__actor__avatar_asset__isnull=False,
@@ -188,6 +209,12 @@ def issue_group_values(
     filters: Dict[str, Any] = {},
     queryset: Optional[QuerySet] = None,
 ) -> List[Union[str, Any]]:
+    """Return every possible value of ``field`` in the workspace (optionally a single project),
+    used to emit empty groups too.
+
+    Nullable relations include a ``"None"`` group. Date and ``created_by`` groups are taken
+    from the given ``queryset``; unknown fields yield [].
+    """
     if field == "state_id":
         queryset = State.objects.filter(is_triage=False, workspace__slug=slug).values_list("id", flat=True)
         if project_id:

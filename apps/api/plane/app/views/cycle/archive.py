@@ -2,6 +2,13 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 # See the LICENSE file for details.
 
+"""Archive / unarchive cycles and read archived cycles.
+
+Backs the project's "Archived cycles" views: list archived cycles with
+progress counters, fetch one archived cycle with its assignee/label
+distributions and burndown charts, archive a completed cycle and restore it.
+"""
+
 # Django imports
 from django.contrib.postgres.aggregates import ArrayAgg
 from django.contrib.postgres.fields import ArrayField
@@ -38,7 +45,15 @@ from .. import BaseAPIView
 
 
 class CycleArchiveUnarchiveEndpoint(BaseAPIView):
+    """List/detail archived cycles and archive (POST) or unarchive (DELETE) a cycle."""
+
     def get_queryset(self):
+        """Archived cycles of the project, annotated with progress data.
+
+        Restricted to projects where the user is an active member. Annotations
+        include favorite flag, per-state-group issue counts, computed ``status``
+        (CURRENT/UPCOMING/COMPLETED/DRAFT), assignee ids and estimate point sums.
+        """
         favorite_subquery = UserFavorite.objects.filter(
             user=self.request.user,
             entity_type="cycle",
@@ -46,6 +61,8 @@ class CycleArchiveUnarchiveEndpoint(BaseAPIView):
             project_id=self.kwargs.get("project_id"),
             workspace__slug=self.kwargs.get("slug"),
         )
+        # Estimate point subqueries: sum of point values per state group for the
+        # cycle's issues (only for "points" type estimates). Coalesced to 0 below.
         backlog_estimate_point = (
             Issue.issue_objects.filter(
                 estimate_point__estimate__type="points",
@@ -134,6 +151,7 @@ class CycleArchiveUnarchiveEndpoint(BaseAPIView):
                 )
             )
             .annotate(is_favorite=Exists(favorite_subquery))
+            # Issue counters exclude archived, draft and deleted work items.
             .annotate(
                 total_issues=Count(
                     "issue_cycle__issue__id",
@@ -205,6 +223,7 @@ class CycleArchiveUnarchiveEndpoint(BaseAPIView):
                     ),
                 )
             )
+            # Status is derived from the cycle dates relative to now.
             .annotate(
                 status=Case(
                     When(
@@ -270,6 +289,11 @@ class CycleArchiveUnarchiveEndpoint(BaseAPIView):
 
     @allow_permission([ROLE.ADMIN, ROLE.MEMBER])
     def get(self, request, slug, project_id, pk=None):
+        """Return all archived cycles, or one archived cycle (``pk``) with detailed stats.
+
+        The detail response adds sub-issue count, assignee/label distributions,
+        a burndown chart and, for point-based estimates, the same breakdowns in points.
+        """
         if pk is None:
             queryset = (
                 self.get_queryset().values(
@@ -355,6 +379,7 @@ class CycleArchiveUnarchiveEndpoint(BaseAPIView):
             )
             queryset = queryset.first()
 
+            # Point-based breakdowns only make sense when the project uses a "points" estimate.
             estimate_type = Project.objects.filter(
                 workspace__slug=slug,
                 pk=project_id,
@@ -585,6 +610,7 @@ class CycleArchiveUnarchiveEndpoint(BaseAPIView):
 
     @allow_permission([ROLE.ADMIN, ROLE.MEMBER])
     def post(self, request, slug, project_id, cycle_id):
+        """Archive a cycle; only allowed once it has ended. Also removes it from users' favorites."""
         cycle = Cycle.objects.get(pk=cycle_id, project_id=project_id, workspace__slug=slug)
 
         if cycle.end_date >= timezone.now():
@@ -605,6 +631,7 @@ class CycleArchiveUnarchiveEndpoint(BaseAPIView):
 
     @allow_permission([ROLE.ADMIN, ROLE.MEMBER])
     def delete(self, request, slug, project_id, cycle_id):
+        """Unarchive a cycle by clearing ``archived_at``."""
         cycle = Cycle.objects.get(pk=cycle_id, project_id=project_id, workspace__slug=slug)
         cycle.archived_at = None
         cycle.save()

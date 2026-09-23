@@ -2,6 +2,13 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 # See the LICENSE file for details.
 
+"""URL routes for file assets (uploads).
+
+Legacy endpoints (``file-assets``) and the V2 endpoints (``assets/v2/...``) for
+workspace, user and project assets, including restore, duplication, existence
+checks and downloads.
+"""
+
 from django.urls import path
 
 

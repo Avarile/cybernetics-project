@@ -2,6 +2,9 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 # See the LICENSE file for details.
 
+"""URL routes for workspace/project analytics: ad-hoc analytics, saved analytic views,
+CSV export, default dashboards, project stats and the "advance analytics" endpoints."""
+
 from django.urls import path
 
 

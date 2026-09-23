@@ -2,6 +2,11 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 # See the LICENSE file for details.
 
+"""Management command ``activate_user``: re-activate a user account by email.
+
+Usage: ``python manage.py activate_user <email>``. Sets ``User.is_active = True``.
+"""
+
 # Django imports
 from django.core.management import BaseCommand, CommandError
 
@@ -10,6 +15,8 @@ from plane.db.models import User
 
 
 class Command(BaseCommand):
+    """Mark the user with the given email as active."""
+
     help = "Make the user with the given email active"
 
     def add_arguments(self, parser):
@@ -17,6 +24,7 @@ class Command(BaseCommand):
         parser.add_argument("email", type=str, help="user email")
 
     def handle(self, *args, **options):
+        """Look up the user by email and activate it; raise CommandError if missing."""
         # get the user email from console
         email = options.get("email", False)
 

@@ -2,6 +2,13 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 # See the LICENSE file for details.
 
+"""
+Shared auth endpoints: CSRF token, CSRF failure page and password change/set.
+
+Routes: ``GET /auth/get-csrf-token/``, ``POST /auth/change-password/`` and
+``POST /auth/set-password/`` (the latter two require an authenticated user).
+"""
+
 # Django imports
 from django.shortcuts import render
 
@@ -26,9 +33,12 @@ from plane.authentication.utils.host import base_host
 
 
 class CSRFTokenEndpoint(APIView):
+    """Public endpoint returning a CSRF token so the frontends can POST the auth forms."""
+
     permission_classes = [AllowAny]
 
     def get(self, request):
+        """Return ``{"csrf_token": ...}`` (also sets the CSRF cookie)."""
         # Generate a CSRF token
         csrf_token = get_token(request)
         # Return the CSRF token in a JSON response
@@ -45,7 +55,13 @@ def csrf_failure(request, reason=""):
 
 
 class ChangePasswordEndpoint(APIView):
+    """Change the current user's password."""
+
     def post(self, request):
+        """Check the old password (unless it was auto-set), enforce strength (zxcvbn score >= 3), save and re-login.
+
+        Re-login keeps the session valid after the password hash changes.
+        """
         user = User.objects.get(pk=request.user.id)
 
         # If the user password is not autoset then we need to check the old passwords
@@ -97,8 +113,14 @@ class ChangePasswordEndpoint(APIView):
 
 
 class SetUserPasswordEndpoint(APIView):
+    """Set a first real password for users whose password was auto-generated (OAuth/magic-code sign-ups)."""
+
     @invalidate_cache("/api/users/me/")
     def post(self, request):
+        """Set the password if still auto-set and strong enough, re-login and return the serialized user.
+
+        Invalidates the cached ``/api/users/me/`` response.
+        """
         user = User.objects.get(pk=request.user.id)
         password = request.data.get("password", False)
 

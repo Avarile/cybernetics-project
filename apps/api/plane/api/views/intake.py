@@ -2,6 +2,13 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 # See the LICENSE file for details.
 
+"""Public API endpoints for intake (triage queue) work items (routes in plane/api/urls/intake.py).
+
+Intake work items are regular Issues in the project's TRIAGE state wrapped by an
+IntakeIssue row whose ``status`` is -2 Pending, -1 Rejected, 0 Snoozed,
+1 Accepted or 2 Duplicate. Project roles: 20 Admin, 15 Member, 5 Guest.
+"""
+
 # Python imports
 import json
 
@@ -62,6 +69,7 @@ class IntakeIssueListCreateAPIEndpoint(BaseAPIView):
     use_read_replica = True
 
     def get_queryset(self):
+        """Non-snoozed intake items of the project; empty if intake is missing or disabled."""
         intake = Intake.objects.filter(
             workspace__slug=self.kwargs.get("slug"),
             project_id=self.kwargs.get("project_id"),
@@ -74,6 +82,7 @@ class IntakeIssueListCreateAPIEndpoint(BaseAPIView):
 
         return (
             IntakeIssue.objects.filter(
+                # Hide items that are snoozed until a future date.
                 Q(snoozed_till__gte=timezone.now()) | Q(snoozed_till__isnull=True),
                 workspace__slug=self.kwargs.get("slug"),
                 project_id=self.kwargs.get("project_id"),
@@ -171,6 +180,7 @@ class IntakeIssueListCreateAPIEndpoint(BaseAPIView):
             return Response({"error": "Invalid priority"}, status=status.HTTP_400_BAD_REQUEST)
 
         # get the triage state
+        # Lazily create the project's TRIAGE state the first time it is needed.
         triage_state = State.triage_objects.filter(project_id=project_id, workspace__slug=slug).first()
 
         if not triage_state:
@@ -202,6 +212,8 @@ class IntakeIssueListCreateAPIEndpoint(BaseAPIView):
         )
 
         # create an intake issue
+        # NOTE: assumes an Intake row exists; the check above only rejects when it is
+        # missing *and* intake_view is disabled.
         intake_issue = IntakeIssue.objects.create(
             intake_id=intake.id,
             project_id=project_id,
@@ -236,6 +248,7 @@ class IntakeIssueDetailAPIEndpoint(BaseAPIView):
     filterset_fields = ["status"]
 
     def get_queryset(self):
+        """Non-snoozed intake items of the project; empty if intake is missing or disabled."""
         intake = Intake.objects.filter(
             workspace__slug=self.kwargs.get("slug"),
             project_id=self.kwargs.get("project_id"),
@@ -339,6 +352,7 @@ class IntakeIssueDetailAPIEndpoint(BaseAPIView):
         )
 
         # Only project members admins and created_by users can access this endpoint
+        # role <= 5 means Guest: guests may only edit intake items they created.
         if project_member.role <= 5 and str(intake_issue.created_by_id) != str(request.user.id):
             return Response(
                 {"error": "You cannot edit intake work items"},
@@ -352,6 +366,7 @@ class IntakeIssueDetailAPIEndpoint(BaseAPIView):
 
         # Validate issue data if provided
         if bool(issue_data):
+            # Load the work item with its current label/assignee ids for the activity snapshot.
             issue = Issue.objects.annotate(
                 label_ids=Coalesce(
                     ArrayAgg(
@@ -390,6 +405,7 @@ class IntakeIssueDetailAPIEndpoint(BaseAPIView):
                 return Response(issue_serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
         # Only project admins and members can edit intake issue attributes
+        # NOTE: role > 15 matches Admins (20) only, despite the comment above.
         if project_member.role > 15:
             intake_serializer = IntakeIssueUpdateSerializer(intake_issue, data=request.data, partial=True)
 
@@ -477,6 +493,8 @@ class IntakeIssueDetailAPIEndpoint(BaseAPIView):
         )
 
         # Check the issue status
+        # Pending, rejected, snoozed or duplicate items also delete their work item;
+        # accepted items (status 1) keep the work item in the project.
         if intake_issue.status in [-2, -1, 0, 2]:
             # Delete the issue also
             issue = Issue.objects.filter(workspace__slug=slug, project_id=project_id, pk=issue_id).first()

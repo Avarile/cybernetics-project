@@ -2,6 +2,13 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 # See the LICENSE file for details.
 
+"""Workspace models: the workspace itself, its members and invites, teams, themes, and
+per-user workspace preferences (view filters, home widgets, sidebar navigation, quick links).
+
+Most tables use soft delete (``deleted_at``); their uniqueness is enforced only among
+non-deleted rows via partial UniqueConstraints.
+"""
+
 # Python imports
 import pytz
 from typing import Optional, Any
@@ -16,10 +23,11 @@ from .base import BaseModel
 from plane.utils.constants import RESTRICTED_WORKSPACE_SLUGS
 from plane.utils.color import get_random_color
 
-ROLE_CHOICES = ((20, "Admin"), (15, "Member"), (5, "Guest"))
+ROLE_CHOICES = ((20, "Admin"), (15, "Member"), (5, "Guest"))  # role values used across workspace permissions
 
 
 def get_default_props():
+    """Default saved view settings (filters, display filters, display properties) for a workspace member."""
     return {
         "filters": {
             "priority": None,
@@ -60,6 +68,7 @@ def get_default_props():
 
 
 def get_default_filters():
+    """Default issue filters for WorkspaceUserProperties."""
     return {
         "priority": None,
         "state": None,
@@ -74,6 +83,7 @@ def get_default_filters():
 
 
 def get_default_display_filters():
+    """Default display filters (grouping, ordering, layout) for WorkspaceUserProperties."""
     return {
         "display_filters": {
             "group_by": None,
@@ -88,6 +98,7 @@ def get_default_display_filters():
 
 
 def get_default_display_properties():
+    """Default visible issue properties for WorkspaceUserProperties."""
     return {
         "display_properties": {
             "assignee": True,
@@ -108,15 +119,19 @@ def get_default_display_properties():
 
 
 def get_issue_props():
+    """Default issue-tab toggles for a workspace member."""
     return {"subscribed": True, "assigned": True, "created": True, "all_issues": True}
 
 
 def slug_validator(value):
+    """Reject reserved workspace slugs (e.g. ones clashing with app routes)."""
     if value in RESTRICTED_WORKSPACE_SLUGS:
         raise ValidationError("Slug is not valid")
 
 
 class Workspace(BaseModel):
+    """Top-level tenant: owns projects, members and settings. Addressed in URLs by its unique ``slug``."""
+
     TIMEZONE_CHOICES = tuple(zip(pytz.common_timezones, pytz.common_timezones))
 
     name = models.CharField(max_length=80, verbose_name="Workspace Name")
@@ -144,6 +159,7 @@ class Workspace(BaseModel):
 
     @property
     def logo_url(self):
+        """URL of the uploaded logo asset, else the legacy ``logo`` URL, else None."""
         # Return the logo asset url if it exists
         if self.logo_asset:
             return self.logo_asset.asset_url
@@ -183,6 +199,11 @@ class Workspace(BaseModel):
 
 
 class WorkspaceBaseModel(BaseModel):
+    """Abstract base for rows scoped to a workspace and optionally a project.
+
+    On save, ``workspace`` is always derived from ``project`` when a project is set.
+    """
+
     workspace = models.ForeignKey("db.Workspace", models.CASCADE, related_name="workspace_%(class)s")
     project = models.ForeignKey("db.Project", models.CASCADE, related_name="project_%(class)s", null=True)
 
@@ -190,12 +211,19 @@ class WorkspaceBaseModel(BaseModel):
         abstract = True
 
     def save(self, *args, **kwargs):
+        """Sync ``workspace`` from ``project`` before saving."""
         if self.project:
             self.workspace = self.project.workspace
         super(WorkspaceBaseModel, self).save(*args, **kwargs)
 
 
 class WorkspaceMember(BaseModel):
+    """Membership of a user in a workspace with a role (20 admin, 15 member, 5 guest).
+
+    Also stores the member's per-workspace UI state (view props, onboarding checklist, tips).
+    Deactivated members keep their row with ``is_active=False``.
+    """
+
     workspace = models.ForeignKey("db.Workspace", on_delete=models.CASCADE, related_name="workspace_member")
     member = models.ForeignKey(
         settings.AUTH_USER_MODEL,
@@ -232,6 +260,8 @@ class WorkspaceMember(BaseModel):
 
 
 class WorkspaceMemberInvite(BaseModel):
+    """Pending/answered email invitation to join a workspace with a given role."""
+
     workspace = models.ForeignKey("db.Workspace", on_delete=models.CASCADE, related_name="workspace_member_invite")
     email = models.CharField(max_length=255)
     accepted = models.BooleanField(default=False)
@@ -259,6 +289,8 @@ class WorkspaceMemberInvite(BaseModel):
 
 
 class Team(BaseModel):
+    """Named group of users within a workspace."""
+
     name = models.CharField(max_length=255, verbose_name="Team Name")
     description = models.TextField(verbose_name="Team Description", blank=True)
     workspace = models.ForeignKey(Workspace, on_delete=models.CASCADE, related_name="workspace_team")
@@ -284,6 +316,8 @@ class Team(BaseModel):
 
 
 class WorkspaceTheme(BaseModel):
+    """Custom color theme saved by a user in a workspace."""
+
     workspace = models.ForeignKey("db.Workspace", on_delete=models.CASCADE, related_name="themes")
     name = models.CharField(max_length=300)
     actor = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="themes")
@@ -308,6 +342,8 @@ class WorkspaceTheme(BaseModel):
 
 
 class WorkspaceUserProperties(BaseModel):
+    """A user's workspace-level issue view settings and sidebar navigation preferences."""
+
     class NavigationControlPreference(models.TextChoices):
         ACCORDION = "ACCORDION", "Accordion"
         TABBED = "TABBED", "Tabbed"
@@ -352,6 +388,8 @@ class WorkspaceUserProperties(BaseModel):
 
 
 class WorkspaceUserLink(WorkspaceBaseModel):
+    """Quick link saved by a user on the workspace home page."""
+
     title = models.CharField(max_length=255, null=True, blank=True)
     url = models.TextField()
     metadata = models.JSONField(default=dict)

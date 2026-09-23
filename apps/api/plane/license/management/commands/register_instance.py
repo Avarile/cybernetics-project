@@ -2,6 +2,12 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 # See the LICENSE file for details.
 
+"""``manage.py register_instance <machine_signature>``: create or refresh the Instance record.
+
+Run at start-up. Creates the singleton Instance on first boot and, on every run, updates
+version information, then triggers a telemetry push.
+"""
+
 # Python imports
 import json
 import secrets
@@ -19,6 +25,8 @@ from plane.license.bgtasks.telemetry_metrics import push_instance_metrics
 
 
 class Command(BaseCommand):
+    """Register this deployment as an Instance, or update the existing one."""
+
     help = "Check if instance in registered else register"
 
     def add_arguments(self, parser):
@@ -26,6 +34,7 @@ class Command(BaseCommand):
         parser.add_argument("machine_signature", type=str, help="Machine signature")
 
     def check_for_current_version(self):
+        """Return the running version from ``APP_VERSION`` or ``package.json`` (fallback ``v0.1.0``)."""
         if os.environ.get("APP_VERSION", False):
             return os.environ.get("APP_VERSION")
 
@@ -38,6 +47,7 @@ class Command(BaseCommand):
             return "v0.1.0"
 
     def check_for_latest_version(self, fallback_version):
+        """Return the latest Plane release tag from GitHub, or ``fallback_version`` on any error."""
         try:
             response = requests.get(
                 "https://api.github.com/repos/makeplane/plane/releases/latest",
@@ -51,6 +61,9 @@ class Command(BaseCommand):
             return fallback_version
 
     def handle(self, *args, **options):
+        """Create the Instance (random ``instance_id``, community edition) if missing, else refresh its
+        version/edition/test fields. Queues ``push_instance_metrics`` in both cases.
+        """
         # Check if the instance is registered
         instance = Instance.objects.first()
 

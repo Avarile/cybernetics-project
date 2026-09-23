@@ -2,3 +2,4 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 # See the LICENSE file for details.
 
+"""OAuth providers (Google, GitHub, GitLab, Gitea) built on ``OauthAdapter``."""

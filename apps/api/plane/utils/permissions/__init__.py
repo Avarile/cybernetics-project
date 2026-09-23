@@ -2,6 +2,14 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 # See the LICENSE file for details.
 
+"""
+DRF permission classes and helpers used by API views.
+
+Re-exports the workspace-, project- and page-level permission classes plus the
+``allow_permission`` decorator and ``ROLE`` enum so views can import them from
+``plane.utils.permissions`` directly.
+"""
+
 from .workspace import (
     WorkSpaceBasePermission,
     WorkspaceOwnerPermission,

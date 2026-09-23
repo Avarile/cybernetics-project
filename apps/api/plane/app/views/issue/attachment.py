@@ -2,6 +2,15 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 # See the LICENSE file for details.
 
+"""Work item attachment endpoints.
+
+``IssueAttachmentEndpoint`` is the legacy multipart upload flow (file goes
+through the API server). ``IssueAttachmentV2Endpoint`` uses presigned S3
+uploads: POST creates the ``FileAsset`` and returns upload data, the client
+uploads directly, then PATCH marks it uploaded. Attachment changes are logged
+as issue activity.
+"""
+
 # Python imports
 import json
 import uuid
@@ -30,12 +39,15 @@ from plane.utils.host import base_host
 
 
 class IssueAttachmentEndpoint(BaseAPIView):
+    """Legacy multipart upload, list and hard delete of work item attachments."""
+
     serializer_class = IssueAttachmentSerializer
     model = FileAsset
     parser_classes = (MultiPartParser, FormParser)
 
     @allow_permission([ROLE.ADMIN, ROLE.MEMBER, ROLE.GUEST])
     def post(self, request, slug, project_id, issue_id):
+        """Upload an attachment via multipart form data and log an ``attachment.activity.created`` activity."""
         serializer = IssueAttachmentSerializer(data=request.data)
         workspace = Workspace.objects.get(slug=slug)
         if serializer.is_valid():
@@ -61,6 +73,7 @@ class IssueAttachmentEndpoint(BaseAPIView):
 
     @allow_permission([ROLE.ADMIN], creator=True, model=FileAsset)
     def delete(self, request, slug, project_id, issue_id, pk):
+        """Delete the attachment and its stored file (project admin or uploader only)."""
         issue_attachment = FileAsset.objects.filter(
             pk=pk, workspace__slug=slug, project_id=project_id, issue_id=issue_id
         ).first()
@@ -87,17 +100,25 @@ class IssueAttachmentEndpoint(BaseAPIView):
 
     @allow_permission([ROLE.ADMIN, ROLE.MEMBER, ROLE.GUEST])
     def get(self, request, slug, project_id, issue_id):
+        """List all file assets linked to the work item."""
         issue_attachments = FileAsset.objects.filter(issue_id=issue_id, workspace__slug=slug, project_id=project_id)
         serializer = IssueAttachmentSerializer(issue_attachments, many=True)
         return Response(serializer.data, status=status.HTTP_200_OK)
 
 
 class IssueAttachmentV2Endpoint(BaseAPIView):
+    """Presigned-upload based attachment API (current flow)."""
+
     serializer_class = IssueAttachmentSerializer
     model = FileAsset
 
     @allow_permission([ROLE.ADMIN, ROLE.MEMBER, ROLE.GUEST])
     def post(self, request, slug, project_id, issue_id):
+        """Create an attachment record and return a presigned POST for direct upload.
+
+        ``type`` must be in ``settings.ATTACHMENT_MIME_TYPES``; size is capped at
+        ``FILE_SIZE_LIMIT``. The asset is not visible in listings until PATCHed as uploaded.
+        """
         name = sanitize_filename(request.data.get("name")) or "unnamed"
         type = request.data.get("type", False)
         size = int(request.data.get("size", settings.FILE_SIZE_LIMIT))
@@ -148,6 +169,7 @@ class IssueAttachmentV2Endpoint(BaseAPIView):
 
     @allow_permission([ROLE.ADMIN], creator=True, model=FileAsset)
     def delete(self, request, slug, project_id, issue_id, pk):
+        """Soft-delete an attachment (project admin or uploader) and log the activity."""
         issue_attachment = FileAsset.objects.get(
             pk=pk, workspace__slug=slug, project_id=project_id, issue_id=issue_id
         )
@@ -171,6 +193,7 @@ class IssueAttachmentV2Endpoint(BaseAPIView):
 
     @allow_permission([ROLE.ADMIN, ROLE.MEMBER, ROLE.GUEST])
     def get(self, request, slug, project_id, issue_id, pk=None):
+        """Redirect to a presigned download for one attachment (``pk``), or list uploaded attachments."""
         if pk:
             # Get the asset
             asset = FileAsset.objects.get(id=pk, workspace__slug=slug, project_id=project_id, issue_id=issue_id)
@@ -204,6 +227,10 @@ class IssueAttachmentV2Endpoint(BaseAPIView):
 
     @allow_permission([ROLE.ADMIN, ROLE.MEMBER, ROLE.GUEST])
     def patch(self, request, slug, project_id, issue_id, pk):
+        """Confirm an upload finished: mark it uploaded (logging the activity the first time).
+
+        Storage metadata is fetched asynchronously if missing.
+        """
         issue_attachment = FileAsset.objects.get(
             pk=pk, workspace__slug=slug, project_id=project_id, issue_id=issue_id
         )

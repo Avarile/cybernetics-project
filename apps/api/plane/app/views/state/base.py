@@ -2,6 +2,14 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 # See the LICENSE file for details.
 
+"""Project workflow state views.
+
+``StateViewSet`` handles CRUD for a project's issue states (Backlog, Todo, In
+Progress, ...), excluding the hidden triage state used by Intake.
+``IntakeStateEndpoint`` returns that triage state. Mutations invalidate the
+cached workspace-level state list (``workspaces/:slug/states/``).
+"""
+
 # Python imports
 from itertools import groupby
 from collections import defaultdict
@@ -22,10 +30,13 @@ from plane.utils.cache import invalidate_cache
 
 
 class StateViewSet(BaseViewSet):
+    """CRUD for the (non-triage) workflow states of a project."""
+
     serializer_class = StateSerializer
     model = State
 
     def get_queryset(self):
+        """Return non-triage states of the project, restricted to active members of a non-archived project."""
         return self.filter_queryset(
             super()
             .get_queryset()
@@ -45,6 +56,7 @@ class StateViewSet(BaseViewSet):
     @invalidate_cache(path="workspaces/:slug/states/", url_params=True, user=False)
     @allow_permission([ROLE.ADMIN])
     def create(self, request, slug, project_id):
+        """Create a state in the project (admin only); duplicate names return 400."""
         try:
             serializer = StateSerializer(data=request.data)
             if serializer.is_valid():
@@ -60,6 +72,7 @@ class StateViewSet(BaseViewSet):
 
     @allow_permission([ROLE.ADMIN, ROLE.MEMBER, ROLE.GUEST])
     def partial_update(self, request, slug, project_id, pk):
+        """Partially update a state; duplicate names return 400."""
         try:
             state = State.objects.get(pk=pk, project_id=project_id, workspace__slug=slug)
             serializer = StateSerializer(state, data=request.data, partial=True)
@@ -76,8 +89,14 @@ class StateViewSet(BaseViewSet):
 
     @allow_permission([ROLE.ADMIN, ROLE.MEMBER, ROLE.GUEST])
     def list(self, request, slug, project_id):
+        """List project states with a computed ``order`` within each group.
+
+        Pass ``?grouped=true`` to get a dict keyed by state group instead of a flat list.
+        """
         states = StateSerializer(self.get_queryset(), many=True).data
 
+        # Assign each state a fractional order (index / group size) within its group,
+        # so ordering is in (0, 1] regardless of how many states a group has
         grouped_states = defaultdict(list)
         for state in states:
             grouped_states[state["group"]].append(state)
@@ -104,6 +123,7 @@ class StateViewSet(BaseViewSet):
     @invalidate_cache(path="workspaces/:slug/states/", url_params=True, user=False)
     @allow_permission([ROLE.ADMIN])
     def mark_as_default(self, request, slug, project_id, pk):
+        """Make the given state the project's default (admin only), unsetting any previous default."""
         # Select all the states which are marked as default
         _ = State.objects.filter(workspace__slug=slug, project_id=project_id, default=True).update(default=False)
         _ = State.objects.filter(workspace__slug=slug, project_id=project_id, pk=pk).update(default=True)
@@ -112,6 +132,10 @@ class StateViewSet(BaseViewSet):
     @invalidate_cache(path="workspaces/:slug/states/", url_params=True, user=False)
     @allow_permission([ROLE.ADMIN])
     def destroy(self, request, slug, project_id, pk):
+        """Delete a state (admin only).
+
+        The default state and states that still have issues cannot be deleted.
+        """
         state = State.objects.get(is_triage=False, pk=pk, project_id=project_id, workspace__slug=slug)
 
         if state.default:
@@ -134,8 +158,12 @@ class StateViewSet(BaseViewSet):
 
 
 class IntakeStateEndpoint(BaseAPIView):
+    """Expose the project's hidden triage state used by Intake."""
+
     @allow_permission([ROLE.ADMIN, ROLE.MEMBER, ROLE.GUEST])
     def get(self, request, slug, project_id):
+        """Return the triage state of the project, or 404 if it does not exist."""
+        # triage_objects is a manager that only returns is_triage=True states
         state = State.triage_objects.filter(workspace__slug=slug, project_id=project_id).first()
         if not state:
             return Response(

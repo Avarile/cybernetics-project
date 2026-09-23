@@ -2,6 +2,8 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 # See the LICENSE file for details.
 
+"""Serializer for workspace stickies (personal quick notes) in the public API."""
+
 from rest_framework import serializers
 
 from .base import BaseSerializer
@@ -10,6 +12,7 @@ from plane.utils.content_validator import validate_html_content, validate_binary
 
 
 class StickySerializer(BaseSerializer):
+    """Serializer for a Sticky note; workspace and owner are set by the view."""
     class Meta:
         model = Sticky
         fields = "__all__"
@@ -17,6 +20,7 @@ class StickySerializer(BaseSerializer):
         extra_kwargs = {"name": {"required": False}}
 
     def validate(self, data):
+        """Sanitize description HTML and validate the binary (collaborative editor) payload."""
         # Validate description content for security
         if "description_html" in data and data["description_html"]:
             is_valid, error_msg, sanitized_html = validate_html_content(data["description_html"])

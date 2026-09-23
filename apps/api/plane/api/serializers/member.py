@@ -2,6 +2,8 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 # See the LICENSE file for details.
 
+"""Serializer for project membership (add/update project members) in the public API."""
+
 # Third party imports
 from rest_framework import serializers
 
@@ -23,6 +25,7 @@ class ProjectMemberSerializer(BaseSerializer):
     )
 
     def validate_member(self, value):
+        """Require a workspace ``slug`` in context and that the user is a member of that workspace."""
         slug = self.context.get("slug")
         if not slug:
             raise serializers.ValidationError("Slug is required", code="INVALID_SLUG")
@@ -33,6 +36,7 @@ class ProjectMemberSerializer(BaseSerializer):
         return value
 
     def validate_role(self, value):
+        """Only Admin, Member and Guest roles are accepted."""
         if value not in [ROLE.ADMIN.value, ROLE.MEMBER.value, ROLE.GUEST.value]:
             raise serializers.ValidationError("Invalid role", code="INVALID_ROLE")
         return value

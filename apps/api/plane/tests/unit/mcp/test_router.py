@@ -2,6 +2,12 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 # See the LICENSE file for details.
 
+"""Unit tests for ``plane.mcp.asgi``: ``MCPRouter`` and ``with_mcp``.
+
+The router sits in front of the Django ASGI app, sends POSTs to the MCP path to the MCP
+server, everything else to Django, and ties the MCP session manager to the ASGI lifespan.
+"""
+
 from contextlib import asynccontextmanager
 from types import SimpleNamespace
 
@@ -11,6 +17,7 @@ from plane.mcp.asgi import MCPRouter, with_mcp
 
 
 def recording_app(name, seen):
+    """Return an ASGI app that records ``(name, path)`` into ``seen`` and sends nothing."""
     async def app(scope, receive, send):
         seen.append((name, scope["path"]))
 
@@ -18,6 +25,7 @@ def recording_app(name, seen):
 
 
 def make_router(seen, events=None):
+    """Build an ``MCPRouter`` with recording apps and a fake server/client that log lifecycle ``events``."""
     @asynccontextmanager
     async def run():
         events.append("started")
@@ -42,6 +50,8 @@ async def noop_send(message):
 
 @pytest.mark.unit
 class TestMCPRouter:
+    """Path/method dispatch and lifespan handling of ``MCPRouter``."""
+
     @pytest.mark.anyio
     @pytest.mark.parametrize(
         "path, expected",
@@ -54,6 +64,7 @@ class TestMCPRouter:
         ],
     )
     async def test_http_dispatch(self, path, expected):
+        """Only the exact MCP path (with or without trailing slash) goes to the MCP app."""
         seen = []
         router = make_router(seen, [])
 
@@ -64,6 +75,7 @@ class TestMCPRouter:
     @pytest.mark.anyio
     @pytest.mark.parametrize("method", ["GET", "DELETE", "PUT", "OPTIONS"])
     async def test_non_post_is_rejected_without_reaching_the_mcp_app(self, method):
+        """Non-POST requests to the MCP path get 405 with ``Allow: POST``."""
         seen, sent = [], []
         router = make_router(seen, [])
 
@@ -87,6 +99,7 @@ class TestMCPRouter:
 
     @pytest.mark.anyio
     async def test_lifespan_starts_and_stops_session_manager(self):
+        """Startup enters the session manager; shutdown exits it and closes the loopback client."""
         events, sent = [], []
         router = make_router([], events)
         messages = iter([{"type": "lifespan.startup"}, {"type": "lifespan.shutdown"}])
@@ -103,6 +116,7 @@ class TestMCPRouter:
         assert events == ["started", "stopped", "client closed"]
 
     def test_disabled_returns_inner_app_unchanged(self, settings):
+        """With ``MCP_SERVER_ENABLED`` off, ``with_mcp`` is a no-op wrapper."""
         settings.MCP_SERVER_ENABLED = False
         inner = object()
 

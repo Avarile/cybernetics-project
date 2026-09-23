@@ -2,6 +2,13 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 # See the LICENSE file for details.
 
+"""URL routes for the Cybernetics Data integration of a project.
+
+- configuration and connection test of the external data service,
+- read-only proxy endpoints to browse its databases, tables, schemas and records,
+- attaching/refreshing/removing external records on a work item.
+"""
+
 from django.urls import path
 
 from plane.app.views import (
@@ -15,6 +22,7 @@ from plane.app.views import (
     ProjectCyberneticsDataTestEndpoint,
 )
 
+# Common prefix for all project-scoped routes in this module
 _PROJECT = "workspaces/<str:slug>/projects/<uuid:project_id>"
 
 urlpatterns = [

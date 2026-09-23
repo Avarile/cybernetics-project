@@ -2,7 +2,11 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 # See the LICENSE file for details.
 
-"""Production settings"""
+"""Production settings
+
+Adds proxy-aware HTTPS detection, Scout APM and production logging (JSON to console, plus
+a size/time-rotated file for exceptions) on top of ``common.py``.
+"""
 
 import os
 

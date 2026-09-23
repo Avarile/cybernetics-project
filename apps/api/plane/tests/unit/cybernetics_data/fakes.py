@@ -28,6 +28,11 @@ class DictCache:
 
 
 class FakeResponse:
+    """Minimal ``requests.Response`` double supporting streamed reads via ``iter_content``.
+
+    ``raw`` (bytes) takes precedence over ``body``, which is JSON-encoded.
+    """
+
     def __init__(self, status_code=200, body=None, raw=None):
         self.status_code = status_code
         self._content = raw if raw is not None else json.dumps(body).encode()
@@ -38,10 +43,12 @@ class FakeResponse:
             yield self._content[start : start + chunk_size]
 
     def close(self):
+        # Tests assert on ``closed`` to check the client releases streamed connections.
         self.closed = True
 
 
 def _record(record_id, name, fields):
+    """Build a Teable record payload in the shape the records API returns."""
     return {"id": record_id, "name": name, "fields": fields, "autoNumber": 1, "createdTime": "2026-01-01T00:00:00Z"}
 
 
@@ -95,13 +102,16 @@ class FakeTeable:
 
     # ------------------------------------------------------------------ helpers
     def paths(self):
+        """Return the API paths of all recorded calls, in call order."""
         return [call["path"] for call in self.calls]
 
     def calls_to(self, path):
+        """Return the recorded calls whose path equals ``path``."""
         return [call for call in self.calls if call["path"] == path]
 
     # ------------------------------------------------------------------ routing
     def _route(self, path, query):
+        """Dispatch ``path`` to a canned payload; an ``int`` return means an HTTP error status."""
         routes = [
             (r"/space", lambda: self.spaces),
             (r"/base/access/all", lambda: list(self.bases.values())),
@@ -114,6 +124,7 @@ class FakeTeable:
             (r"/table/(?P<table>[^/]+)/aggregation/row-count", lambda table: self._row_count(table)),
             (r"/table/(?P<table>[^/]+)/record/(?P<record>[^/]+)", self._get_record),
         ]
+        # fullmatch ensures e.g. "/base/x/table" is not swallowed by the "/base/<base>" route.
         for pattern, handler in routes:
             match = re.fullmatch(pattern, path)
             if match:
@@ -124,6 +135,7 @@ class FakeTeable:
         return next((t for t in self.tables.get(base, []) if t["id"] == table), 404)
 
     def _list_records(self, table, query):
+        """Emulate Teable's ``take``/``skip`` pagination over the table's records."""
         if table not in self.records:
             return 404
         params = dict(query)
@@ -141,6 +153,7 @@ class FakeTeable:
 
     # ----------------------------------------------------------- pinned_fetch
     def __call__(self, method, url, *, allowed_ips=None, allowed_hosts=None, headers=None, timeout=None, **kwargs):
+        """Mimic ``pinned_fetch``: record the call, apply injected ``errors``, then route."""
         parts = urlsplit(url)
         assert parts.path.startswith("/api/"), url
         path = parts.path[len("/api") :]

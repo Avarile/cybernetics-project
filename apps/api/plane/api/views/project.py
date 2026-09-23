@@ -2,6 +2,14 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 # See the LICENSE file for details.
 
+"""Public API (``plane.api``) endpoints for projects.
+
+Covers project list/create, retrieve/update/delete, archive/unarchive and a
+lightweight per-project summary of entity counts. Project creation seeds the
+default workflow states and admin membership; mutations emit webhook events
+through Celery tasks (``model_activity`` / ``webhook_activity``).
+"""
+
 # Python imports
 import json
 
@@ -81,6 +89,12 @@ class ProjectListCreateAPIEndpoint(BaseAPIView):
     use_read_replica = True
 
     def get_queryset(self):
+        """Projects visible to the user in the workspace, with member/cycle/module counts.
+
+        A project is visible if the user is an active member or the project is
+        public (``network=2``). Also annotates ``is_member``, the user's
+        ``member_role`` and ``is_deployed`` (has a DeployBoard).
+        """
         return (
             Project.objects.filter(workspace__slug=self.kwargs.get("slug"))
             .filter(
@@ -167,6 +181,7 @@ class ProjectListCreateAPIEndpoint(BaseAPIView):
         Retrieve all projects in a workspace or get details of a specific project.
         Returns projects ordered by user's custom sort order with member information.
         """
+        # The user's per-project sort_order from their ProjectMember row (drives default ordering)
         sort_order_query = ProjectMember.objects.filter(
             member=request.user,
             project_id=OuterRef("pk"),
@@ -221,6 +236,7 @@ class ProjectListCreateAPIEndpoint(BaseAPIView):
         try:
             workspace = Workspace.objects.get(slug=slug)
 
+            # Spread request.data into a plain dict so the serializer receives a mutable copy
             serializer = ProjectCreateSerializer(data={**request.data}, context={"workspace_id": workspace.id})
 
             if serializer.is_valid():
@@ -245,6 +261,7 @@ class ProjectListCreateAPIEndpoint(BaseAPIView):
                             role=20,
                         )
 
+                    # Seed the project with the default workflow states (DEFAULT_STATES)
                     State.objects.bulk_create(
                         [
                             State(
@@ -341,6 +358,7 @@ class ProjectDetailAPIEndpoint(BaseAPIView):
     use_read_replica = True
 
     def get_queryset(self):
+        """Same visibility rules and annotations as ProjectListCreateAPIEndpoint.get_queryset."""
         return (
             Project.objects.filter(workspace__slug=self.kwargs.get("slug"))
             .filter(
@@ -457,6 +475,7 @@ class ProjectDetailAPIEndpoint(BaseAPIView):
             project = Project.objects.get(pk=pk)
             current_instance = json.dumps(ProjectSerializer(project).data, cls=DjangoJSONEncoder)
 
+            # Preserve the current intake_view unless the client explicitly changes it
             intake_view = request.data.get("intake_view", project.intake_view)
 
             if project.archived_at:
@@ -474,6 +493,7 @@ class ProjectDetailAPIEndpoint(BaseAPIView):
 
             if serializer.is_valid():
                 serializer.save()
+                # Enabling intake ensures the project has a default Intake to collect requests into
                 if serializer.data["intake_view"]:
                     intake = Intake.objects.filter(project=project, is_default=True).first()
                     if not intake:
@@ -499,6 +519,7 @@ class ProjectDetailAPIEndpoint(BaseAPIView):
                 return Response(serializer.data, status=status.HTTP_200_OK)
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
         except IntegrityError as e:
+            # Other IntegrityErrors fall through and the method returns None
             if "already exists" in str(e):
                 return Response(
                     {"name": "The project name is already taken"},
@@ -529,6 +550,7 @@ class ProjectDetailAPIEndpoint(BaseAPIView):
         Permanently remove a project and all its associated data from the workspace.
         Only admins can delete projects and the action cannot be undone.
         """
+        # Delete the project, then dispatch a "deleted" webhook with its id
         project = Project.objects.get(pk=pk, workspace__slug=slug)
         # Delete the user favorite cycle
         UserFavorite.objects.filter(entity_type="project", entity_identifier=pk, project_id=pk).delete()
@@ -575,6 +597,7 @@ class ProjectArchiveUnarchiveAPIEndpoint(BaseAPIView):
         project = Project.objects.get(pk=project_id, workspace__slug=slug)
         project.archived_at = timezone.now()
         project.save()
+        # Archived projects are removed from all users' favorites in this workspace
         UserFavorite.objects.filter(workspace__slug=slug, project=project_id).delete()
         return Response(status=status.HTTP_204_NO_CONTENT)
 
@@ -602,6 +625,7 @@ class ProjectArchiveUnarchiveAPIEndpoint(BaseAPIView):
         return Response(status=status.HTTP_204_NO_CONTENT)
 
 
+# Entity counts that can be requested via ``?fields=`` on ProjectSummaryAPIEndpoint
 ALLOWED_PROJECT_SUMMARY_FIELDS = [
     "members",
     "states",
@@ -615,6 +639,8 @@ ALLOWED_PROJECT_SUMMARY_FIELDS = [
 
 
 class ProjectSummaryAPIEndpoint(BaseAPIView):
+    """Return a project's id, name, identifier and selected entity counts (workspace admin/member only)."""
+
     permission_classes = [WorkSpaceAdminPermission]
     use_read_replica = True
 
@@ -626,6 +652,7 @@ class ProjectSummaryAPIEndpoint(BaseAPIView):
         project = Project.objects.filter(pk=project_id, workspace__slug=slug).first()
         if not project:
             return Response({"error": "Project not found"}, status=status.HTTP_404_NOT_FOUND)
+        # ``?fields=members,states,...`` limits the counts; unknown fields are ignored, empty means all
         fields = request.GET.get("fields", "").split(",")
         requested_fields = set(filter(None, (f.strip() for f in fields))) & set(ALLOWED_PROJECT_SUMMARY_FIELDS)
         if not requested_fields:
@@ -683,6 +710,7 @@ class ProjectSummaryAPIEndpoint(BaseAPIView):
             ),
             "issues": lambda: (
                 Issue.objects.filter(project_id=OuterRef("pk"))
+                # Triage issues (intake) are not counted as project work items
                 .exclude(state__group=StateGroup.TRIAGE.value)
                 .values("project_id")
                 .annotate(count=Count("*"))

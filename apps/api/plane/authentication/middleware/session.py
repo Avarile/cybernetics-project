@@ -2,6 +2,14 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 # See the LICENSE file for details.
 
+"""
+Custom session middleware replacing Django's ``SessionMiddleware``.
+
+Requests under the instance-admin ("instances") paths use a separate admin
+session cookie (``ADMIN_SESSION_COOKIE_NAME``/``ADMIN_SESSION_COOKIE_AGE``) so
+god-mode admin sessions are independent from regular app sessions.
+"""
+
 import time
 from importlib import import_module
 
@@ -14,12 +22,15 @@ from django.utils.http import http_date
 
 
 class SessionMiddleware(MiddlewareMixin):
+    """Session middleware that picks the admin or regular session cookie based on the request path."""
+
     def __init__(self, get_response):
         super().__init__(get_response)
         engine = import_module(settings.SESSION_ENGINE)
         self.SessionStore = engine.SessionStore
 
     def process_request(self, request):
+        """Load the session from the admin cookie for instance-admin paths, otherwise from the normal cookie."""
         if "instances" in request.path:
             session_key = request.COOKIES.get(settings.ADMIN_SESSION_COOKIE_NAME)
         else:

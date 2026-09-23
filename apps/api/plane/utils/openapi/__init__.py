@@ -11,6 +11,9 @@ This module provides reusable components for API documentation:
 - Helper decorators
 - Schema preprocessing hooks
 - Examples
+
+Everything is re-exported here so the public API views (``plane/api``) can
+import documentation building blocks from ``plane.utils.openapi`` directly.
 """
 
 # Authentication extensions

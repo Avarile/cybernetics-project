@@ -2,11 +2,15 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 # See the LICENSE file for details.
 
+"""Serializer for uploaded file assets (``FileAsset``)."""
+
 from .base import BaseSerializer
 from plane.db.models import FileAsset
 
 
 class FileAssetSerializer(BaseSerializer):
+    """Full FileAsset serializer with audit fields read-only."""
+
     class Meta:
         model = FileAsset
         fields = "__all__"

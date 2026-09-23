@@ -2,6 +2,15 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 # See the LICENSE file for details.
 
+"""
+URL routes for authentication (mounted under ``/auth/``).
+
+Each flow has an app variant and a ``spaces/`` variant for the public space
+frontend: email/password sign-in/up, magic code, Google/GitHub/GitLab/Gitea
+OAuth (initiate + callback), email check, sign-out, CSRF token and password
+management (forgot/reset/change/set).
+"""
+
 from django.urls import path
 
 from .views import (

@@ -7,6 +7,11 @@ Helper decorators for drf-spectacular OpenAPI documentation.
 
 This module provides domain-specific decorators that apply common
 parameters, responses, and tags to API endpoints based on their context.
+
+Used on the public API v1 views in ``plane.api.views``. Each ``*_docs``
+decorator wraps ``extend_schema`` with a tag, the standard path parameters
+(workspace slug and, for project-scoped resources, project id) and common
+error responses; any kwargs passed are merged on top of these defaults.
 """
 
 from drf_spectacular.utils import extend_schema
@@ -15,7 +20,11 @@ from .responses import UNAUTHORIZED_RESPONSE, FORBIDDEN_RESPONSE, NOT_FOUND_RESP
 
 
 def _merge_schema_options(defaults, kwargs):
-    """Helper function to merge responses and parameters from kwargs into defaults"""
+    """Helper function to merge responses and parameters from kwargs into defaults
+
+    ``responses`` are dict-merged and ``parameters`` appended (rather than
+    replaced); all other kwargs override the defaults. Mutates ``defaults``.
+    """
     # Merge responses
     if "responses" in kwargs:
         defaults["responses"].update(kwargs["responses"])

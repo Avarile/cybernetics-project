@@ -2,6 +2,15 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 # See the LICENSE file for details.
 
+"""
+Contract tests for the public Cycle API.
+
+Covers ``/api/v1/workspaces/<slug>/projects/<project_id>/cycles/`` (list/create,
+including ``cycle_view`` filtering) and the ``.../cycles/<cycle_id>/`` detail
+endpoint (retrieve/update/delete, external-id conflicts, issue-count annotations).
+All requests are made with an API key client.
+"""
+
 import pytest
 from rest_framework import status
 from django.utils import timezone
@@ -19,7 +28,7 @@ def project(db, workspace, create_user):
         identifier="TP",
         workspace=workspace,
         created_by=create_user,
-        cycle_view=True,
+        cycle_view=True,  # Cycles feature must be enabled on the project for the endpoints to be usable
     )
     ProjectMember.objects.create(
         project=project,
@@ -229,7 +238,7 @@ class TestCycleListCreateAPIEndpoint:
             owned_by=create_user,
         )
 
-        # Draft cycle
+        # Draft cycle (no start/end dates)
         Cycle.objects.create(
             name="Draft Cycle",
             project=project,
@@ -237,7 +246,8 @@ class TestCycleListCreateAPIEndpoint:
             owned_by=create_user,
         )
 
-        # Test current cycles
+        # Test current cycles. Note the "current" view returns a plain list rather
+        # than a paginated {"results": [...]} payload like the other views.
         response = api_key_client.get(url, {"cycle_view": "current"})
         assert response.status_code == status.HTTP_200_OK
         assert len(response.data) == 1

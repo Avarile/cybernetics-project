@@ -2,6 +2,8 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 # See the LICENSE file for details.
 
+"""Contract tests for PATCH on the ``workspace-user-preference`` route (sidebar pin/order preferences)."""
+
 from datetime import timedelta
 
 import pytest

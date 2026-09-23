@@ -2,6 +2,12 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 # See the LICENSE file for details.
 
+"""
+Timezone helpers for converting datetimes between UTC, the requesting user's
+timezone and a project's timezone (``Project.timezone``), e.g. for cycle
+start/end dates.
+"""
+
 # Python imports
 import pytz
 from datetime import datetime, time
@@ -15,6 +21,12 @@ from plane.db.models import Project
 
 
 def user_timezone_converter(queryset, datetime_fields, user_timezone):
+    """
+    Convert the given datetime fields to ``user_timezone`` in place.
+
+    ``queryset`` is either a single dict or an iterable of dicts (e.g. a
+    ``.values()`` queryset); returns a dict or list of dicts accordingly.
+    """
     # Create a timezone object for the user's timezone
     user_tz = pytz.timezone(user_timezone)
 
@@ -47,6 +59,9 @@ def convert_to_utc(date, project_id, is_start_date=False):
     Args:
         date (str): The date string in "YYYY-MM-DD" format.
         project_id (int): The project's ID to fetch the associated timezone.
+        is_start_date (bool): If True, returns 00:00:01 local time (or "now" if
+            the date is today in the project timezone); otherwise returns
+            23:59 local time as an end-of-day timestamp.
 
     Returns:
         datetime: The UTC datetime.
@@ -69,7 +84,7 @@ def convert_to_utc(date, project_id, is_start_date=False):
     # Localize the datetime to the project's timezone
     localized_datetime = local_tz.localize(local_datetime)
 
-    # If it's an start date, add one minute
+    # If it's an start date, add one minute (actually one second, per the timedelta below)
     if is_start_date:
         localized_datetime += timedelta(minutes=0, seconds=1)
 
@@ -79,6 +94,7 @@ def convert_to_utc(date, project_id, is_start_date=False):
         current_datetime_in_project_tz = timezone.now().astimezone(local_tz)
         current_datetime_in_utc = current_datetime_in_project_tz.astimezone(pytz.utc)
 
+        # A start date of "today" starts now rather than at midnight
         if localized_datetime.date() == current_datetime_in_project_tz.date():
             return current_datetime_in_utc
 

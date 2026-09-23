@@ -2,6 +2,15 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 # See the LICENSE file for details.
 
+"""
+Contract tests for the personal API token endpoints of the web app
+(``api-tokens`` -> ``/api/users/api-tokens/`` and ``api-tokens-details``).
+
+Checks create/list/retrieve/update/delete, that users can only see their own
+non-service tokens (others' and service tokens answer 404), and that
+server-controlled fields (token value, user_type, rate limit) are read-only.
+"""
+
 import pytest
 from datetime import timedelta
 from uuid import uuid4
@@ -247,7 +256,7 @@ class TestApiTokenEndpoint:
         # Act
         response = session_client.delete(url)
 
-        # Assert
+        # Assert: service tokens are filtered out of the user's queryset, so they look nonexistent
         assert response.status_code == status.HTTP_404_NOT_FOUND
         # Verify token still exists
         assert APIToken.objects.filter(pk=service_token.pk).exists()

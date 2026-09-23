@@ -2,6 +2,16 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 # See the LICENSE file for details.
 
+"""Celery tasks that deliver outgoing workspace webhooks.
+
+Flow: ``model_activity`` (enqueued from API views) diffs changed fields and
+enqueues ``webhook_activity`` per change; that selects the active Webhook rows
+subscribed to the event type and enqueues ``webhook_send_task`` per webhook,
+which signs and POSTs the payload (SSRF-safe via ``pinned_fetch``), logs the
+attempt in WebhookLog, retries with backoff and finally deactivates the webhook
+(emailing its creator) after repeated failures.
+"""
+
 import hashlib
 import hmac
 import json
@@ -55,6 +65,7 @@ from plane.utils.exception_logger import log_exception
 from plane.utils.url_security import pinned_fetch
 
 
+# Webhook event name -> public API serializer used to build the payload ``data``
 SERIALIZER_MAPPER = {
     "project": ProjectSerializer,
     "issue": IssueExpandSerializer,
@@ -67,6 +78,7 @@ SERIALIZER_MAPPER = {
     "intake_issue": IntakeIssueSerializer,
 }
 
+# Webhook event name -> model used to load the object being reported
 MODEL_MAPPER = {
     "project": Project,
     "issue": Issue,
@@ -84,6 +96,7 @@ logger = logging.getLogger("plane.worker")
 
 
 def get_issue_prefetches():
+    """Prefetches for labels/assignees so the expanded issue serializer avoids N+1 queries."""
     return [
         Prefetch("label_issue", queryset=IssueLabel.objects.select_related("label")),
         Prefetch("issue_assignee", queryset=IssueAssignee.objects.select_related("assignee")),
@@ -101,6 +114,7 @@ def save_webhook_log(
     retry_count: int,
     event_type: str,
 ) -> None:
+    """Persist one webhook delivery attempt to WebhookLog; failures are logged, never raised."""
     log_data = {
         "workspace_id": str(webhook.workspace_id),
         "webhook": str(webhook.id),
@@ -271,11 +285,13 @@ def webhook_send_task(
             "X-Plane-Event": event,
         }
 
+        # Round-trip through DjangoJSONEncoder so UUIDs/datetimes become JSON-safe primitives
         # # Your secret key
         event_data = json.loads(json.dumps(event_data, cls=DjangoJSONEncoder)) if event_data is not None else None
 
         activity = json.loads(json.dumps(activity, cls=DjangoJSONEncoder)) if activity is not None else None
 
+        # Normalise HTTP methods to webhook action names; other values (e.g. "created") pass through
         action = {
             "POST": "create",
             "PATCH": "update",
@@ -293,7 +309,7 @@ def webhook_send_task(
             "activity": activity,
         }
 
-        # Use HMAC for generating signature
+        # Use HMAC for generating signature (receivers verify X-Plane-Signature with the shared secret)
         if webhook.secret_key:
             hmac_signature = hmac.new(
                 webhook.secret_key.encode("utf-8"),
@@ -351,7 +367,8 @@ def webhook_send_task(
             event_type=event,
         )
         logger.error(f"Webhook {webhook.id} failed with error: {e}")
-        # Retry logic
+        # Retry logic: after the final retry, deactivate the webhook and notify its creator;
+        # otherwise re-raise so Celery's autoretry schedules another attempt.
         if self.request.retries >= self.max_retries:
             Webhook.objects.filter(pk=webhook.id).update(is_active=False)
             if webhook:
@@ -447,6 +464,7 @@ def webhook_activity(
         if event == "issue_comment":
             webhooks = webhooks.filter(issue_comment=True)
 
+        # Deleted objects can no longer be serialized, so only their id is sent
         for webhook in webhooks:
             webhook_send_task.delay(
                 webhook_id=webhook.id,
@@ -477,7 +495,12 @@ def webhook_activity(
 
 @shared_task
 def model_activity(model_name, model_id, requested_data, current_instance, actor_id, slug, origin=None):
-    """Function takes in two json and computes differences between keys of both the json"""
+    """Function takes in two json and computes differences between keys of both the json.
+
+    ``current_instance`` is the JSON string of the object before the change (None on
+    create); ``requested_data`` is the request payload dict. Emits one "created"
+    event, or one "updated" ``webhook_activity`` per changed key.
+    """
     if current_instance is None:
         webhook_activity.delay(
             event=model_name,

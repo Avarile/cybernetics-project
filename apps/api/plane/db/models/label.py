@@ -2,6 +2,12 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 # See the LICENSE file for details.
 
+"""Work item label model.
+
+Labels belong to a project (or to the workspace when ``project`` is null) and
+can be nested one under another via ``parent``.
+"""
+
 from django.db import models
 from django.db.models import Q
 
@@ -9,6 +15,8 @@ from .workspace import WorkspaceBaseModel
 
 
 class Label(WorkspaceBaseModel):
+    """A label that can be applied to work items; ``sort_order`` controls display order."""
+
     parent = models.ForeignKey(
         "self",
         on_delete=models.CASCADE,
@@ -44,6 +52,7 @@ class Label(WorkspaceBaseModel):
         ordering = ("-created_at",)
 
     def save(self, *args, **kwargs):
+        """On create, append the label after the highest ``sort_order`` in its project."""
         if self._state.adding:
             # Get the maximum sequence value from the database
             last_id = Label.objects.filter(project=self.project).aggregate(largest=models.Max("sort_order"))["largest"]

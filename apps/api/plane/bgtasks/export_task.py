@@ -2,6 +2,15 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 # See the LICENSE file for details.
 
+"""
+Celery task that exports project issues (CSV/JSON/XLSX) as a ZIP download.
+
+Triggered by the issue export API: it builds the issue queryset (only projects
+the initiator is an active member of), serializes it with ``DataExporter``,
+uploads a ZIP to S3/MinIO and stores a presigned URL on the ``ExporterHistory``
+row (status: processing -> completed/failed).
+"""
+
 # Python imports
 import io
 import zipfile
@@ -44,6 +53,7 @@ def upload_to_s3(zip_file: io.BytesIO, workspace_id: UUID, token_id: str, slug: 
     Upload a ZIP file to S3 and generate a presigned URL.
     """
     file_name = f"{workspace_id}/export-{slug}-{token_id[:6]}-{str(timezone.now().date())}.zip"
+    # Presigned download links are valid for 7 days (old files are purged by exporter_expired_task).
     expires_in = 7 * 24 * 60 * 60
 
     if settings.USE_MINIO:
@@ -61,6 +71,7 @@ def upload_to_s3(zip_file: io.BytesIO, workspace_id: UUID, token_id: str, slug: 
             ExtraArgs={"ACL": "public-read", "ContentType": "application/zip"},
         )
 
+        # MinIO: the presigning client must use the public (custom) domain so the URL works from browsers.
         # Generate presigned url for the uploaded file with different base
         presign_s3 = boto3.client(
             "s3",
@@ -145,6 +156,7 @@ def issue_export_task(
         exporter_instance.save(update_fields=["status"])
 
         # Build base queryset for issues
+        # Restrict to non-archived projects where the user who started the export is an active member.
         workspace_issues = (
             Issue.objects.filter(
                 workspace__id=workspace_id,

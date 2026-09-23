@@ -2,6 +2,12 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 # See the LICENSE file for details.
 
+"""Celery task that emails a magic sign-in code to a user.
+
+Triggered by the magic-link authentication flow; SMTP settings are read from
+the instance configuration rather than Django settings.
+"""
+
 # Python imports
 import logging
 
@@ -21,6 +27,10 @@ from plane.utils.exception_logger import log_exception
 
 @shared_task
 def magic_link(email, key, token):
+    """Send the magic login ``token`` to ``email`` using the instance SMTP config.
+
+    ``key`` is unused here (kept for caller compatibility). Errors are logged and swallowed.
+    """
     try:
         (
             EMAIL_HOST,
@@ -44,6 +54,7 @@ def magic_link(email, key, token):
             port=int(EMAIL_PORT),
             username=EMAIL_HOST_USER,
             password=EMAIL_HOST_PASSWORD,
+            # Instance config stores booleans as "1"/"0" strings
             use_tls=EMAIL_USE_TLS == "1",
             use_ssl=EMAIL_USE_SSL == "1",
         )

@@ -2,6 +2,12 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 # See the LICENSE file for details.
 
+"""DRF authentication class that authenticates requests via the ``X-Api-Key`` header.
+
+Looks up an active, non-expired ``APIToken`` belonging to an active user and
+records its last-used timestamp.
+"""
+
 # Django imports
 from django.utils import timezone
 from django.db.models import Q
@@ -24,9 +30,16 @@ class APIKeyAuthentication(authentication.BaseAuthentication):
     auth_header_name = "X-Api-Key"
 
     def get_api_token(self, request):
+        """Return the raw API key from the ``X-Api-Key`` request header (or None)."""
         return request.headers.get(self.auth_header_name)
 
     def validate_api_token(self, token):
+        """Resolve ``token`` to an active APIToken and return ``(user, token)``.
+
+        Raises AuthenticationFailed if the token is unknown, inactive, expired or
+        belongs to an inactive user. Side effect: updates ``last_used``.
+        """
+        # Token is valid if it has no expiry or its expiry is in the future
         try:
             api_token = APIToken.objects.get(
                 Q(Q(expired_at__gt=timezone.now()) | Q(expired_at__isnull=True)),
@@ -43,6 +56,10 @@ class APIKeyAuthentication(authentication.BaseAuthentication):
         return (api_token.user, api_token.token)
 
     def authenticate(self, request):
+        """DRF hook: return ``(user, token)`` or None when no API key header is sent.
+
+        Returning None lets DRF fall through to the next authentication class.
+        """
         token = self.get_api_token(request=request)
         if not token:
             return None

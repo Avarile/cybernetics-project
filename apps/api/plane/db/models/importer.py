@@ -2,6 +2,8 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 # See the LICENSE file for details.
 
+"""Import job model for bringing data in from external services (GitHub, Jira)."""
+
 # Django imports
 from django.conf import settings
 from django.db import models
@@ -11,6 +13,11 @@ from .project import ProjectBaseModel
 
 
 class Importer(ProjectBaseModel):
+    """One import run into a project, with its status and the raw/config/imported payloads.
+
+    ``token`` is the API token the importer uses to write data back into the app.
+    """
+
     service = models.CharField(max_length=50, choices=(("github", "GitHub"), ("jira", "Jira")))
     status = models.CharField(
         max_length=50,

@@ -2,6 +2,14 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 # See the LICENSE file for details.
 
+"""
+Authentication error codes and the exception type used across auth flows.
+
+The numeric codes are returned to the web/space frontends (usually as redirect
+query params or JSON) so they can display a matching, localized message.
+"""
+
+# Map of symbolic error name -> numeric code consumed by the frontends.
 AUTHENTICATION_ERROR_CODES = {
     # Global
     "INSTANCE_NOT_CONFIGURED": 5000,
@@ -75,6 +83,8 @@ AUTHENTICATION_ERROR_CODES = {
 
 
 class AuthenticationException(Exception):
+    """Error raised by auth adapters/providers carrying a code, message and extra payload."""
+
     error_code = None
     error_message = None
     payload = {}
@@ -85,6 +95,7 @@ class AuthenticationException(Exception):
         self.payload = payload
 
     def get_error_dict(self):
+        """Return the error as a flat dict (code, message, plus any payload keys) for responses/redirect params."""
         error = {"error_code": self.error_code, "error_message": self.error_message}
         for key in self.payload:
             error[key] = self.payload[key]

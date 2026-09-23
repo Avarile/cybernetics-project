@@ -2,6 +2,8 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 # See the LICENSE file for details.
 
+"""Serializers for instance admins and the currently signed-in admin user (god-mode API)."""
+
 # Module imports
 from .base import BaseSerializer
 from plane.db.models import User
@@ -10,6 +12,8 @@ from plane.license.models import InstanceAdmin
 
 
 class InstanceAdminMeSerializer(BaseSerializer):
+    """Read-only profile of the signed-in instance admin (``/api/instances/admins/me/``)."""
+
     class Meta:
         model = User
         fields = [
@@ -34,6 +38,8 @@ class InstanceAdminMeSerializer(BaseSerializer):
 
 
 class InstanceAdminSerializer(BaseSerializer):
+    """InstanceAdmin rows with nested lite user details; instance and user are read-only."""
+
     user_detail = UserAdminLiteSerializer(source="user", read_only=True)
 
     class Meta:

@@ -2,6 +2,11 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 # See the LICENSE file for details.
 
+"""Celery task that emails a user when they are added directly to a project.
+
+SMTP settings come from the instance configuration (``get_email_configuration``).
+"""
+
 # Python imports
 import logging
 
@@ -23,6 +28,10 @@ from plane.db.models import User
 
 @shared_task
 def project_add_user_email(current_site, project_member_id, invitor_id):
+    """Send the "added to project" email for ``project_member_id`` on behalf of ``invitor_id``.
+
+    ``current_site`` is the web app base URL used to build the project link. Errors are logged.
+    """
     try:
         # Get the invitor
         invitor = User.objects.get(pk=invitor_id)

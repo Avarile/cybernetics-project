@@ -2,6 +2,13 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 # See the LICENSE file for details.
 
+"""Unit tests for IssueComment.save(), which keeps a linked Description row in sync.
+
+Verifies the Description is created on insert, updated only when the comment content
+changes, back-filled for legacy comments without one, and that stripped text is derived
+from comment_html.
+"""
+
 import pytest
 
 from plane.db.models import IssueComment, Description, Project, Issue, Workspace, State

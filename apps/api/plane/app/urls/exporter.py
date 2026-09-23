@@ -2,6 +2,8 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 # See the LICENSE file for details.
 
+"""URL route for exporting a workspace's issues (background export job)."""
+
 from django.urls import path
 
 from plane.app.views import ExportIssuesEndpoint

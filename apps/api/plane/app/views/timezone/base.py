@@ -2,6 +2,13 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 # See the LICENSE file for details.
 
+"""Public timezone list endpoint.
+
+``TimezoneEndpoint`` returns a curated list of friendly timezone names with
+their current UTC/GMT offsets, used by the frontend timezone pickers. It needs
+no authentication, is throttled, and the response is cached for 2 hours.
+"""
+
 # Python imports
 import pytz
 from datetime import datetime
@@ -21,12 +28,19 @@ from plane.authentication.rate_limit import AuthenticationThrottle
 
 
 class TimezoneEndpoint(APIView):
+    """Unauthenticated, throttled endpoint returning the supported timezones."""
+
     permission_classes = [AllowAny]
 
     throttle_classes = [AuthenticationThrottle]
 
     @method_decorator(cache_page(60 * 60 * 2))
     def get(self, request):
+        """Return ``{"timezones": [...]}`` sorted by current offset, then label.
+
+        Offsets are computed at request time, so DST is reflected (within the 2h cache window).
+        """
+        # (friendly label, IANA identifier); several labels may map to the same zone
         timezone_locations = [
             ("Midway Island", "Pacific/Midway"),  # UTC-11:00
             ("American Samoa", "Pacific/Pago_Pago"),  # UTC-11:00
@@ -205,7 +219,7 @@ class TimezoneEndpoint(APIView):
             except pytz.exceptions.UnknownTimeZoneError:
                 continue
 
-        # Sort by offset and then by label
+        # Sort by offset and then by label ("offset" is the numeric %z value, e.g. -530 or 100)
         timezone_list.sort(key=lambda x: (x["offset"], x["label"]))
 
         # Remove offset from final output

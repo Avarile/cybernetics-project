@@ -2,6 +2,12 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 # See the LICENSE file for details.
 
+"""Work item export endpoints (CSV / XLSX / JSON).
+
+Exports run asynchronously in ``issue_export_task``; each request is tracked
+in ``ExporterHistory`` so users can download finished exports later.
+"""
+
 # Third Party imports
 from rest_framework import status
 from rest_framework.response import Response
@@ -16,11 +22,18 @@ from .. import BaseAPIView
 
 
 class ExportIssuesEndpoint(BaseAPIView):
+    """Start a work item export and list past exports for a workspace."""
+
     model = ExporterHistory
     serializer_class = ExporterHistorySerializer
 
     @allow_permission(allowed_roles=[ROLE.ADMIN, ROLE.MEMBER], level="WORKSPACE")
     def post(self, request, slug):
+        """Queue an export for ``provider`` (csv/xlsx/json).
+
+        When no ``project`` ids are given, exports every non-archived project the user
+        is an active member of. ``multiple`` is passed through to the export task.
+        """
         # Get the workspace
         workspace = Workspace.objects.get(slug=slug)
 
@@ -66,6 +79,7 @@ class ExportIssuesEndpoint(BaseAPIView):
 
     @allow_permission(allowed_roles=[ROLE.ADMIN, ROLE.MEMBER], level="WORKSPACE")
     def get(self, request, slug):
+        """Return the workspace's export history (cursor pagination; ``per_page`` and ``cursor`` required)."""
         exporter_history = ExporterHistory.objects.filter(workspace__slug=slug, type="issue_exports").select_related(
             "workspace", "initiated_by"
         )

@@ -7,6 +7,12 @@ Common OpenAPI parameters for drf-spectacular.
 
 This module provides reusable parameter definitions that can be shared
 across multiple API endpoints to ensure consistency.
+
+Each constant documents one path or query parameter; its ``name`` must match
+the URL kwarg / query key the view actually reads. Some resources therefore
+have two variants (e.g. ``PROJECT_ID_PARAMETER`` for ``project_id`` and
+``PROJECT_PK_PARAMETER`` for routes that use ``pk``). These are purely
+documentation objects and do not affect request handling.
 """
 
 from drf_spectacular.utils import OpenApiParameter, OpenApiExample
@@ -256,6 +262,7 @@ ACTIVITY_ID_PARAMETER = OpenApiParameter(
 )
 
 # Query Parameters
+# Cursor/per_page map to the cursor-based paginator in plane/utils/paginator.py
 CURSOR_PARAMETER = OpenApiParameter(
     name="cursor",
     type=OpenApiTypes.STR,
@@ -320,6 +327,8 @@ EXTERNAL_SOURCE_PARAMETER = OpenApiParameter(
 )
 
 # Ordering Parameters
+# Accepted values are restricted server-side by the allowlists in
+# plane/utils/order_queryset.py
 ORDER_BY_PARAMETER = OpenApiParameter(
     name="order_by",
     type=OpenApiTypes.STR,

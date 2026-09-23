@@ -2,6 +2,12 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 # See the LICENSE file for details.
 
+"""User-centric views within a workspace.
+
+Covers the last visited workspace/projects, a member's profile page (issues, stats, activity),
+per-user workspace display properties, and the current user's activity/completion graphs.
+"""
+
 # Python imports
 import copy
 from datetime import date
@@ -66,7 +72,10 @@ from plane.utils.filters import IssueFilterSet
 
 
 class UserLastProjectWithWorkspaceEndpoint(BaseAPIView):
+    """Return the user's last visited workspace and their project memberships in it."""
+
     def get(self, request):
+        """Return `workspace_details` and `project_details`; empty payload if no last workspace is set."""
         user = User.objects.get(pk=request.user.id)
 
         last_workspace_id = user.last_workspace_id
@@ -96,12 +105,15 @@ class UserLastProjectWithWorkspaceEndpoint(BaseAPIView):
 
 
 class WorkspaceUserProfileIssuesEndpoint(BaseAPIView):
+    """Issues shown on a member's profile page (assigned to, created by, or subscribed by that user)."""
+
     permission_classes = [WorkspaceViewerPermission]
 
     filter_backends = (ComplexFilterBackend,)
     filterset_class = IssueFilterSet
 
     def apply_annotations(self, issues):
+        """Annotate issues with cycle_id and link/attachment/sub-issue counts, and prefetch relations."""
         return (
             issues.annotate(
                 cycle_id=Subquery(
@@ -133,6 +145,10 @@ class WorkspaceUserProfileIssuesEndpoint(BaseAPIView):
         )
 
     def get(self, request, slug, user_id):
+        """Return `user_id`'s related issues, limited to projects the requester is an active member of.
+
+        Supports filterset + legacy filters, ordering, and optional group_by / sub_group_by pagination.
+        """
         filters = issue_filters(request.query_params, "GET")
 
         order_by_param = request.GET.get("order_by", "-created_at")
@@ -152,7 +168,7 @@ class WorkspaceUserProfileIssuesEndpoint(BaseAPIView):
         # Apply legacy filters
         issue_queryset = issue_queryset.filter(**filters)
 
-        # Total count queryset
+        # Total count queryset (copied before annotations/grouping so counts stay cheap and correct)
         total_issue_queryset = copy.deepcopy(issue_queryset)
 
         # Apply annotations to the issue queryset
@@ -203,6 +219,7 @@ class WorkspaceUserProfileIssuesEndpoint(BaseAPIView):
                         ),
                         group_by_field_name=group_by,
                         sub_group_by_field_name=sub_group_by,
+                        # Exclude intake issues that are still pending or snoozed (count accepted/declined/duplicate or non-intake)
                         count_filter=Q(
                             Q(issue_intake__status=1)
                             | Q(issue_intake__status=-1)
@@ -250,9 +267,12 @@ class WorkspaceUserProfileIssuesEndpoint(BaseAPIView):
 
 
 class WorkspaceUserPropertiesEndpoint(BaseAPIView):
+    """Per-user workspace display properties (filters, display filters/properties)."""
+
     permission_classes = [WorkspaceViewerPermission]
 
     def patch(self, request, slug):
+        """Partially update the user's properties for this workspace, creating the row if needed."""
         workspace = Workspace.objects.get(slug=slug)
 
         (workspace_properties, _) = WorkspaceUserProperties.objects.get_or_create(
@@ -267,6 +287,7 @@ class WorkspaceUserPropertiesEndpoint(BaseAPIView):
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
     def get(self, request, slug):
+        """Return the user's properties for this workspace, creating defaults if missing."""
         workspace = Workspace.objects.get(slug=slug)
 
         (workspace_properties, _) = WorkspaceUserProperties.objects.get_or_create(
@@ -278,7 +299,13 @@ class WorkspaceUserPropertiesEndpoint(BaseAPIView):
 
 
 class WorkspaceUserProfileEndpoint(BaseAPIView):
+    """Profile summary of a workspace member."""
+
     def get(self, request, slug, user_id):
+        """Return basic user data plus, for Member/Admin requesters, per-project issue stats for `user_id`.
+
+        Project stats cover only non-archived projects the requester is an active member of.
+        """
         requesting_workspace_member = WorkspaceMember.objects.get(
             workspace__slug=slug, member=request.user, is_active=True
         )
@@ -290,6 +317,7 @@ class WorkspaceUserProfileEndpoint(BaseAPIView):
         )
         user_data = target_workspace_member.member
         projects = []
+        # Guests (role 5) do not get project-level statistics.
         if requesting_workspace_member.role >= 15:
             projects = (
                 Project.objects.filter(
@@ -373,9 +401,12 @@ class WorkspaceUserProfileEndpoint(BaseAPIView):
 
 
 class WorkspaceUserActivityEndpoint(BaseAPIView):
+    """Paginated issue activity feed for a workspace member."""
+
     permission_classes = [WorkspaceEntityPermission]
 
     def get(self, request, slug, user_id):
+        """Return `user_id`'s activities in projects visible to the requester, optionally filtered by `project`."""
         projects = request.query_params.getlist("project", [])
 
         queryset = IssueActivity.objects.filter(
@@ -391,6 +422,7 @@ class WorkspaceUserActivityEndpoint(BaseAPIView):
             queryset = queryset.filter(project__in=projects)
 
         return self.paginate(
+            # Only allow-listed order_by values are accepted to avoid arbitrary field ordering.
             order_by=sanitize_order_by(
                 request.GET.get("order_by", "-created_at"),
                 ACTIVITY_ORDER_BY_ALLOWLIST,
@@ -403,7 +435,13 @@ class WorkspaceUserActivityEndpoint(BaseAPIView):
 
 
 class WorkspaceUserProfileStatsEndpoint(BaseAPIView):
+    """Aggregated issue statistics for a member's profile page."""
+
     def get(self, request, slug, user_id):
+        """Return state/priority distributions, issue counts and current/upcoming cycles for `user_id`.
+
+        Counts are limited to projects where the requester is an active member.
+        """
         filters = issue_filters(request.query_params, "GET")
 
         state_distribution = (
@@ -420,6 +458,7 @@ class WorkspaceUserProfileStatsEndpoint(BaseAPIView):
             .order_by("state_group")
         )
 
+        # Sort priorities by severity rather than alphabetically.
         priority_order = ["urgent", "high", "medium", "low", "none"]
 
         priority_distribution = (
@@ -530,7 +569,10 @@ class WorkspaceUserProfileStatsEndpoint(BaseAPIView):
 
 
 class UserActivityGraphEndpoint(BaseAPIView):
+    """Daily activity counts for the current user (activity heatmap)."""
+
     def get(self, request, slug):
+        """Return per-day activity counts for the last 6 months."""
         issue_activities = (
             IssueActivity.objects.filter(
                 actor=request.user,
@@ -547,7 +589,10 @@ class UserActivityGraphEndpoint(BaseAPIView):
 
 
 class UserIssueCompletedGraphEndpoint(BaseAPIView):
+    """Weekly completed-issue counts for the current user."""
+
     def get(self, request, slug):
+        """Return completed issue counts for `month`, bucketed by ISO week number modulo 4."""
         month = request.GET.get("month", 1)
 
         issues = (

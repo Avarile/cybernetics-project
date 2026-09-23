@@ -2,6 +2,14 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 # See the LICENSE file for details.
 
+"""Public intake endpoints for published boards
+(``/api/public/anchor/<anchor>/intakes/<intake_id>/intake-issues/``).
+
+Lets signed-in visitors of a published project submit issues into the project's intake
+(triage) queue, list them, and edit or delete the ones they submitted. Every action first
+checks that intake is enabled on the project's DeployBoard.
+"""
+
 # Python imports
 import json
 
@@ -30,12 +38,19 @@ from plane.db.models.intake import SourceType
 
 
 class IntakeIssuePublicViewSet(BaseViewSet):
+    """CRUD on intake issues through a published project board (authentication required)."""
+
     serializer_class = IntakeIssueSerializer
     model = IntakeIssue
 
     filterset_fields = ["status"]
 
     def get_queryset(self):
+        """Intake issues of the URL's project/intake that are not currently snoozed.
+
+        Note: relies on ``slug``/``project_id`` URL kwargs, which the anchor-based routes do not provide;
+        the action methods below build their own querysets.
+        """
         project_deploy_board = DeployBoard.objects.get(
             workspace__slug=self.kwargs.get("slug"),
             project_id=self.kwargs.get("project_id"),
@@ -55,6 +70,11 @@ class IntakeIssuePublicViewSet(BaseViewSet):
         return IntakeIssue.objects.none()
 
     def list(self, request, anchor, intake_id):
+        """List issues in the intake with triage metadata.
+
+        Accepts the standard issue filters as query params; each issue is annotated with
+        sub-issue, link and attachment counts and ``bridge_id`` (the IntakeIssue id).
+        """
         project_deploy_board = DeployBoard.objects.get(anchor=anchor, entity_name="project")
         if project_deploy_board.intake is None:
             return Response(
@@ -75,6 +95,7 @@ class IntakeIssuePublicViewSet(BaseViewSet):
             .prefetch_related("assignees", "labels")
             .order_by("issue_intake__snoozed_till", "issue_intake__status")
             .annotate(
+                # Correlated COUNT subqueries; order_by() drops default ordering so the aggregate stays per issue.
                 sub_issues_count=Issue.issue_objects.filter(parent=OuterRef("id"))
                 .order_by()
                 .annotate(count=Func(F("id"), function="Count"))
@@ -106,6 +127,11 @@ class IntakeIssuePublicViewSet(BaseViewSet):
         return Response(issues_data, status=status.HTTP_200_OK)
 
     def create(self, request, anchor, intake_id):
+        """Create an issue in the project's Triage state and link it to the intake as an in-app submission.
+
+        Creates the Triage state if the project has none, sanitizes ``description_html``, and
+        queues an ``issue.activity.created`` activity.
+        """
         project_deploy_board = DeployBoard.objects.get(anchor=anchor, entity_name="project")
         if project_deploy_board.intake is None:
             return Response(
@@ -179,6 +205,10 @@ class IntakeIssuePublicViewSet(BaseViewSet):
         return Response(serializer.data, status=status.HTTP_200_OK)
 
     def partial_update(self, request, anchor, intake_id, pk):
+        """Let the submitter edit the name/description of their own intake issue.
+
+        Queues an ``issue.activity.updated`` activity with the previous state before saving.
+        """
         project_deploy_board = DeployBoard.objects.get(anchor=anchor, entity_name="project")
         if project_deploy_board.intake is None:
             return Response(
@@ -208,6 +238,7 @@ class IntakeIssuePublicViewSet(BaseViewSet):
             project_id=project_deploy_board.project_id,
         )
         # viewers and guests since only viewers and guests
+        # Only name and description are editable from the public board.
         issue_data = {
             "name": issue_data.get("name", issue.name),
             "description_html": issue_data.get("description_html", issue.description_html),
@@ -240,6 +271,7 @@ class IntakeIssuePublicViewSet(BaseViewSet):
         return Response(issue_serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
     def retrieve(self, request, anchor, intake_id, pk):
+        """Return a single intake issue with its triage metadata."""
         project_deploy_board = DeployBoard.objects.get(anchor=anchor, entity_name="project")
         if project_deploy_board.intake is None:
             return Response(
@@ -262,6 +294,7 @@ class IntakeIssuePublicViewSet(BaseViewSet):
         return Response(serializer.data, status=status.HTTP_200_OK)
 
     def destroy(self, request, anchor, intake_id, pk):
+        """Delete an intake issue; only its submitter may do this."""
         project_deploy_board = DeployBoard.objects.get(anchor=anchor, entity_name="project")
         if project_deploy_board.intake is None:
             return Response(

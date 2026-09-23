@@ -2,6 +2,13 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 # See the LICENSE file for details.
 
+"""Management command ``create_project_member``: add a workspace member to a project.
+
+Usage: ``python manage.py create_project_member --project_id <uuid> --user_email <email> [--role <int>]``.
+The user must already be an active member of the project's workspace. Existing
+(possibly inactive) memberships are re-activated with the given role.
+"""
+
 # Django imports
 from typing import Any
 from django.core.management import BaseCommand, CommandError
@@ -17,6 +24,8 @@ from plane.db.models import (
 
 
 class Command(BaseCommand):
+    """Create or re-activate a ``ProjectMember`` for a user already in the workspace."""
+
     help = "Add a member to a project. If present in the workspace"
 
     def add_arguments(self, parser):
@@ -26,6 +35,10 @@ class Command(BaseCommand):
         parser.add_argument("--role", type=int, nargs="?", help="Role of the user in the project")
 
     def handle(self, *args: Any, **options: Any):
+        """Validate inputs, upsert the project membership and ensure a ``ProjectUserProperty`` row.
+
+        Validation errors are printed rather than raised.
+        """
         try:
             if not options["project_id"]:
                 raise CommandError("Project ID is required")
@@ -34,6 +47,8 @@ class Command(BaseCommand):
 
             project_id = options["project_id"]
             user_email = options["user_email"]
+            # Plane roles: 20 = Admin, 15 = Member, 5 = Guest. Note the key is always
+            # present in options (argparse default None), so the 20 fallback rarely applies.
             role = options.get("role", 20)
 
             print(f"Role: {role}")
@@ -61,7 +76,7 @@ class Command(BaseCommand):
                 # Create the project member
                 ProjectMember.objects.create(project=project, member=user, role=role)
 
-            # Issue Property
+            # Per-user project view preferences (filters, display properties)
             ProjectUserProperty.objects.get_or_create(user=user, project=project)
 
             # Success message

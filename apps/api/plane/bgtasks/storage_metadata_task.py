@@ -2,6 +2,12 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 # See the LICENSE file for details.
 
+"""Celery task that fetches object metadata from S3-compatible storage for a FileAsset.
+
+Enqueued after an asset upload is confirmed so the stored metadata (size, content type, etc.)
+reflects what actually landed in the bucket.
+"""
+
 # Third party imports
 from celery import shared_task
 
@@ -13,6 +19,7 @@ from plane.utils.exception_logger import log_exception
 
 @shared_task
 def get_asset_object_metadata(asset_id):
+    """Read the asset's object metadata from storage and save it to ``FileAsset.storage_metadata``."""
     try:
         # Get the asset
         asset = FileAsset.objects.get(pk=asset_id)

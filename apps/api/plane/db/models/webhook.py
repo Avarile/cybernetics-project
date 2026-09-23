@@ -2,6 +2,13 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 # See the LICENSE file for details.
 
+"""Outgoing webhook models.
+
+``Webhook`` configures a workspace endpoint and which events it receives;
+``WebhookLog`` records each delivery attempt (made by the webhook background
+task); ``ProjectWebhook`` scopes a webhook to specific projects.
+"""
+
 # Python imports
 from uuid import uuid4
 from urllib.parse import urlparse
@@ -15,16 +22,19 @@ from plane.db.models import BaseModel, ProjectBaseModel
 
 
 def generate_token():
+    """Generate the secret used to sign webhook payloads (``plane_wh_`` prefix)."""
     return "plane_wh_" + uuid4().hex
 
 
 def validate_schema(value):
+    """Validator allowing only http/https webhook URLs."""
     parsed_url = urlparse(value)
     if parsed_url.scheme not in ["http", "https"]:
         raise ValidationError("Invalid schema. Only HTTP and HTTPS are allowed.")
 
 
 def validate_domain(value):
+    """Validator rejecting obvious local hosts (basic SSRF guard; only exact netloc matches are blocked)."""
     parsed_url = urlparse(value)
     domain = parsed_url.netloc
     if domain in ["localhost", "127.0.0.1"]:
@@ -32,10 +42,13 @@ def validate_domain(value):
 
 
 class Webhook(BaseModel):
+    """A workspace webhook endpoint; the boolean fields select which event types are delivered."""
+
     workspace = models.ForeignKey("db.Workspace", on_delete=models.CASCADE, related_name="workspace_webhooks")
     url = models.URLField(validators=[validate_schema, validate_domain], max_length=1024)
     is_active = models.BooleanField(default=True)
     secret_key = models.CharField(max_length=255, default=generate_token)
+    # Event subscriptions (not foreign keys): send project / work item / module / cycle / comment events
     project = models.BooleanField(default=False)
     issue = models.BooleanField(default=False)
     module = models.BooleanField(default=False)
@@ -63,8 +76,10 @@ class Webhook(BaseModel):
 
 
 class WebhookLog(BaseModel):
+    """Record of one webhook delivery attempt, including request and response details."""
+
     workspace = models.ForeignKey("db.Workspace", on_delete=models.CASCADE, related_name="webhook_logs")
-    # Associated webhook
+    # Associated webhook (stored as a plain UUID, not a foreign key)
     webhook = models.UUIDField()
 
     # Basic request details
@@ -92,6 +107,8 @@ class WebhookLog(BaseModel):
 
 
 class ProjectWebhook(ProjectBaseModel):
+    """Associates a webhook with a project (unique per project/webhook among non-deleted rows)."""
+
     webhook = models.ForeignKey("db.Webhook", on_delete=models.CASCADE, related_name="project_webhooks")
 
     class Meta:

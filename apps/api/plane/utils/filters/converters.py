@@ -2,6 +2,13 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 # See the LICENSE file for details.
 
+"""Conversion of legacy (flat key -> value list) work item filters into the rich filter format.
+
+The rich format is the nested ``{"and"|"or"|"not": [...]}`` / ``{"field__lookup": value}``
+structure consumed by ``ComplexFilterBackend``; see ``filter_migrations`` for how
+stored view/user filters are migrated with this converter.
+"""
+
 import re
 import uuid
 from datetime import datetime
@@ -11,6 +18,12 @@ from dateutil.parser import parse as dateutil_parse
 
 
 class LegacyToRichFiltersConverter:
+    """Configurable converter from legacy filter dicts to rich filters.
+
+    Values are validated per field type (UUID / choice / date); invalid values are either
+    dropped (default) or collected and raised as one ValueError when ``strict=True``.
+    """
+
     # Default mapping from legacy filter names to new rich filter field names
     DEFAULT_FIELD_MAPPINGS = {
         "state": "state_id",
@@ -302,10 +315,12 @@ class LegacyToRichFiltersConverter:
                     before_dates.append(date_part)
                 # Skip unsupported directions
 
-        # Determine return format
+        # Determine return format: only "one after + one before" (range) or a single exact date
+        # are representable; anything else produces no filter for this field
         result = {}
         if len(after_dates) == 1 and len(before_dates) == 1 and len(exact_dates) == 0:
             # Simple range: one after and one before
+            # String min/max: correct for ISO (YYYY-MM-DD) dates, normalises reversed bounds
             start_date = min(after_dates[0], before_dates[0])
             end_date = max(after_dates[0], before_dates[0])
             self._add_rich_filter(result, field_name, "range", [start_date, end_date])

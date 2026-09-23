@@ -2,6 +2,8 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 # See the LICENSE file for details.
 
+"""OAuth/social login connections (Google, GitHub, GitLab, Jira) linked to a user."""
+
 # Django imports
 from django.conf import settings
 from django.db import models
@@ -12,6 +14,9 @@ from .base import BaseModel
 
 
 class SocialLoginConnection(BaseModel):
+    """A user's connection to an OAuth provider, holding the provider tokens and profile data."""
+
+    # Note: the stored value is the capitalised name (e.g. "Google"), the display label is lowercase
     medium = models.CharField(
         max_length=20,
         choices=(

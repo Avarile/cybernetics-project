@@ -2,7 +2,13 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 # See the LICENSE file for details.
 
-"""Integration lookup, verification, response shaping and snapshots."""
+"""Integration lookup, verification, response shaping and snapshots.
+
+Service layer between the Cybernetics-Data API views and ``CyberneticsDataClient``:
+resolves a project's ``ProjectCyberneticsDataIntegration``, caches metadata lookups in
+the Django cache, reshapes upstream payloads into snake_case API responses and builds
+the denormalised snapshot stored on ``IssueCyberneticsRecord`` rows.
+"""
 
 # Python imports
 import hashlib
@@ -26,14 +32,19 @@ from .secrets import TokenDecryptionError, decrypt_token
 
 # Upper bound of records attached or refreshed per request (each one is an upstream call).
 MAX_RECORDS_PER_REQUEST = 10
+# Snapshot preview: how many non-primary fields to keep and the max length of each value
 PREVIEW_FIELD_COUNT = 4
 PREVIEW_VALUE_LENGTH = 256
+# Field types whose text form is not useful as a preview
 _PREVIEW_EXCLUDED_TYPES = {"attachment", "button", "link"}
 
+# Cache lifetime in seconds per kind of cached upstream lookup
 CACHE_TTL = {"databases": 60, "tables": 60, "table": 300, "schema": 120, "base": 300}
 
 
 class IntegrationNotConfigured(CyberneticsDataError):
+    """The project has no integration, or it (or the feature flag) is disabled."""
+
     code = "CYBERNETICS_NOT_CONFIGURED"
     http_status = 404
 
@@ -42,6 +53,8 @@ class IntegrationNotConfigured(CyberneticsDataError):
 
 
 class TokenUnreadable(CyberneticsDataError):
+    """The stored token can't be decrypted (e.g. SECRET_KEY rotated); the user must re-enter it."""
+
     code = "CYBERNETICS_TOKEN_UNREADABLE"
     http_status = 409
 
@@ -50,6 +63,7 @@ class TokenUnreadable(CyberneticsDataError):
 
 
 def get_integration(slug, project_id):
+    """Return the project's integration row or raise IntegrationNotConfigured."""
     integration = ProjectCyberneticsDataIntegration.objects.filter(workspace__slug=slug, project_id=project_id).first()
     if integration is None:
         raise IntegrationNotConfigured()
@@ -57,6 +71,10 @@ def get_integration(slug, project_id):
 
 
 def client_for(integration):
+    """Build a client for an enabled integration, decrypting its stored token.
+
+    Raises IntegrationNotConfigured if disabled globally/per project, TokenUnreadable if undecryptable.
+    """
     if not settings.CYBERNETICS_DATA_ENABLED or not integration.is_enabled:
         raise IntegrationNotConfigured("Cybernetics Data is disabled for this project")
     try:
@@ -67,11 +85,13 @@ def client_for(integration):
 
 
 def get_client(slug, project_id):
+    """Return ``(integration, client)`` for a workspace slug + project id."""
     integration = get_integration(slug, project_id)
     return integration, client_for(integration)
 
 
 def build_deep_link(base_url, base_id, table_id, record_id=None, view_id=None):
+    """Build a URL that opens the table (and optionally view/record) in the Cybernetics-Data web UI."""
     url = f"{base_url.rstrip('/')}/base/{quote(base_id, safe='')}/table/{quote(table_id, safe='')}"
     if view_id:
         url += f"/{quote(view_id, safe='')}"
@@ -81,12 +101,17 @@ def build_deep_link(base_url, base_id, table_id, record_id=None, view_id=None):
 
 
 def _cache_key(integration, kind, *args):
+    """Build a cache key scoped to the project and to the current base URL + token.
+
+    Hashing base_url with the token fingerprint means changing either invalidates cached entries.
+    """
     namespace = hashlib.sha256(f"{integration.base_url}|{integration.token_fingerprint}".encode()).hexdigest()[:16]
     suffix = ":".join(str(a) for a in args)
     return f"cyb:{integration.project_id}:{namespace}:{kind}:{suffix}"
 
 
 def _cached(integration, kind, args, loader):
+    """Return the cached value for (kind, args), calling ``loader`` and caching it for CACHE_TTL[kind] on a miss."""
     key = _cache_key(integration, kind, *args)
     value = cache.get(key)
     if value is None:
@@ -99,6 +124,7 @@ def verify_connection(client):
     """Probe the token: bases → tables → records. Returns a result dict."""
     bases = []
     try:
+        # Probe one base/table/record only; enough to exercise each read scope
         bases = client.list_bases()
         if bases:
             tables = client.list_tables(bases[0]["id"])
@@ -121,6 +147,7 @@ def verify_connection(client):
 
 
 def _shape_field(field):
+    """Reshape an upstream field into the API schema, keeping only a light subset of its options."""
     options = field.get("options") or {}
     lite = {}
     if isinstance(options.get("choices"), list):
@@ -142,6 +169,7 @@ def _shape_field(field):
 
 
 def _shape_record(record):
+    """Reshape an upstream record into the API response format."""
     return {
         "id": record.get("id"),
         "name": record.get("name") or "",
@@ -153,11 +181,14 @@ def _shape_record(record):
 
 
 def list_databases(integration, client):
+    """Return accessible bases grouped by space (``[{"space": {...}, "bases": [...]}]``), cached."""
+
     def load():
         bases = client.list_bases()
         try:
             space_names = {s.get("id"): s.get("name") for s in client.list_spaces()}
         except (CyberneticsForbidden, CyberneticsNotFound):
+            # Space names are cosmetic; tokens without space scope still get their bases
             space_names = {}
         groups = {}
         for base in bases:
@@ -173,6 +204,8 @@ def list_databases(integration, client):
 
 
 def list_tables(integration, client, base_id):
+    """Return the tables of a base in API format, cached."""
+
     def load():
         return [
             {
@@ -194,10 +227,13 @@ def get_table(integration, client, base_id, table_id):
 
 
 def get_base(integration, client, base_id):
+    """Return upstream base metadata, cached."""
     return _cached(integration, "base", (base_id,), lambda: client.get_base(base_id))
 
 
 def get_schema(integration, client, base_id, table_id, view_id=None):
+    """Return ``{"fields", "views"}`` for a table, cached per table/view."""
+    # Called first so a table id that doesn't belong to base_id is rejected before loading the schema
     get_table(integration, client, base_id, table_id)
 
     def load():
@@ -209,12 +245,17 @@ def get_schema(integration, client, base_id, table_id, view_id=None):
 
 
 def primary_field_id(schema):
+    """Return the id of the schema's primary field, or None."""
     return next((f["id"] for f in schema["fields"] if f["is_primary"]), None)
 
 
 def list_records(
     integration, client, base_id, table_id, *, take, skip, view_id, search, search_field, filter_, order_by, with_total
 ):
+    """Return a page of shaped records (text cell format), plus ``total`` when ``with_total``.
+
+    The schema lookup also validates base/table ownership and limits the projection to its fields.
+    """
     schema = get_schema(integration, client, base_id, table_id, view_id)
     projection = [f["id"] for f in schema["fields"]]
     data = client.list_records(
@@ -238,6 +279,7 @@ def list_records(
 
 
 def get_record(integration, client, base_id, table_id, record_id, cell_format="json"):
+    """Return a single shaped record together with the table fields and a deep link."""
     schema = get_schema(integration, client, base_id, table_id)
     record = client.get_record(table_id, record_id, cell_format=cell_format)
     return {
@@ -248,6 +290,7 @@ def get_record(integration, client, base_id, table_id, record_id, cell_format="j
 
 
 def _truncate(value):
+    """Stringify a cell value and cut it to PREVIEW_VALUE_LENGTH (None -> "")."""
     if value is None:
         return ""
     text = value if isinstance(value, str) else str(value)
@@ -263,12 +306,14 @@ def build_snapshot(integration, client, base_id, table_id, record_id, view_id=""
     preview_fields = [f for f in schema["fields"] if not f["is_primary"] and f["type"] not in _PREVIEW_EXCLUDED_TYPES][
         :PREVIEW_FIELD_COUNT
     ]
+    # Fetch only the primary field and the preview fields
     projection = [fid for fid in [primary_id, *[f["id"] for f in preview_fields]] if fid]
     record = client.get_record(table_id, record_id, cell_format="text", projection=projection)
     values = record.get("fields") or {}
     preview = {
         f["name"]: _truncate(values.get(f["id"])) for f in preview_fields if values.get(f["id"]) not in (None, "")
     }
+    # Lengths are truncated to fit the IssueCyberneticsRecord column sizes
     return {
         "space_id": base.get("spaceId") or "",
         "base_id": base_id,

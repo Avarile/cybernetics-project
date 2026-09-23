@@ -2,6 +2,14 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 # See the LICENSE file for details.
 
+"""Work items inside a cycle.
+
+Lists a cycle's work items (filtered, ordered, optionally grouped and
+sub-grouped with offset pagination), adds work items to a cycle (moving them
+from any other cycle) and removes a work item from a cycle. Changes are
+recorded in the issue activity feed via Celery.
+"""
+
 # Python imports
 import copy
 import json
@@ -38,6 +46,8 @@ from plane.utils.filters import IssueFilterSet
 
 
 class CycleIssueViewSet(BaseViewSet):
+    """List, add and remove work items of a cycle (``CycleIssue`` bridge rows)."""
+
     serializer_class = CycleIssueSerializer
     model = CycleIssue
     filter_backends = (ComplexFilterBackend,)
@@ -49,6 +59,7 @@ class CycleIssueViewSet(BaseViewSet):
     filterset_fields = ["issue__labels__id", "issue__assignees__id"]
 
     def get_queryset(self):
+        """CycleIssue rows of the URL's cycle, limited to active members of non-archived projects."""
         return self.filter_queryset(
             super()
             .get_queryset()
@@ -75,6 +86,11 @@ class CycleIssueViewSet(BaseViewSet):
         )
 
     def apply_annotations(self, issues):
+        """Add list-view annotations to an Issue queryset.
+
+        Adds the current cycle id, link/attachment/sub-issue counts and prefetches
+        assignees, labels, modules and cycles.
+        """
         return (
             issues.annotate(
                 cycle_id=Subquery(
@@ -108,6 +124,11 @@ class CycleIssueViewSet(BaseViewSet):
     @method_decorator(gzip_page)
     @allow_permission([ROLE.ADMIN, ROLE.MEMBER])
     def list(self, request, slug, project_id, cycle_id):
+        """List the cycle's work items.
+
+        Supports filterset + legacy query filters, ``order_by``, and ``group_by`` /
+        ``sub_group_by`` (which must differ). Response is paginated per group.
+        """
         filters = issue_filters(request.query_params, "GET")
         issue_queryset = (
             Issue.issue_objects.filter(issue_cycle__cycle_id=cycle_id, issue_cycle__deleted_at__isnull=True)
@@ -122,6 +143,7 @@ class CycleIssueViewSet(BaseViewSet):
         issue_queryset = issue_queryset.filter(**filters)
 
         # Total count queryset
+        # Keep an un-annotated copy for counting totals cheaply.
         total_issue_queryset = copy.deepcopy(issue_queryset)
 
         # Applying annotations to the issue queryset
@@ -173,6 +195,8 @@ class CycleIssueViewSet(BaseViewSet):
                         ),
                         group_by_field_name=group_by,
                         sub_group_by_field_name=sub_group_by,
+                        # Only count accepted (1), rejected (-1) and duplicate (2) intake items or
+                        # regular (non-intake) work items that are not archived or drafts.
                         count_filter=Q(
                             Q(issue_intake__status=1)
                             | Q(issue_intake__status=-1)
@@ -222,6 +246,11 @@ class CycleIssueViewSet(BaseViewSet):
 
     @allow_permission([ROLE.ADMIN, ROLE.MEMBER])
     def create(self, request, slug, project_id, cycle_id):
+        """Add work items (``issues`` list of ids) to the cycle.
+
+        Completed cycles are rejected. Work items already in another cycle are moved
+        here; the rest get new CycleIssue rows. Logs a ``cycle.activity.created`` activity.
+        """
         issues = request.data.get("issues", [])
 
         if not issues:
@@ -308,6 +337,7 @@ class CycleIssueViewSet(BaseViewSet):
 
     @allow_permission([ROLE.ADMIN, ROLE.MEMBER])
     def destroy(self, request, slug, project_id, cycle_id, issue_id):
+        """Remove a work item from the cycle and log a ``cycle.activity.deleted`` activity."""
         cycle_issue = CycleIssue.objects.filter(
             issue_id=issue_id,
             workspace__slug=slug,

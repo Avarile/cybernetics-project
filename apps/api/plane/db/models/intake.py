@@ -2,6 +2,13 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 # See the LICENSE file for details.
 
+"""Intake (triage inbox) models.
+
+An ``Intake`` is a project's inbox for incoming work item requests; each
+``IntakeIssue`` wraps a work item awaiting triage (accept, reject, snooze or
+mark as duplicate).
+"""
+
 # Django imports
 from django.db import models
 
@@ -10,6 +17,8 @@ from plane.db.models.project import ProjectBaseModel
 
 
 class Intake(ProjectBaseModel):
+    """A project's intake inbox; ``is_default`` marks the project's primary intake."""
+
     name = models.CharField(max_length=255)
     description = models.TextField(verbose_name="Intake Description", blank=True)
     is_default = models.BooleanField(default=False)
@@ -36,10 +45,14 @@ class Intake(ProjectBaseModel):
 
 
 class SourceType(models.TextChoices):
+    """Where an intake work item came from."""
+
     IN_APP = "IN_APP"
 
 
 class IntakeIssueStatus(models.IntegerChoices):
+    """Triage status of an intake work item (mirrors the ``IntakeIssue.status`` choices)."""
+
     PENDING = -2
     REJECTED = -1
     SNOOZED = 0
@@ -48,6 +61,12 @@ class IntakeIssueStatus(models.IntegerChoices):
 
 
 class IntakeIssue(ProjectBaseModel):
+    """A work item submitted to an intake, together with its triage state.
+
+    ``snoozed_till`` applies to snoozed items and ``duplicate_to`` points at the
+    original work item when marked as duplicate.
+    """
+
     intake = models.ForeignKey("db.Intake", related_name="issue_intake", on_delete=models.CASCADE)
     issue = models.ForeignKey("db.Issue", related_name="issue_intake", on_delete=models.CASCADE)
     status = models.IntegerField(

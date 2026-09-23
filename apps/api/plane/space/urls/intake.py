@@ -2,6 +2,10 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 # See the LICENSE file for details.
 
+"""Public intake routes: submit/list/manage intake issues on a published board, and list a
+workspace's published project boards. ``inbox-issues`` is a legacy alias of ``intake-issues``.
+"""
+
 from django.urls import path
 
 

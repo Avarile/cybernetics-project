@@ -7,6 +7,10 @@ Import/Export System with Pluggable Formatters
 
 Exporter: QuerySet → Serializer → Formatter → File/String
 Importer: File/String → Formatter → Serializer → Models
+
+Each formatter converts between a list of dicts and an encoded payload. CSV and
+XLSX output is passed through ``sanitize_csv_row``/``sanitize_csv_value`` to
+guard against spreadsheet formula injection.
 """
 
 import csv
@@ -23,6 +27,8 @@ from plane.utils.csv_utils import sanitize_csv_row, sanitize_csv_value
 
 
 class BaseFormatter(ABC):
+    """Abstract formatter: encode/decode a list of row dicts and expose a file extension."""
+
     @abstractmethod
     def encode(self, data: List[Dict]) -> Union[str, bytes]:
         """Data → formatted string/bytes"""
@@ -36,10 +42,13 @@ class BaseFormatter(ABC):
     @property
     @abstractmethod
     def extension(self) -> str:
+        """File extension (without dot) for this format."""
         pass
 
 
 class JSONFormatter(BaseFormatter):
+    """JSON formatter; non-JSON types (dates, UUIDs, ...) are stringified via ``default=str``."""
+
     def __init__(self, indent: int = 2):
         self.indent = indent
 
@@ -55,6 +64,8 @@ class JSONFormatter(BaseFormatter):
 
 
 class CSVFormatter(BaseFormatter):
+    """CSV formatter with optional flattening of nested dicts into ``parent__child`` columns."""
+
     def __init__(self, flatten: bool = True, delimiter: str = ",", prettify_headers: bool = True):
         """
         Args:
@@ -75,6 +86,7 @@ class CSVFormatter(BaseFormatter):
         return header.strip().lower().replace(" ", "_")
 
     def _flatten(self, row: Dict, parent_key: str = "") -> Dict:
+        """Recursively flatten nested dicts to ``a__b`` keys; lists become JSON strings."""
         items = {}
         for key, value in row.items():
             new_key = f"{parent_key}__{key}" if parent_key else key
@@ -87,6 +99,7 @@ class CSVFormatter(BaseFormatter):
         return items
 
     def _unflatten(self, row: Dict) -> Dict:
+        """Inverse of ``_flatten``: rebuild nested dicts and parse JSON list/dict strings."""
         result = {}
         for key, value in row.items():
             parts = key.split("__")
@@ -106,6 +119,7 @@ class CSVFormatter(BaseFormatter):
         return result
 
     def encode(self, data: List[Dict]) -> str:
+        """Encode rows to a CSV string (empty string for no rows); headers are the union of all keys."""
         if not data:
             return ""
 
@@ -135,6 +149,7 @@ class CSVFormatter(BaseFormatter):
                 writer.writerow(sanitize_csv_row([row.get(key, "") for key in fieldnames]))
         else:
             writer = csv.DictWriter(output, fieldnames=fieldnames, delimiter=self.delimiter)
+            # Header row written by hand (instead of writeheader) so it gets sanitized too
             writer.writerow({k: sanitize_csv_value(k) for k in fieldnames})
             for row in data:
                 writer.writerow({k: sanitize_csv_value(row.get(k, "")) for k in fieldnames})
@@ -221,7 +236,7 @@ class XLSXFormatter(BaseFormatter):
             headers = fieldnames
         ws.append(sanitize_csv_row(headers))
 
-        # Write data rows
+        # Write data rows (sanitized to neutralise spreadsheet formula injection)
         for row in data:
             ws.append(sanitize_csv_row([self._format_value(row.get(key, "")) for key in fieldnames]))
 
@@ -238,6 +253,7 @@ class XLSXFormatter(BaseFormatter):
             content: XLSX file bytes
             normalize_headers: If True, converts 'Display Name' → 'display_name'
         """
+        # data_only=True returns cached cell values instead of formulas
         wb = load_workbook(filename=BytesIO(content), read_only=True, data_only=True)
         ws = wb.active
 
@@ -255,6 +271,7 @@ class XLSXFormatter(BaseFormatter):
         for row in rows[1:]:
             row_dict = {}
             for i, value in enumerate(row):
+                # Skip cells beyond the header row or under empty headers
                 if i < len(headers) and headers[i]:
                     # Try to parse JSON strings back to lists/dicts
                     if isinstance(value, str):

@@ -2,6 +2,17 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 # See the LICENSE file for details.
 
+"""
+Contract tests for the web-app authentication flows (``plane.authentication``).
+
+Covers magic-code generation (``magic-generate``), email/password sign-in
+(``sign-in``), magic-code sign-in / sign-up (``magic-sign-in`` / ``magic-sign-up``),
+the per-token wrong-code attempt cap stored in Redis, and the per-IP
+``AuthenticationThrottle``. Sign-in/up endpoints answer with 302 redirects that
+carry an ``error_code`` query parameter on failure, so most assertions inspect
+the redirect URL. Requires a live Redis for the magic-code keys.
+"""
+
 import json
 import uuid
 import pytest
@@ -108,9 +119,11 @@ class TestMagicLinkGenerate:
         """Test exceeding maximum magic link generation attempts"""
         url = reverse("magic-generate")
 
+        # Start from a clean slate: the magic-code record (and its request counter) lives in Redis.
         ri = redis_instance()
         ri.delete("magic_user@plane.so")
 
+        # Burn through the allowed regenerations; the next request must be rejected.
         for _ in range(4):
             api_client.post(url, {"email": "user@plane.so"}, format="json")
 
@@ -450,6 +463,7 @@ class TestMagicSignInVerifyAttempts:
 
     @pytest.fixture
     def setup_user(self, db):
+        """Create the existing user whose magic sign-in attempts are counted."""
         user = User.objects.create(email=self.EMAIL)
         user.set_password("user@123")
         user.save()
@@ -561,6 +575,7 @@ class TestMagicSignUpVerifyAttempts:
 
     @pytest.fixture(autouse=True)
     def _clear_state(self):
+        """Reset throttle cache and magic-link redis state between tests in this class."""
         cache.clear()
         ri = redis_instance()
         ri.delete(f"magic_{self.EMAIL}")
@@ -596,6 +611,7 @@ class TestAuthenticationThrottle:
 
     @pytest.fixture(autouse=True)
     def _clear_state(self):
+        """Clear the Django cache that backs the throttle history before and after each test."""
         cache.clear()
         yield
         cache.clear()

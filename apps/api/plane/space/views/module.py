@@ -2,6 +2,8 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 # See the LICENSE file for details.
 
+"""Public endpoint listing a published project's modules (``/api/public/anchor/<anchor>/modules/``)."""
+
 # Third Party imports
 from rest_framework import status
 from rest_framework.permissions import AllowAny
@@ -13,6 +15,8 @@ from plane.db.models import DeployBoard, Module
 
 
 class ProjectModulesEndpoint(BaseAPIView):
+    """List the modules of the project published under ``anchor`` (id, name); no auth required."""
+
     permission_classes = [AllowAny]
 
     def get(self, request, anchor):

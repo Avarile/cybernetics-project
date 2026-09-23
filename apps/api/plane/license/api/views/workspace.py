@@ -2,6 +2,12 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 # See the LICENSE file for details.
 
+"""Workspace management endpoints for god mode (``/api/instances/workspaces/``).
+
+Lets instance admins check slug availability, list all workspaces on the instance with
+project/member counts, and create new workspaces.
+"""
+
 # Third party imports
 from rest_framework.response import Response
 from rest_framework import status
@@ -17,9 +23,12 @@ from plane.utils.constants import RESTRICTED_WORKSPACE_SLUGS
 
 
 class InstanceWorkSpaceAvailabilityCheckEndpoint(BaseAPIView):
+    """Check whether a workspace slug is free (instance admins only)."""
+
     permission_classes = [InstanceAdminPermission]
 
     def get(self, request):
+        """Return ``{"status": True}`` if ``?slug=`` is neither taken (case-insensitive) nor reserved."""
         slug = request.GET.get("slug", False)
 
         if not slug or slug == "":
@@ -33,11 +42,19 @@ class InstanceWorkSpaceAvailabilityCheckEndpoint(BaseAPIView):
 
 
 class InstanceWorkSpaceEndpoint(BaseAPIView):
+    """List and create workspaces across the whole instance (instance admins only)."""
+
     model = Workspace
     serializer_class = WorkspaceSerializer
     permission_classes = [InstanceAdminPermission]
 
     def get(self, request):
+        """Return a paginated list (10 per page) of all workspaces, optionally filtered by ``?search=`` on name.
+
+        Each workspace is annotated with ``total_projects`` and ``total_members`` (active, non-bot members).
+        """
+        # Correlated subqueries: COUNT(id) per workspace. ``order_by()`` clears default ordering so the
+        # aggregate isn't grouped by extra columns.
         project_count = (
             Project.objects.filter(workspace_id=OuterRef("id"))
             .order_by()
@@ -69,6 +86,11 @@ class InstanceWorkSpaceEndpoint(BaseAPIView):
         )
 
     def post(self, request):
+        """Create a workspace owned by the requesting admin and add them as a member with role 20 (admin).
+
+        Validates presence and length of name/slug (80/48 chars max). A duplicate slug that slips
+        past validation surfaces as an IntegrityError and returns 409.
+        """
         try:
             serializer = WorkspaceSerializer(data=request.data)
 

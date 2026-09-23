@@ -2,18 +2,33 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 # See the LICENSE file for details.
 
+"""Legacy query-param based issue filtering.
+
+``issue_filters(query_params, method, prefix)`` converts request params into a
+dict of Django ORM lookups to pass to ``Issue.objects.filter(**...)``. Each
+``filter_*`` helper handles one param and mutates/returns ``issue_filter``:
+
+* GET: the value is a comma-separated string; ``"null"`` entries are ignored,
+  ID lists are UUID-validated and ``"None"`` usually means "is null".
+* Other methods: the value is taken as-is from a JSON body (already a list).
+
+``prefix`` lets the same lookups target a related model (e.g. ``issue__``).
+Newer endpoints use the rich filters in ``plane.utils.filters`` instead.
+"""
+
 import re
 import uuid
 from datetime import timedelta
 
 from django.utils import timezone
 
-# The date from pattern
+# Relative date token such as "2_weeks" or "3_months"
 pattern = re.compile(r"\d+_(weeks|months)$")
 
 
 # check the valid uuids
 def filter_valid_uuids(uuid_list):
+    """Return ``uuid.UUID`` objects for the parseable entries of ``uuid_list``."""
     valid_uuids = []
     for uuid_str in uuid_list:
         try:
@@ -27,6 +42,11 @@ def filter_valid_uuids(uuid_list):
 
 # Get the 2_weeks, 3_months
 def string_date_filter(issue_filter, duration, subsequent, term, date_filter, offset):
+    """Add a relative date bound (``__gte`` for "after", ``__lte`` otherwise).
+
+    ``offset == "fromnow"`` shifts forward from today, anything else backwards.
+    Months are approximated as 30 days.
+    """
     now = timezone.now().date()
     if term == "months":
         if subsequent == "after":
@@ -55,6 +75,10 @@ def string_date_filter(issue_filter, duration, subsequent, term, date_filter, of
 def date_filter(issue_filter, date_term, queries):
     """
     Handle all date filters
+
+    Each query is ``"<value>;<after|before>[;<fromnow|ago>]"``: ``<value>`` is
+    either an ISO date or a relative token like ``2_weeks`` (which requires the
+    third part). A query without ``;`` becomes a ``__contains`` lookup.
     """
     for query in queries:
         date_query = query.split(";")
@@ -82,6 +106,7 @@ def date_filter(issue_filter, date_term, queries):
 
 
 def filter_state(params, issue_filter, method, prefix=""):
+    """Filter by state IDs (``state__in``); invalid UUIDs are dropped."""
     if method == "GET":
         states = [item for item in params.get("state").split(",") if item != "null"]
         states = filter_valid_uuids(states)
@@ -94,6 +119,7 @@ def filter_state(params, issue_filter, method, prefix=""):
 
 
 def filter_state_group(params, issue_filter, method, prefix=""):
+    """Filter by state group names (backlog/unstarted/started/completed/cancelled)."""
     if method == "GET":
         state_group = [item for item in params.get("state_group").split(",") if item != "null"]
         if len(state_group) and "" not in state_group:
@@ -105,6 +131,7 @@ def filter_state_group(params, issue_filter, method, prefix=""):
 
 
 def filter_estimate_point(params, issue_filter, method, prefix=""):
+    """Filter by estimate point IDs."""
     if method == "GET":
         estimate_points = [item for item in params.get("estimate_point").split(",") if item != "null"]
         if len(estimate_points) and "" not in estimate_points:
@@ -120,6 +147,7 @@ def filter_estimate_point(params, issue_filter, method, prefix=""):
 
 
 def filter_priority(params, issue_filter, method, prefix=""):
+    """Filter by priority values (urgent/high/medium/low/none)."""
     if method == "GET":
         priorities = [item for item in params.get("priority").split(",") if item != "null"]
         if len(priorities) and "" not in priorities:
@@ -131,6 +159,7 @@ def filter_priority(params, issue_filter, method, prefix=""):
 
 
 def filter_parent(params, issue_filter, method, prefix=""):
+    """Filter by parent issue IDs; ``"None"`` matches issues without a parent."""
     if method == "GET":
         parents = [item for item in params.get("parent").split(",") if item != "null"]
         if "None" in parents:
@@ -145,6 +174,7 @@ def filter_parent(params, issue_filter, method, prefix=""):
 
 
 def filter_labels(params, issue_filter, method, prefix=""):
+    """Filter by label IDs; ``"None"`` matches unlabelled issues. Ignores soft-deleted links."""
     if method == "GET":
         labels = [item for item in params.get("labels").split(",") if item != "null"]
         if "None" in labels:
@@ -160,6 +190,7 @@ def filter_labels(params, issue_filter, method, prefix=""):
 
 
 def filter_assignees(params, issue_filter, method, prefix=""):
+    """Filter by assignee user IDs; ``"None"`` matches unassigned issues. Ignores soft-deleted links."""
     if method == "GET":
         assignees = [item for item in params.get("assignees").split(",") if item != "null"]
         if "None" in assignees:
@@ -175,6 +206,7 @@ def filter_assignees(params, issue_filter, method, prefix=""):
 
 
 def filter_mentions(params, issue_filter, method, prefix=""):
+    """Filter issues that mention any of the given user IDs."""
     if method == "GET":
         mentions = [item for item in params.get("mentions").split(",") if item != "null"]
         mentions = filter_valid_uuids(mentions)
@@ -187,6 +219,7 @@ def filter_mentions(params, issue_filter, method, prefix=""):
 
 
 def filter_created_by(params, issue_filter, method, prefix=""):
+    """Filter by creator user IDs; ``"None"`` matches issues with no creator."""
     if method == "GET":
         created_bys = [item for item in params.get("created_by").split(",") if item != "null"]
         if "None" in created_bys:
@@ -201,12 +234,14 @@ def filter_created_by(params, issue_filter, method, prefix=""):
 
 
 def filter_name(params, issue_filter, method, prefix=""):
+    """Case-insensitive substring match on the issue name."""
     if params.get("name", "") != "":
         issue_filter[f"{prefix}name__icontains"] = params.get("name")
     return issue_filter
 
 
 def filter_created_at(params, issue_filter, method, prefix=""):
+    """Filter by creation date using the ``date_filter`` syntax."""
     if method == "GET":
         created_ats = params.get("created_at").split(",")
         if len(created_ats) and "" not in created_ats:
@@ -226,11 +261,13 @@ def filter_created_at(params, issue_filter, method, prefix=""):
 
 
 def filter_updated_at(params, issue_filter, method, prefix=""):
+    """Filter by ``updated_at`` query param using the ``date_filter`` syntax."""
     if method == "GET":
         updated_ats = params.get("updated_at").split(",")
         if len(updated_ats) and "" not in updated_ats:
             date_filter(
                 issue_filter=issue_filter,
+                # NOTE: filters on created_at, not updated_at (existing behaviour)
                 date_term=f"{prefix}created_at__date",
                 queries=updated_ats,
             )
@@ -245,6 +282,7 @@ def filter_updated_at(params, issue_filter, method, prefix=""):
 
 
 def filter_start_date(params, issue_filter, method, prefix=""):
+    """Filter by start date (``date_filter`` syntax for GET, exact value otherwise)."""
     if method == "GET":
         start_dates = params.get("start_date").split(",")
         if len(start_dates) and "" not in start_dates:
@@ -260,6 +298,7 @@ def filter_start_date(params, issue_filter, method, prefix=""):
 
 
 def filter_target_date(params, issue_filter, method, prefix=""):
+    """Filter by target (due) date (``date_filter`` syntax for GET, exact value otherwise)."""
     if method == "GET":
         target_dates = params.get("target_date").split(",")
         if len(target_dates) and "" not in target_dates:
@@ -275,6 +314,7 @@ def filter_target_date(params, issue_filter, method, prefix=""):
 
 
 def filter_completed_at(params, issue_filter, method, prefix=""):
+    """Filter by completion date using the ``date_filter`` syntax."""
     if method == "GET":
         completed_ats = params.get("completed_at").split(",")
         if len(completed_ats) and "" not in completed_ats:
@@ -294,6 +334,7 @@ def filter_completed_at(params, issue_filter, method, prefix=""):
 
 
 def filter_issue_state_type(params, issue_filter, method, prefix=""):
+    """Map ``type`` (``backlog`` / ``active`` / anything else = all) to state groups."""
     type = params.get("type", "all")
     group = ["backlog", "unstarted", "started", "completed", "cancelled"]
     if type == "backlog":
@@ -306,6 +347,7 @@ def filter_issue_state_type(params, issue_filter, method, prefix=""):
 
 
 def filter_project(params, issue_filter, method, prefix=""):
+    """Filter by project IDs."""
     if method == "GET":
         projects = [item for item in params.get("project").split(",") if item != "null"]
         projects = filter_valid_uuids(projects)
@@ -318,6 +360,7 @@ def filter_project(params, issue_filter, method, prefix=""):
 
 
 def filter_cycle(params, issue_filter, method, prefix=""):
+    """Filter by cycle IDs; ``"None"`` matches issues not in any cycle."""
     if method == "GET":
         cycles = [item for item in params.get("cycle").split(",") if item != "null"]
         if "None" in cycles:
@@ -333,6 +376,7 @@ def filter_cycle(params, issue_filter, method, prefix=""):
 
 
 def filter_module(params, issue_filter, method, prefix=""):
+    """Filter by module IDs; ``"None"`` matches issues not in any module."""
     if method == "GET":
         modules = [item for item in params.get("module").split(",") if item != "null"]
         if "None" in modules:
@@ -348,6 +392,7 @@ def filter_module(params, issue_filter, method, prefix=""):
 
 
 def filter_intake_status(params, issue_filter, method, prefix=""):
+    """Filter intake (triage) issues by their intake status values."""
     if method == "GET":
         status = [item for item in params.get("intake_status").split(",") if item != "null"]
         if len(status) and "" not in status:
@@ -358,11 +403,13 @@ def filter_intake_status(params, issue_filter, method, prefix=""):
             and len(params.get("intake_status"))
             and params.get("intake_status") != "null"
         ):
+            # NOTE: reads "inbox_status" although "intake_status" was checked above
             issue_filter[f"{prefix}issue_intake__status__in"] = params.get("inbox_status")
     return issue_filter
 
 
 def filter_inbox_status(params, issue_filter, method, prefix=""):
+    """Legacy alias of ``filter_intake_status`` (``inbox_status`` param)."""
     if method == "GET":
         status = [item for item in params.get("inbox_status").split(",") if item != "null"]
         if len(status) and "" not in status:
@@ -378,6 +425,7 @@ def filter_inbox_status(params, issue_filter, method, prefix=""):
 
 
 def filter_sub_issue_toggle(params, issue_filter, method, prefix=""):
+    """Exclude sub-issues (``parent__isnull``) unless ``sub_issue`` is ``"true"``."""
     if method == "GET":
         sub_issue = params.get("sub_issue", "false")
         if sub_issue == "false":
@@ -390,6 +438,7 @@ def filter_sub_issue_toggle(params, issue_filter, method, prefix=""):
 
 
 def filter_subscribed_issues(params, issue_filter, method, prefix=""):
+    """Filter issues subscribed to by the given user IDs."""
     if method == "GET":
         subscribers = [item for item in params.get("subscriber").split(",") if item != "null"]
         subscribers = filter_valid_uuids(subscribers)
@@ -404,6 +453,7 @@ def filter_subscribed_issues(params, issue_filter, method, prefix=""):
 
 
 def filter_start_target_date_issues(params, issue_filter, method, prefix=""):
+    """When ``start_target_date=true``, keep only issues with both dates set."""
     start_target_date = params.get("start_target_date", "false")
     if start_target_date == "true":
         issue_filter[f"{prefix}target_date__isnull"] = False
@@ -412,6 +462,7 @@ def filter_start_target_date_issues(params, issue_filter, method, prefix=""):
 
 
 def filter_logged_by(params, issue_filter, method, prefix=""):
+    """Filter by ``logged_by`` user IDs; ``"None"`` matches null values."""
     if method == "GET":
         logged_bys = [item for item in params.get("logged_by").split(",") if item != "null"]
         if "None" in logged_bys:
@@ -426,6 +477,10 @@ def filter_logged_by(params, issue_filter, method, prefix=""):
 
 
 def issue_filters(query_params, method, prefix=""):
+    """Build an ORM filter dict from ``query_params`` (see module docstring).
+
+    Only params present in ``query_params`` are applied.
+    """
     issue_filter = {}
 
     ISSUE_FILTER = {

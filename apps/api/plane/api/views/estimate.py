@@ -2,6 +2,12 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 # See the LICENSE file for details.
 
+"""Public API endpoints for project estimates and estimate points (routes in plane/api/urls/estimate.py).
+
+A project has at most one Estimate; its EstimatePoints are the selectable
+values. Access is enforced by ProjectEntityPermission.
+"""
+
 # Third party imports
 from rest_framework.response import Response
 from rest_framework import status
@@ -28,11 +34,13 @@ from plane.utils.openapi import (
 
 
 class ProjectEstimateAPIEndpoint(BaseAPIView):
+    """Create, read, update and delete the single estimate of a project."""
     permission_classes = [ProjectEntityPermission]
     model = Estimate
     serializer_class = EstimateSerializer
 
     def get_queryset(self):
+        """Estimates of the project identified by the URL."""
         return self.model.objects.filter(workspace__slug=self.workspace_slug, project_id=self.project_id)
 
     @estimate_docs(
@@ -45,6 +53,7 @@ class ProjectEstimateAPIEndpoint(BaseAPIView):
         ),
     )
     def post(self, request, slug, project_id):
+        """Create the project's estimate; returns 409 with the existing id if one already exists."""
         project = Project.objects.filter(id=project_id, workspace__slug=slug).first()
         if not project:
             return Response(status=status.HTTP_404_NOT_FOUND, data={"error": "Project not found"})
@@ -81,6 +90,7 @@ class ProjectEstimateAPIEndpoint(BaseAPIView):
         },
     )
     def get(self, request, slug, project_id):
+        """Return the project's estimate, or 404."""
         estimate = self.get_queryset().first()
         if not estimate:
             return Response(status=status.HTTP_404_NOT_FOUND, data={"error": "Estimate not found"})
@@ -104,6 +114,7 @@ class ProjectEstimateAPIEndpoint(BaseAPIView):
         },
     )
     def patch(self, request, slug, project_id):
+        """Update the estimate's name/description; other fields in the payload are ignored."""
         ALLOWED_FIELDS = ["name", "description"]
         estimate = self.get_queryset().first()
         if not estimate:
@@ -127,6 +138,7 @@ class ProjectEstimateAPIEndpoint(BaseAPIView):
         },
     )
     def delete(self, request, slug, project_id):
+        """Delete the project's estimate."""
         estimate = self.get_queryset().first()
         if not estimate:
             return Response(status=status.HTTP_404_NOT_FOUND, data={"error": "Estimate not found"})
@@ -142,6 +154,7 @@ class EstimatePointListCreateAPIEndpoint(BaseAPIView):
     serializer_class = EstimatePointSerializer
 
     def get_queryset(self):
+        """Points of the estimate in the URL, scoped to its workspace and project."""
         return self.model.objects.filter(
             estimate_id=self.kwargs["estimate_id"],
             workspace__slug=self.kwargs["slug"],
@@ -166,6 +179,7 @@ class EstimatePointListCreateAPIEndpoint(BaseAPIView):
         },
     )
     def get(self, request, slug, project_id, estimate_id):
+        """List the points of an estimate."""
         estimate = Estimate.objects.filter(
             id=estimate_id,
             workspace__slug=slug,
@@ -194,6 +208,10 @@ class EstimatePointListCreateAPIEndpoint(BaseAPIView):
         },
     )
     def post(self, request, slug, project_id, estimate_id):
+        """Bulk-create points for an estimate.
+
+        Accepts either a JSON list or an object with an ``estimate_points`` list.
+        """
         estimate = Estimate.objects.filter(
             id=estimate_id,
             workspace__slug=slug,
@@ -239,6 +257,7 @@ class EstimatePointDetailAPIEndpoint(BaseAPIView):
     serializer_class = EstimatePointSerializer
 
     def get_queryset(self):
+        """Points of the estimate in the URL, scoped to its workspace and project."""
         return self.model.objects.filter(
             estimate_id=self.kwargs["estimate_id"],
             workspace__slug=self.kwargs["slug"],
@@ -262,6 +281,7 @@ class EstimatePointDetailAPIEndpoint(BaseAPIView):
         },
     )
     def patch(self, request, slug, project_id, estimate_id, estimate_point_id):
+        """Update an estimate point's key/value/description; other fields are ignored."""
         estimate_point = self.get_queryset().filter(id=estimate_point_id).first()
         if not estimate_point:
             return Response(status=status.HTTP_404_NOT_FOUND, data={"error": "Estimate point not found"})
@@ -284,6 +304,7 @@ class EstimatePointDetailAPIEndpoint(BaseAPIView):
         },
     )
     def delete(self, request, slug, project_id, estimate_id, estimate_point_id):
+        """Delete an estimate point."""
         estimate_point = self.get_queryset().filter(id=estimate_point_id).first()
         if not estimate_point:
             return Response(status=status.HTTP_404_NOT_FOUND, data={"error": "Estimate point not found"})

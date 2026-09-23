@@ -2,6 +2,14 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 # See the LICENSE file for details.
 
+"""Workspace-level analytics endpoints.
+
+Provides the custom analytics graph (x-axis / y-axis / segment breakdowns of
+work items), saved analytic views, e-mailed CSV exports, the default
+workspace analytics dashboard and per-project summary counts. All data is
+scoped to the workspace identified by ``slug``.
+"""
+
 # Django imports
 from django.db.models import Count, F, Sum, Q
 from django.db.models.functions import ExtractMonth
@@ -35,8 +43,17 @@ from plane.app.permissions import allow_permission, ROLE
 
 
 class AnalyticsEndpoint(BaseAPIView):
+    """Build a custom analytics chart for all work items in a workspace."""
+
     @allow_permission([ROLE.ADMIN, ROLE.MEMBER], level="WORKSPACE")
     def get(self, request, slug):
+        """Return grouped distribution data for the requested axes.
+
+        Query params: ``x_axis`` and ``y_axis`` (required, validated against
+        ``VALID_ANALYTICS_FIELDS`` / ``VALID_YAXIS``), optional ``segment`` plus the
+        usual issue filters. Also returns lookup "extras" (names/colors/avatars)
+        for whichever dimension is used as x-axis or segment so the UI can label it.
+        """
         x_axis = request.GET.get("x_axis", False)
         y_axis = request.GET.get("y_axis", False)
         segment = request.GET.get("segment", False)
@@ -67,6 +84,7 @@ class AnalyticsEndpoint(BaseAPIView):
         # Build the graph payload
         distribution = build_graph_plot(queryset=queryset, x_axis=x_axis, y_axis=y_axis, segment=segment)
 
+        # Extras: only fetched when the corresponding dimension is actually plotted.
         state_details = {}
         if x_axis in ["state_id"] or segment in ["state_id"]:
             state_details = (
@@ -174,21 +192,32 @@ class AnalyticsEndpoint(BaseAPIView):
 
 
 class AnalyticViewViewset(BaseViewSet):
+    """CRUD for saved analytic views (stored query + axes) in a workspace; admin only."""
+
     permission_classes = [WorkSpaceAdminPermission]
     model = AnalyticView
     serializer_class = AnalyticViewSerializer
 
     def perform_create(self, serializer):
+        """Attach the new saved view to the workspace from the URL slug."""
         workspace = Workspace.objects.get(slug=self.kwargs.get("slug"))
         serializer.save(workspace_id=workspace.id)
 
     def get_queryset(self):
+        """Limit saved views to the current workspace."""
         return self.filter_queryset(super().get_queryset().filter(workspace__slug=self.kwargs.get("slug")))
 
 
 class SavedAnalyticEndpoint(BaseAPIView):
+    """Re-run a saved analytic view and return its chart data."""
+
     @allow_permission([ROLE.ADMIN, ROLE.MEMBER], level="WORKSPACE")
     def get(self, request, slug, analytic_id):
+        """Evaluate the stored ``query`` of an analytic view.
+
+        Axes come from the saved view's ``query_dict``; ``segment`` may be
+        overridden via query params.
+        """
         analytic_view = AnalyticView.objects.get(pk=analytic_id, workspace__slug=slug)
 
         filter = analytic_view.query
@@ -220,8 +249,11 @@ class SavedAnalyticEndpoint(BaseAPIView):
 
 
 class ExportAnalyticsEndpoint(BaseAPIView):
+    """Queue an analytics CSV export that is e-mailed to the requesting user."""
+
     @allow_permission([ROLE.ADMIN, ROLE.MEMBER], level="WORKSPACE")
     def post(self, request, slug):
+        """Validate the axes and enqueue ``analytic_export_task`` (Celery); returns immediately."""
         x_axis = request.data.get("x_axis", False)
         y_axis = request.data.get("y_axis", False)
         segment = request.data.get("segment", False)
@@ -249,8 +281,16 @@ class ExportAnalyticsEndpoint(BaseAPIView):
 
 
 class DefaultAnalyticsEndpoint(BaseAPIView):
+    """Default workspace analytics dashboard (no custom axes required)."""
+
     @allow_permission([ROLE.ADMIN, ROLE.MEMBER, ROLE.GUEST], level="WORKSPACE")
     def get(self, request, slug):
+        """Return summary stats for the workspace's work items.
+
+        Includes totals and open counts per state group, month-wise completions for
+        the current year, top creators/closers, pending work per assignee and
+        estimate point sums.
+        """
         filters = issue_filters(request.GET, "GET")
         base_issues = Issue.issue_objects.filter(workspace__slug=slug, **filters)
 
@@ -262,6 +302,7 @@ class DefaultAnalyticsEndpoint(BaseAPIView):
             state_groups.values("state_group").annotate(state_count=Count("state_group")).order_by("state_group")
         )
 
+        # State groups considered "open" (not completed or cancelled).
         open_issues_groups = ["backlog", "unstarted", "started"]
         open_issues_queryset = state_groups.filter(state__group__in=open_issues_groups)
 
@@ -389,8 +430,15 @@ class DefaultAnalyticsEndpoint(BaseAPIView):
 
 
 class ProjectStatsEndpoint(BaseAPIView):
+    """Per-project summary counters for a workspace."""
+
     @allow_permission([ROLE.ADMIN, ROLE.MEMBER, ROLE.GUEST], level="WORKSPACE")
     def get(self, request, slug):
+        """Return selected counters for each project in the workspace.
+
+        ``fields`` (comma separated) picks which counters to compute (defaults to
+        all valid ones); ``project_ids`` optionally restricts the projects.
+        """
         fields = request.GET.get("fields", "").split(",")
         project_ids = request.GET.get("project_ids", "")
 
@@ -410,6 +458,8 @@ class ProjectStatsEndpoint(BaseAPIView):
         if project_ids:
             projects = projects.filter(id__in=project_ids.split(","))
 
+        # Each counter is a correlated subquery (OuterRef on the project) using a raw
+        # COUNT(); ``order_by()`` clears default ordering so the subquery aggregates cleanly.
         annotations = {}
         if "total_issues" in requested_fields:
             annotations["total_issues"] = (

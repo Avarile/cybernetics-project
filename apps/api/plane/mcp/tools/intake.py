@@ -2,6 +2,12 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 # See the LICENSE file for details.
 
+"""MCP tool for submitting work items to a project's intake (triage) queue.
+
+Note: each tool function's docstring is sent to MCP clients as the tool description,
+so edit those docstrings as user-facing text.
+"""
+
 # Python imports
 from typing import Annotated, Optional
 
@@ -30,4 +36,5 @@ async def create_intake_work_item(
 
 
 def register(tool) -> None:
+    """Register the intake tool."""
     tool(read_only=False, title="Submit to intake")(create_intake_work_item)

@@ -2,6 +2,14 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 # See the LICENSE file for details.
 
+"""Validation and sanitization of user-supplied rich content.
+
+Used by serializers for description/page content: validate_binary_data checks binary
+(e.g. collaborative editor state) payloads, validate_html_content sanitizes HTML with nh3
+using an allowlist of tags/attributes the editor emits, and has_alphanumeric backs name
+validation.
+"""
+
 # Python imports
 import base64
 import nh3
@@ -156,6 +164,7 @@ ATTRIBUTES = {
     "input": {"type", "checked"},
 }
 
+# URL schemes allowed in href/src attributes; anything else (e.g. javascript:) is removed.
 SAFE_PROTOCOLS = {"http", "https", "mailto", "tel"}
 
 
@@ -169,6 +178,7 @@ def _compute_html_sanitization_diff(before_html: str, after_html: str):
     """
     try:
 
+        # Count tags and collect attribute names per tag in a parsed document.
         def collect(soup):
             tag_counts = defaultdict(int)
             attrs_by_tag = defaultdict(set)

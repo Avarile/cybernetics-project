@@ -7,6 +7,10 @@ Common OpenAPI responses for drf-spectacular.
 
 This module provides reusable response definitions for common HTTP status codes
 and scenarios that occur across multiple API endpoints.
+
+The constants are documentation-only ``OpenApiResponse`` objects referenced in
+``extend_schema(responses=...)`` on the public API views; they describe the
+error/success payloads but do not generate them.
 """
 
 from drf_spectacular.utils import OpenApiResponse, OpenApiExample, inline_serializer
@@ -361,7 +365,13 @@ def create_paginated_response(
     description="Paginated results",
     example_name="Paginated Response",
 ):
-    """Create a paginated response with the specified item schema"""
+    """Create a paginated response with the specified item schema
+
+    ``item_schema`` is a serializer class used for each entry in ``results``;
+    ``schema_name`` must be unique across the schema since drf-spectacular
+    registers the inline serializer as a named component. The envelope fields
+    mirror the output of the cursor paginator in ``plane/utils/paginator.py``.
+    """
 
     return OpenApiResponse(
         description=description,

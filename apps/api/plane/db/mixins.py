@@ -2,6 +2,15 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 # See the LICENSE file for details.
 
+"""
+Reusable abstract model bases and mixins for ``plane.db`` models.
+
+Provides created/updated timestamps and user audit fields, soft deletion
+(``deleted_at`` plus a manager that hides deleted rows and a background task
+that cascades the soft delete), and ``ChangeTrackerMixin`` for detecting
+which fields changed between load and save.
+"""
+
 # Type imports
 from typing import Any
 
@@ -14,7 +23,7 @@ from plane.bgtasks.deletion_task import soft_delete_related_objects
 
 
 class TimeAuditModel(models.Model):
-    """To path when the record was created and last modified"""
+    """Abstract base adding ``created_at`` / ``updated_at`` timestamps."""
 
     created_at = models.DateTimeField(auto_now_add=True, verbose_name="Created At")
     updated_at = models.DateTimeField(auto_now=True, verbose_name="Last Modified At")
@@ -24,11 +33,12 @@ class TimeAuditModel(models.Model):
 
 
 class UserAuditModel(models.Model):
-    """To path when the record was created and last modified"""
+    """Abstract base adding ``created_by`` / ``updated_by`` user foreign keys (nullable, SET_NULL)."""
 
     created_by = models.ForeignKey(
         "db.User",
         on_delete=models.SET_NULL,
+        # %(class)s expands to the concrete model name so reverse accessors don't clash
         related_name="%(class)s_created_by",
         verbose_name="Created By",
         null=True,
@@ -46,7 +56,14 @@ class UserAuditModel(models.Model):
 
 
 class SoftDeletionQuerySet(models.QuerySet):
+    """QuerySet whose bulk ``delete()`` soft-deletes by default."""
+
     def delete(self, soft=True):
+        """Set ``deleted_at`` on all rows (soft) or hard delete them when ``soft=False``.
+
+        Note: unlike ``SoftDeleteModel.delete``, the bulk soft delete does not
+        cascade to related objects.
+        """
         if soft:
             return self.update(deleted_at=timezone.now())
         else:
@@ -54,12 +71,17 @@ class SoftDeletionQuerySet(models.QuerySet):
 
 
 class SoftDeletionManager(models.Manager):
+    """Default manager that excludes soft-deleted rows (``deleted_at`` set)."""
+
     def get_queryset(self):
         return SoftDeletionQuerySet(self.model, using=self._db).filter(deleted_at__isnull=True)
 
 
 class SoftDeleteModel(models.Model):
-    """To soft delete records"""
+    """Abstract base adding soft deletion via ``deleted_at``.
+
+    ``objects`` hides soft-deleted rows; ``all_objects`` returns every row.
+    """
 
     deleted_at = models.DateTimeField(verbose_name="Deleted At", null=True, blank=True)
 
@@ -70,6 +92,11 @@ class SoftDeleteModel(models.Model):
         abstract = True
 
     def delete(self, using=None, soft=True, *args, **kwargs):
+        """Soft delete this instance (default) or hard delete it when ``soft=False``.
+
+        Soft delete saves ``deleted_at`` and enqueues the
+        ``soft_delete_related_objects`` Celery task to cascade to related rows.
+        """
         if soft:
             # Soft delete the current instance
             self.deleted_at = timezone.now()
@@ -83,7 +110,7 @@ class SoftDeleteModel(models.Model):
 
 
 class AuditModel(TimeAuditModel, UserAuditModel, SoftDeleteModel):
-    """To path when the record was created and last modified"""
+    """Abstract base combining timestamps, user audit fields and soft deletion."""
 
     class Meta:
         abstract = True
@@ -125,6 +152,7 @@ class ChangeTrackerMixin:
 
     def __init__(self, *args: Any, **kwargs: Any) -> None:
         super().__init__(*args, **kwargs)
+        # Snapshot field values right after the instance is built/loaded
         self._original_values = {}
         self._track_fields()
 

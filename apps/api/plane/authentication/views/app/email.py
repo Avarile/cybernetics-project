@@ -2,6 +2,14 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 # See the LICENSE file for details.
 
+"""
+Email/password sign-in and sign-up views for the web app.
+
+Routes: ``POST /auth/sign-in/`` and ``POST /auth/sign-up/``. These are plain
+Django form-POST views: on success they create a session and redirect to the
+app; on failure they redirect back with auth error query params.
+"""
+
 # Django imports
 from django.core.exceptions import ValidationError
 from django.core.validators import validate_email
@@ -24,7 +32,10 @@ from plane.utils.path_validator import get_safe_redirect_url
 
 
 class SignInAuthEndpoint(View):
+    """Sign in an existing user with email and password (form POST)."""
+
     def post(self, request):
+        """Validate input, authenticate via ``EmailProvider``, log in and redirect to ``next_path``/default path."""
         next_path = request.POST.get("next_path")
         # Check instance configuration
         instance = Instance.objects.first()
@@ -133,7 +144,10 @@ class SignInAuthEndpoint(View):
 
 
 class SignUpAuthEndpoint(View):
+    """Create a new account with email and password (form POST)."""
+
     def post(self, request):
+        """Validate input, create the user via ``EmailProvider`` (password strength checked), log in and redirect."""
         next_path = request.POST.get("next_path")
         # Check instance configuration
         instance = Instance.objects.first()

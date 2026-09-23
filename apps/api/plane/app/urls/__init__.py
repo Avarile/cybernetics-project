@@ -2,6 +2,12 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 # See the LICENSE file for details.
 
+"""URL configuration for the internal web-app API (``plane.app``).
+
+Aggregates the per-feature URL modules; mounted under ``/api/`` by
+``plane/urls.py``.
+"""
+
 from .analytic import urlpatterns as analytic_urls
 from .api import urlpatterns as api_urls
 from .asset import urlpatterns as asset_urls

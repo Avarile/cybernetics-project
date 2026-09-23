@@ -2,6 +2,12 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 # See the LICENSE file for details.
 
+"""Saved work item views.
+
+An ``IssueView`` stores a named set of work item filters and display settings,
+either at project level or workspace level (``project`` is null).
+"""
+
 # Django imports
 from django.conf import settings
 from django.db import models
@@ -12,6 +18,7 @@ from plane.utils.issue_filters import issue_filters
 
 
 def get_default_filters():
+    """Default (empty) filter set for a view."""
     return {
         "priority": None,
         "state": None,
@@ -26,6 +33,7 @@ def get_default_filters():
 
 
 def get_default_display_filters():
+    """Default layout/grouping/ordering settings for a view."""
     return {
         "group_by": None,
         "order_by": "-created_at",
@@ -38,6 +46,7 @@ def get_default_display_filters():
 
 
 def get_default_display_properties():
+    """Default set of work item properties shown in a view (all visible)."""
     return {
         "assignee": True,
         "attachment_count": True,
@@ -56,6 +65,12 @@ def get_default_display_properties():
 
 
 class IssueView(WorkspaceBaseModel):
+    """A saved work item view.
+
+    ``filters`` is the user-facing filter dict; ``query`` is the ORM filter
+    derived from it on save. ``access`` 0 = private to ``owned_by``, 1 = public.
+    """
+
     name = models.CharField(max_length=255, verbose_name="View Name")
     description = models.TextField(verbose_name="View Description", blank=True)
     query = models.JSONField(verbose_name="View Query")
@@ -77,6 +92,11 @@ class IssueView(WorkspaceBaseModel):
         ordering = ("-created_at",)
 
     def save(self, *args, **kwargs):
+        """Rebuild ``query`` from ``filters`` and, on create, append after the highest ``sort_order``.
+
+        Project views are ordered within their project; workspace views within the
+        workspace's project-less views.
+        """
         query_params = self.filters
         self.query = issue_filters(query_params, "POST") if query_params else {}
 

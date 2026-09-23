@@ -2,6 +2,17 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 # See the LICENSE file for details.
 
+"""
+GitHub OAuth views for the main web app (``/auth/github/`` and
+``/auth/github/callback/``).
+
+The initiate view stores the frontend host, a random ``state`` (CSRF protection) and
+``next_path`` in the session, then redirects to GitHub. The callback runs
+``post_user_auth_workflow`` (accepting pending invitations) and redirects to
+``next_path`` or the path from ``get_redirection_path``. Errors are sent back to the
+frontend as auth error query params.
+"""
+
 # Python imports
 import uuid
 
@@ -24,7 +35,10 @@ from plane.utils.path_validator import get_safe_redirect_url
 
 
 class GitHubOauthInitiateEndpoint(View):
+    """Start the GitHub OAuth flow for the main web app."""
+
     def get(self, request):
+        """Save host/``state``/``next_path`` in the session and redirect to the GitHub authorize URL."""
         # Get host and next path
         request.session["host"] = base_host(request=request, is_app=True)
         next_path = request.GET.get("next_path")
@@ -58,11 +72,15 @@ class GitHubOauthInitiateEndpoint(View):
 
 
 class GitHubCallbackEndpoint(View):
+    """Handle the GitHub redirect back to Plane and log the user in."""
+
     def get(self, request):
+        """Verify ``state``, exchange ``code`` via the provider, log the user in and redirect to the frontend."""
         code = request.GET.get("code")
         state = request.GET.get("state")
         next_path = request.session.get("next_path")
 
+        # Reject callbacks whose state doesn't match the one issued at initiate (CSRF).
         if state != request.session.get("state", ""):
             exc = AuthenticationException(
                 error_code=AUTHENTICATION_ERROR_CODES["GITHUB_OAUTH_PROVIDER_ERROR"],

@@ -2,6 +2,8 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 # See the LICENSE file for details.
 
+"""Serializer for workspace member invitations exposed by the public API."""
+
 # Django imports
 from django.core.exceptions import ValidationError
 from django.core.validators import validate_email
@@ -39,6 +41,7 @@ class WorkspaceInviteSerializer(BaseSerializer):
         ]
 
     def validate_email(self, value):
+        """Ensure the email is syntactically valid."""
         try:
             validate_email(value)
         except ValidationError:
@@ -46,11 +49,13 @@ class WorkspaceInviteSerializer(BaseSerializer):
         return value
 
     def validate_role(self, value):
+        """Only Admin, Member and Guest roles can be assigned through invites."""
         if value not in [ROLE.ADMIN.value, ROLE.MEMBER.value, ROLE.GUEST.value]:
             raise serializers.ValidationError("Invalid role", code="INVALID_WORKSPACE_MEMBER_ROLE")
         return value
 
     def validate(self, data):
+        """Reject duplicate invites for the same email in the workspace (``slug`` from context)."""
         slug = self.context["slug"]
         if (
             data.get("email")

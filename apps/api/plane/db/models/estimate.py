@@ -2,6 +2,13 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 # See the LICENSE file for details.
 
+"""Work item estimation models.
+
+A project defines an ``Estimate`` system (categories such as S/M/L, or numeric
+points) made up of ordered ``EstimatePoint`` values that work items can be
+assigned.
+"""
+
 # Django imports
 from django.core.validators import MinValueValidator
 from django.db import models
@@ -11,11 +18,15 @@ from django.db.models import Q
 from .project import ProjectBaseModel
 
 class EstimateType(models.TextChoices):
+    """Kind of estimate system: free-form categories or numeric points."""
+
     CATEGORIES = "categories", "Categories"
     POINTS = "points", "Points"
 
 
 class Estimate(ProjectBaseModel):
+    """A project's estimate system; ``last_used`` marks the one most recently activated for the project."""
+
     name = models.CharField(max_length=255)
     description = models.TextField(verbose_name="Estimate Description", blank=True)
     type = models.CharField(max_length=255, choices=EstimateType.choices, default=EstimateType.CATEGORIES)
@@ -27,6 +38,7 @@ class Estimate(ProjectBaseModel):
 
     class Meta:
         unique_together = ["name", "project", "deleted_at"]
+        # Estimate names are unique per project among non-deleted rows
         constraints = [
             models.UniqueConstraint(
                 fields=["name", "project"],
@@ -41,6 +53,8 @@ class Estimate(ProjectBaseModel):
 
 
 class EstimatePoint(ProjectBaseModel):
+    """One selectable value of an estimate; ``key`` is its order/position and ``value`` its label."""
+
     estimate = models.ForeignKey("db.Estimate", on_delete=models.CASCADE, related_name="points")
     key = models.IntegerField(default=0, validators=[MinValueValidator(0)])
     description = models.TextField(blank=True)

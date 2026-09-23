@@ -2,6 +2,14 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 # See the LICENSE file for details.
 
+"""Public API endpoints for uploading and managing file assets (routes in plane/api/urls/asset.py).
+
+Uploads use a two-step flow: POST creates a ``FileAsset`` row and returns a
+presigned S3 POST; the client uploads directly to S3 and then PATCHes the asset
+to mark it uploaded, which queues ``get_asset_object_metadata`` if needed.
+Deletes are soft deletes (``is_deleted`` / ``deleted_at``).
+"""
+
 # Python Imports
 import uuid
 
@@ -51,6 +59,7 @@ class UserAssetEndpoint(BaseAPIView):
     """This endpoint is used to upload user profile images."""
 
     def asset_delete(self, asset_id):
+        """Soft-delete the asset with the given id, if it exists."""
         asset = FileAsset.objects.filter(id=asset_id).first()
         if asset is None:
             return
@@ -60,6 +69,7 @@ class UserAssetEndpoint(BaseAPIView):
         return
 
     def entity_asset_delete(self, entity_type, asset, request):
+        """Clear the user's avatar/cover reference that points at this asset (DB write)."""
         # User Avatar
         if entity_type == FileAsset.EntityTypeContext.USER_AVATAR:
             user = User.objects.get(id=asset.user_id)
@@ -122,6 +132,7 @@ class UserAssetEndpoint(BaseAPIView):
         entity_type = request.data.get("entity_type", False)
 
         # Check if the file size is within the limit
+        # Clamp the declared size to the server-wide upload limit.
         size_limit = min(size, settings.FILE_SIZE_LIMIT)
 
         #  Check if the entity type is allowed
@@ -149,6 +160,7 @@ class UserAssetEndpoint(BaseAPIView):
             )
 
         # asset key
+        # Random prefix keeps object keys unique even for identical filenames.
         asset_key = f"{uuid.uuid4().hex}-{name}"
 
         # Create a File Asset
@@ -249,6 +261,7 @@ class UserServerAssetEndpoint(BaseAPIView):
     """This endpoint is used to upload user profile images."""
 
     def asset_delete(self, asset_id):
+        """Soft-delete the asset with the given id, if it exists."""
         asset = FileAsset.objects.filter(id=asset_id).first()
         if asset is None:
             return
@@ -258,6 +271,7 @@ class UserServerAssetEndpoint(BaseAPIView):
         return
 
     def entity_asset_delete(self, entity_type, asset, request):
+        """Clear the user's avatar/cover reference that points at this asset (DB write)."""
         # User Avatar
         if entity_type == FileAsset.EntityTypeContext.USER_AVATAR:
             user = User.objects.get(id=asset.user_id)
@@ -534,9 +548,11 @@ class GenericAssetEndpoint(BaseAPIView):
         workspace = Workspace.objects.get(slug=slug)
 
         # asset key
+        # Generic assets are stored under a per-workspace key prefix.
         asset_key = f"{workspace.id}/{uuid.uuid4().hex}-{name}"
 
         # Check for existing asset with same external details if provided
+        # Idempotency for integrations: return 409 with the existing asset instead of duplicating.
         if external_id and external_source:
             existing_asset = FileAsset.objects.filter(
                 workspace__slug=slug,

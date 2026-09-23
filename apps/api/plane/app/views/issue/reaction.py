@@ -2,6 +2,8 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 # See the LICENSE file for details.
 
+"""Emoji reactions on work items; add/remove is logged as issue activity."""
+
 # Python imports
 import json
 
@@ -23,10 +25,13 @@ from plane.utils.host import base_host
 
 
 class IssueReactionViewSet(BaseViewSet):
+    """Add/remove the current user's reactions on a work item."""
+
     serializer_class = IssueReactionSerializer
     model = IssueReaction
 
     def get_queryset(self):
+        """Reactions of the URL's work item, limited to active members of non-archived projects."""
         return (
             super()
             .get_queryset()
@@ -44,6 +49,7 @@ class IssueReactionViewSet(BaseViewSet):
 
     @allow_permission([ROLE.ADMIN, ROLE.MEMBER, ROLE.GUEST])
     def create(self, request, slug, project_id, issue_id):
+        """Add a reaction for the current user and log the activity."""
         serializer = IssueReactionSerializer(data=request.data)
         if serializer.is_valid():
             serializer.save(issue_id=issue_id, project_id=project_id, actor=request.user)
@@ -63,6 +69,7 @@ class IssueReactionViewSet(BaseViewSet):
 
     @allow_permission([ROLE.ADMIN, ROLE.MEMBER, ROLE.GUEST])
     def destroy(self, request, slug, project_id, issue_id, reaction_code):
+        """Remove the current user's reaction identified by ``reaction_code``."""
         issue_reaction = IssueReaction.objects.get(
             workspace__slug=slug,
             project_id=project_id,

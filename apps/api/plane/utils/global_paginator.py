@@ -2,14 +2,23 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 # See the LICENSE file for details.
 
+"""Simple page-number style paginator driven by a ``page_size:page:offset`` cursor.
+
+Used by views that need offset pagination over a queryset while returning the
+same cursor-shaped response payload as the main cursor paginator.
+"""
+
 # python imports
 from math import ceil
 
 # constants
+# Hard upper bound on page size (also the default when no cursor is sent)
 PAGINATOR_MAX_LIMIT = 1000
 
 
 class PaginateCursor:
+    """Cursor value object serialised as ``"<page_size>:<page>:<offset>"``."""
+
     def __init__(self, current_page_size: int, current_page: int, offset: int):
         self.current_page_size = current_page_size
         self.current_page = current_page
@@ -31,6 +40,12 @@ class PaginateCursor:
 
 
 def paginate(base_queryset, queryset, cursor, on_result):
+    """Slice ``queryset`` into the page described by ``cursor``.
+
+    ``base_queryset`` is only used for the total count; ``on_result`` (optional)
+    transforms the sliced rows. Returns a dict with cursors, counts and results.
+    Raises ValueError for a malformed cursor.
+    """
     # validating for cursor
     if cursor is None:
         cursor_object = PaginateCursor(PAGINATOR_MAX_LIMIT, 0, 0)
@@ -54,6 +69,8 @@ def paginate(base_queryset, queryset, cursor, on_result):
     paginated_data = queryset[start_index:end_index]
 
     # Create the pagination info object
+    # NOTE: prev_cursor is always built, even on page 0 (then it points to page -1);
+    # clients should check prev_page_results before using it. Offset is always 0.
     prev_cursor = f"{page_size}:{cursor_object.current_page - 1}:0"
     cursor = f"{page_size}:{cursor_object.current_page}:0"
     next_cursor = None

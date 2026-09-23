@@ -2,6 +2,11 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 # See the LICENSE file for details.
 
+"""
+URL helpers: detecting URLs inside free text (e.g. to reject links in names),
+validating/parsing URLs, and normalizing duplicate slashes in URL paths.
+"""
+
 # Python imports
 import re
 from typing import Optional
@@ -9,6 +14,8 @@ from urllib.parse import urlparse, urlunparse
 
 # Compiled regex pattern for better performance and ReDoS protection
 # Using atomic groups and length limits to prevent excessive backtracking
+# Matches any of: explicit http(s) URLs, "www." hosts, bare domain names with
+# a 2-6 letter TLD, or dotted IPv4 addresses.
 URL_PATTERN = re.compile(
     r"(?i)"  # Case insensitive
     r"(?:"  # Non-capturing group for alternatives

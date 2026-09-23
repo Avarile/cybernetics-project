@@ -2,6 +2,12 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 # See the LICENSE file for details.
 
+"""User favorites (sidebar bookmarks) within a workspace.
+
+Favorites point to entities such as projects, cycles, modules, views or pages and can be
+nested under a folder-like parent favorite. All operations are scoped to the requesting user.
+"""
+
 # Third party modules
 from rest_framework import status
 from rest_framework.response import Response
@@ -18,10 +24,13 @@ from plane.app.permissions import allow_permission, ROLE
 
 
 class WorkspaceFavoriteEndpoint(BaseAPIView):
+    """CRUD for the current user's top-level favorites in a workspace (admins and members only)."""
+
     use_read_replica = True
 
     @allow_permission(allowed_roles=[ROLE.ADMIN, ROLE.MEMBER], level="WORKSPACE")
     def get(self, request, slug):
+        """List the user's root favorites, hiding project-scoped ones for projects they are no longer active in."""
         # the second filter is to check if the user is a member of the project
         favorites = UserFavorite.objects.filter(user=request.user, workspace__slug=slug, parent__isnull=True).filter(
             Q(project__isnull=True) & ~Q(entity_type="page")
@@ -36,6 +45,7 @@ class WorkspaceFavoriteEndpoint(BaseAPIView):
 
     @allow_permission(allowed_roles=[ROLE.ADMIN, ROLE.MEMBER], level="WORKSPACE")
     def post(self, request, slug):
+        """Create a favorite, or return the existing one if the same entity is already favorited."""
         try:
             workspace = Workspace.objects.get(slug=slug)
 
@@ -68,6 +78,7 @@ class WorkspaceFavoriteEndpoint(BaseAPIView):
 
     @allow_permission(allowed_roles=[ROLE.ADMIN, ROLE.MEMBER], level="WORKSPACE")
     def patch(self, request, slug, favorite_id):
+        """Partially update one of the user's favorites (e.g. rename, reorder, move under a parent)."""
         favorite = UserFavorite.objects.get(user=request.user, workspace__slug=slug, pk=favorite_id)
         serializer = UserFavoriteSerializer(favorite, data=request.data, partial=True)
         if serializer.is_valid():
@@ -77,14 +88,18 @@ class WorkspaceFavoriteEndpoint(BaseAPIView):
 
     @allow_permission(allowed_roles=[ROLE.ADMIN, ROLE.MEMBER], level="WORKSPACE")
     def delete(self, request, slug, favorite_id):
+        """Permanently (hard) delete one of the user's favorites."""
         favorite = UserFavorite.objects.get(user=request.user, workspace__slug=slug, pk=favorite_id)
         favorite.delete(soft=False)
         return Response(status=status.HTTP_204_NO_CONTENT)
 
 
 class WorkspaceFavoriteGroupEndpoint(BaseAPIView):
+    """List the children of a favorite folder for the current user."""
+
     @allow_permission(allowed_roles=[ROLE.ADMIN, ROLE.MEMBER], level="WORKSPACE")
     def get(self, request, slug, favorite_id):
+        """Return favorites whose parent is `favorite_id`, filtered to projects the user is active in."""
         favorites = UserFavorite.objects.filter(user=request.user, workspace__slug=slug, parent_id=favorite_id).filter(
             Q(project__isnull=True)
             | (

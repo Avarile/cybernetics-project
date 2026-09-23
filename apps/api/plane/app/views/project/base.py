@@ -2,6 +2,13 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 # See the LICENSE file for details.
 
+"""Project API views.
+
+Project CRUD (with role-based visibility), archive/unarchive, project
+identifier availability checks, per-member view preferences, project
+favorites and the public deploy board (published project) settings.
+Mutations emit webhook/model activity background tasks.
+"""
 # Python imports
 import json
 
@@ -45,12 +52,21 @@ from plane.utils.order_queryset import PROJECT_ORDER_BY_ALLOWLIST, sanitize_orde
 
 
 class ProjectViewSet(BaseViewSet):
+    """CRUD for projects in a workspace.
+
+    Visibility: workspace guests only see projects they are members of;
+    workspace members also see public (network=2) projects; admins see all.
+    """
     serializer_class = ProjectListSerializer
     model = Project
     webhook_event = "project"
     use_read_replica = True
 
     def get_queryset(self):
+        """Workspace projects annotated with favorite flag, the user's role,
+        deploy-board anchor and the user's custom sort order; active members
+        are prefetched into ``members_list``.
+        """
         sort_order = ProjectUserProperty.objects.filter(
             user=self.request.user,
             project_id=OuterRef("pk"),
@@ -100,6 +116,10 @@ class ProjectViewSet(BaseViewSet):
 
     @allow_permission(allowed_roles=[ROLE.ADMIN, ROLE.MEMBER, ROLE.GUEST], level="WORKSPACE")
     def list_detail(self, request, slug):
+        """List projects with full serializer data, filtered by the user's workspace role.
+
+        Supports ``fields`` selection and cursor pagination (``per_page`` + ``cursor``).
+        """
         fields = [field for field in request.GET.get("fields", "").split(",") if field]
         projects = self.get_queryset().order_by("sort_order", "name")
         if WorkspaceMember.objects.filter(
@@ -144,6 +164,7 @@ class ProjectViewSet(BaseViewSet):
 
     @allow_permission(allowed_roles=[ROLE.ADMIN, ROLE.MEMBER, ROLE.GUEST], level="WORKSPACE")
     def list(self, request, slug):
+        """Lightweight project list (values dict) with role, pending intake count and sort order."""
         sort_order = ProjectUserProperty.objects.filter(
             user=self.request.user,
             project_id=OuterRef("pk"),
@@ -161,6 +182,7 @@ class ProjectViewSet(BaseViewSet):
                 ).values("role")
             )
             .annotate(
+                # Only pending, non-deleted intake issues count toward the badge.
                 intake_count=Count(
                     "project_intakeissue",
                     filter=Q(
@@ -224,6 +246,10 @@ class ProjectViewSet(BaseViewSet):
 
     @allow_permission(allowed_roles=[ROLE.ADMIN, ROLE.MEMBER, ROLE.GUEST], level="WORKSPACE")
     def retrieve(self, request, slug, pk):
+        """Return a non-archived project; non-members get 403 (secret) or 409 (public).
+
+        Records the visit in the user's recent visits.
+        """
         project = self.get_queryset().filter(archived_at__isnull=True).filter(pk=pk).first()
 
         if project is None:
@@ -256,6 +282,10 @@ class ProjectViewSet(BaseViewSet):
 
     @allow_permission([ROLE.ADMIN, ROLE.MEMBER], level="WORKSPACE")
     def create(self, request, slug):
+        """Create a project, make the creator (and project lead) admins, seed default states.
+
+        Side effect: queues a "project" model activity webhook.
+        """
         workspace = Workspace.objects.get(slug=slug)
 
         serializer = ProjectSerializer(data={**request.data}, context={"workspace_id": workspace.id})
@@ -312,6 +342,11 @@ class ProjectViewSet(BaseViewSet):
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
     def partial_update(self, request, slug, pk=None):
+        """Update a project; allowed for workspace admins or project admins only.
+
+        Archived projects are read-only. Enabling ``inbox_view`` (intake) ensures
+        a default Intake exists. Queues a model activity with the prior state.
+        """
         # try:
         is_workspace_admin = WorkspaceMember.objects.filter(
             member=request.user,
@@ -338,6 +373,7 @@ class ProjectViewSet(BaseViewSet):
         workspace = Workspace.objects.get(slug=slug)
 
         project = Project.objects.get(pk=pk, workspace__slug=slug)
+        # The client still sends the legacy "inbox_view" key for intake.
         intake_view = request.data.get("inbox_view", project.intake_view)
         current_instance = json.dumps(ProjectSerializer(project).data, cls=DjangoJSONEncoder)
         if project.archived_at:
@@ -380,6 +416,10 @@ class ProjectViewSet(BaseViewSet):
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
     def destroy(self, request, slug, pk):
+        """Delete a project (workspace or project admins only).
+
+        Queues a "deleted" webhook and removes deploy boards and favorites.
+        """
         if (
             WorkspaceMember.objects.filter(
                 member=request.user,
@@ -410,7 +450,7 @@ class ProjectViewSet(BaseViewSet):
                 old_identifier=None,
                 new_identifier=None,
             )
-            # Delete the project members
+            # Delete the project deploy boards
             DeployBoard.objects.filter(project_id=pk, workspace__slug=slug).delete()
 
             # Delete the user favorite
@@ -425,8 +465,10 @@ class ProjectViewSet(BaseViewSet):
 
 
 class ProjectArchiveUnarchiveEndpoint(BaseAPIView):
+    """Archive (POST) or unarchive (DELETE) a project."""
     @allow_permission([ROLE.ADMIN, ROLE.MEMBER])
     def post(self, request, slug, project_id):
+        """Archive the project and drop all favorites pointing at it."""
         project = Project.objects.get(pk=project_id, workspace__slug=slug)
         project.archived_at = timezone.now()
         project.save()
@@ -435,6 +477,7 @@ class ProjectArchiveUnarchiveEndpoint(BaseAPIView):
 
     @allow_permission([ROLE.ADMIN, ROLE.MEMBER])
     def delete(self, request, slug, project_id):
+        """Unarchive the project."""
         project = Project.objects.get(pk=project_id, workspace__slug=slug)
         project.archived_at = None
         project.save()
@@ -442,8 +485,10 @@ class ProjectArchiveUnarchiveEndpoint(BaseAPIView):
 
 
 class ProjectIdentifierEndpoint(BaseAPIView):
+    """Check or release project identifiers (the short prefix used in issue keys)."""
     @allow_permission([ROLE.ADMIN, ROLE.MEMBER], level="WORKSPACE")
     def get(self, request, slug):
+        """Return whether an identifier (uppercased ``name``) is already taken in the workspace."""
         name = request.GET.get("name", "").strip().upper()
 
         if name == "":
@@ -455,6 +500,7 @@ class ProjectIdentifierEndpoint(BaseAPIView):
 
     @allow_permission([ROLE.ADMIN, ROLE.MEMBER], level="WORKSPACE")
     def delete(self, request, slug):
+        """Release a reserved identifier unless an existing project still uses it."""
         name = request.data.get("name", "").strip().upper()
 
         if name == "":
@@ -472,7 +518,12 @@ class ProjectIdentifierEndpoint(BaseAPIView):
 
 
 class ProjectUserViewsEndpoint(BaseAPIView):
+    """Per-member project UI preferences stored on the ProjectMember row."""
     def post(self, request, slug, project_id):
+        """Update the requester's view props, default props, preferences and sort order.
+
+        Only active project members may update; omitted keys keep their value.
+        """
         project = Project.objects.get(pk=project_id, workspace__slug=slug)
 
         project_member = ProjectMember.objects.filter(member=request.user, project=project, is_active=True).first()
@@ -496,9 +547,11 @@ class ProjectUserViewsEndpoint(BaseAPIView):
 
 
 class ProjectFavoritesViewSet(BaseViewSet):
+    """Add/remove projects from the requesting user's favorites."""
     model = UserFavorite
 
     def get_queryset(self):
+        """Favorites of the current user in the workspace."""
         return self.filter_queryset(
             super()
             .get_queryset()
@@ -512,6 +565,7 @@ class ProjectFavoritesViewSet(BaseViewSet):
         serializer.save(user=self.request.user)
 
     def create(self, request, slug):
+        """Mark the project in ``request.data["project"]`` as a favorite."""
         _ = UserFavorite.objects.create(
             user=request.user,
             entity_type="project",
@@ -521,6 +575,7 @@ class ProjectFavoritesViewSet(BaseViewSet):
         return Response(status=status.HTTP_204_NO_CONTENT)
 
     def destroy(self, request, slug, project_id):
+        """Remove the project from the user's favorites (hard delete)."""
         project_favorite = UserFavorite.objects.get(
             entity_identifier=project_id,
             entity_type="project",
@@ -533,11 +588,13 @@ class ProjectFavoritesViewSet(BaseViewSet):
 
 
 class DeployBoardViewSet(BaseViewSet):
+    """Settings for publishing a project as a public deploy board."""
     permission_classes = [ProjectMemberPermission]
     serializer_class = DeployBoardSerializer
     model = DeployBoard
 
     def list(self, request, slug, project_id):
+        """Return the project's deploy board settings (if any)."""
         project_deploy_board = DeployBoard.objects.filter(
             entity_name="project", entity_identifier=project_id, workspace__slug=slug
         ).first()
@@ -546,6 +603,7 @@ class DeployBoardViewSet(BaseViewSet):
         return Response(serializer.data, status=status.HTTP_200_OK)
 
     def create(self, request, slug, project_id):
+        """Create or update the project's deploy board (views, votes, comments, reactions, intake)."""
         comments = request.data.get("is_comments_enabled", False)
         reactions = request.data.get("is_reactions_enabled", False)
         intake = request.data.get("intake", None)

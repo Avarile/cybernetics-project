@@ -2,6 +2,12 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 # See the LICENSE file for details.
 
+"""Module archive/unarchive API.
+
+Lists archived modules of a project (with issue/estimate progress stats),
+returns a single archived module's detail with distributions, and archives
+(POST) or unarchives (DELETE) a module.
+"""
 from django.contrib.postgres.aggregates import ArrayAgg
 from django.contrib.postgres.fields import ArrayField
 from django.db.models import (
@@ -40,9 +46,15 @@ from .. import BaseAPIView
 
 
 class ModuleArchiveUnarchiveEndpoint(BaseAPIView):
+    """Archive, unarchive and browse archived modules of a project."""
     permission_classes = [ProjectEntityPermission]
 
     def get_queryset(self):
+        """Return archived modules of the project annotated with favorite flag,
+        per-state issue counts, estimate point sums and member ids.
+        """
+        # Each subquery below counts/sums issues of a module (OuterRef("pk"))
+        # for one state group; soft-deleted module-issue links are excluded.
         favorite_subquery = UserFavorite.objects.filter(
             user=self.request.user,
             entity_type="module",
@@ -109,6 +121,8 @@ class ModuleArchiveUnarchiveEndpoint(BaseAPIView):
             .annotate(cnt=Count("pk"))
             .values("cnt")
         )
+        # Estimate sums only apply to "points" estimates; the numeric value is
+        # stored as text, so it is cast to float before summing.
         completed_estimate_point = (
             Issue.issue_objects.filter(
                 estimate_point__estimate__type="points",
@@ -256,6 +270,11 @@ class ModuleArchiveUnarchiveEndpoint(BaseAPIView):
         )
 
     def get(self, request, slug, project_id, pk=None):
+        """List archived modules, or return one archived module's detail.
+
+        The detail view adds assignee/label distributions and a burndown chart
+        (issue-based, plus point-based when the project uses point estimates).
+        """
         if pk is None:
             queryset = self.get_queryset()
             modules = queryset.values(  # Required fields
@@ -308,6 +327,8 @@ class ModuleArchiveUnarchiveEndpoint(BaseAPIView):
                 )
             )
 
+            # Point-based distributions are only computed when the project's
+            # estimate system is of type "points".
             estimate_type = Project.objects.filter(
                 workspace__slug=slug,
                 pk=project_id,
@@ -419,6 +440,8 @@ class ModuleArchiveUnarchiveEndpoint(BaseAPIView):
                 data["estimate_distribution"]["assignees"] = assignee_distribution
                 data["estimate_distribution"]["labels"] = label_distribution
 
+                # A burndown chart needs a date range, so only build it when
+                # both start and target dates are set.
                 if modules and modules.start_date and modules.target_date:
                     data["estimate_distribution"]["completion_chart"] = burndown_plot(
                         queryset=modules,
@@ -428,6 +451,7 @@ class ModuleArchiveUnarchiveEndpoint(BaseAPIView):
                         module_id=pk,
                     )
 
+            # Issue-count based distributions are always returned.
             assignee_distribution = (
                 Issue.issue_objects.filter(
                     issue_module__module_id=pk,
@@ -542,6 +566,10 @@ class ModuleArchiveUnarchiveEndpoint(BaseAPIView):
             return Response(data, status=status.HTTP_200_OK)
 
     def post(self, request, slug, project_id, module_id):
+        """Archive a module; only completed or cancelled modules are allowed.
+
+        Also removes any user favorites pointing at the module.
+        """
         module = Module.objects.get(pk=module_id, project_id=project_id, workspace__slug=slug)
         if module.status not in ["completed", "cancelled"]:
             return Response(
@@ -559,6 +587,7 @@ class ModuleArchiveUnarchiveEndpoint(BaseAPIView):
         return Response({"archived_at": str(module.archived_at)}, status=status.HTTP_200_OK)
 
     def delete(self, request, slug, project_id, module_id):
+        """Unarchive a module by clearing its archived_at timestamp."""
         module = Module.objects.get(pk=module_id, project_id=project_id, workspace__slug=slug)
         module.archived_at = None
         module.save()

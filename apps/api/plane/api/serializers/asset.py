@@ -2,6 +2,12 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 # See the LICENSE file for details.
 
+"""Serializers for asset (file) upload endpoints of the public API.
+
+Used by plane.api.views.asset for presigned-URL generation and upload
+confirmation of user and workspace/project assets stored in S3.
+"""
+
 # Third party imports
 from rest_framework import serializers
 

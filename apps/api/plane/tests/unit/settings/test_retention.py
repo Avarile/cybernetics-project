@@ -13,6 +13,8 @@ ENV_VAR = "TEST_RETENTION_DAYS"
 
 @pytest.mark.unit
 class TestRetentionDays:
+    """_retention_days(env, default) returns a non-negative int or falls back to default."""
+
     def test_uses_default_when_unset(self, monkeypatch):
         monkeypatch.delenv(ENV_VAR, raising=False)
         assert _retention_days(ENV_VAR, 14) == 14

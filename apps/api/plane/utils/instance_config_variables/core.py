@@ -2,6 +2,14 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 # See the LICENSE file for details.
 
+"""Core instance configuration variables seeded into InstanceConfiguration.
+
+Each entry has ``key``, a default ``value`` read from the environment,
+``category`` (logical group of the setting) and ``is_encrypted`` (secrets are
+stored encrypted in the DB). The ``configure_instance`` management command
+creates any missing keys; existing values are left untouched.
+"""
+
 # Python imports
 import os
 
@@ -232,6 +240,7 @@ unsplash_config_variables = [
     },
 ]
 
+# All groups combined; exported to the package-level instance_config_variables
 core_config_variables = [
     *authentication_config_variables,
     *workspace_management_config_variables,

@@ -22,6 +22,10 @@ logger = logging.getLogger("plane.mcp")
 
 
 def with_mcp(inner_app, django_asgi_app):
+    """Return ``inner_app`` wrapped with the MCP router, or unchanged when ``MCP_SERVER_ENABLED`` is off.
+
+    ``django_asgi_app`` is the plain Django ASGI app that the loopback client replays tool calls against.
+    """
     if not settings.MCP_SERVER_ENABLED:
         return inner_app
 
@@ -36,6 +40,7 @@ def with_mcp(inner_app, django_asgi_app):
 
 
 async def send_method_not_allowed(send) -> None:
+    """Send a 405 JSON response allowing only POST."""
     body = b'{"error": "Only POST is supported on this endpoint"}'
     await send(
         {
@@ -52,6 +57,8 @@ async def send_method_not_allowed(send) -> None:
 
 
 class MCPRouter:
+    """ASGI app that sends MCP_PATH requests to the MCP app and everything else to ``inner_app``."""
+
     def __init__(self, inner_app, mcp_app, server, client, path: str):
         self.inner_app = inner_app
         self.mcp_app = mcp_app
@@ -60,6 +67,7 @@ class MCPRouter:
         self.path = path
 
     async def __call__(self, scope, receive, send):
+        """Dispatch by scope type/path: lifespan events, MCP POSTs, or pass-through to Django."""
         if scope["type"] == "lifespan":
             await self.lifespan(receive, send)
             return
@@ -79,6 +87,9 @@ class MCPRouter:
         await self.inner_app(scope, receive, send)
 
     async def lifespan(self, receive, send):
+        """Handle the ASGI lifespan protocol: start the MCP session manager on startup, and on shutdown
+        close it and the loopback HTTP client.
+        """
         stack = AsyncExitStack()
         while True:
             message = await receive()

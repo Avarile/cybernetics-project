@@ -2,6 +2,13 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 # See the LICENSE file for details.
 
+"""factory_boy factories for the core models used across the test suite.
+
+Each factory builds a valid, persisted model instance with sensible defaults
+(users, workspaces, projects, members, states, issues) plus the Cybernetics-Data
+integration and record-link models. Override any field via keyword arguments.
+"""
+
 import factory
 from uuid import uuid4
 from django.utils import timezone
@@ -29,6 +36,7 @@ class UserFactory(factory.django.DjangoModelFactory):
 
     id = factory.LazyFunction(uuid4)
     email = factory.Sequence(lambda n: f"user{n}@plane.so")
+    # Hash the literal "password" after creation so tests can log in with it.
     password = factory.PostGenerationMethodCall("set_password", "password")
     first_name = factory.Sequence(lambda n: f"First{n}")
     last_name = factory.Sequence(lambda n: f"Last{n}")
@@ -119,6 +127,7 @@ class IssueFactory(factory.django.DjangoModelFactory):
     id = factory.LazyFunction(uuid4)
     name = factory.Sequence(lambda n: f"Issue {n}")
     project = factory.SubFactory(ProjectFactory)
+    # "..project" refers to the parent Issue's project, so the state belongs to the same project.
     state = factory.SubFactory(StateFactory, project=factory.SelfAttribute("..project"))
 
 
@@ -128,6 +137,8 @@ class ProjectCyberneticsDataIntegrationFactory(factory.django.DjangoModelFactory
     class Meta:
         model = ProjectCyberneticsDataIntegration
 
+    # ``token`` is a factory-only parameter (not a model field); the stored
+    # encrypted value, hint and fingerprint are all derived from it.
     class Params:
         token = "cybernetics_factory_token_0001"
 
@@ -163,6 +174,7 @@ class IssueCyberneticsRecordFactory(factory.django.DjangoModelFactory):
 
     @classmethod
     def _create(cls, model_class, *args, **kwargs):
+        """Persist the record, forwarding an optional ``created_by`` user as ``created_by_id`` to save()."""
         # BaseModel.save() overwrites created_by with the request user unless created_by_id is passed.
         created_by = kwargs.pop("created_by", None)
         instance = model_class(*args, **kwargs)

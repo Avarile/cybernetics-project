@@ -2,6 +2,14 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 # See the LICENSE file for details.
 
+"""File asset model.
+
+``FileAsset`` tracks every uploaded file stored in object storage (S3/MinIO):
+work item attachments, images embedded in descriptions/comments/pages, user
+avatars and covers, workspace logos and project covers. The ``entity_type``
+determines which ``/api/assets/v2/...`` endpoint serves the file.
+"""
+
 # Python imports
 from uuid import uuid4
 
@@ -17,6 +25,12 @@ from .base import BaseModel
 
 
 def get_upload_path(instance, filename):
+    """Build the storage key for an uploaded file.
+
+    Workspace files are stored under ``<workspace_id>/``; files without a workspace
+    (e.g. user avatars) get a ``user-`` prefix. A random hex prefix avoids name
+    collisions, and the sanitized filename falls back to a random hex if empty.
+    """
     filename = sanitize_filename(filename) or uuid4().hex
     if instance.workspace_id is not None:
         return f"{instance.workspace.id}/{uuid4().hex}-{filename}"
@@ -24,6 +38,8 @@ def get_upload_path(instance, filename):
 
 
 def file_size(value):
+    """Validator rejecting files larger than ``settings.FILE_SIZE_LIMIT``."""
+    # Note: the message hard-codes "5 MB" even though the actual limit comes from settings.
     if value.size > settings.FILE_SIZE_LIMIT:
         raise ValidationError("File too large. Size should not exceed 5 MB.")
 
@@ -31,9 +47,16 @@ def file_size(value):
 class FileAsset(BaseModel):
     """
     A file asset.
+
+    Exactly which of the nullable foreign keys is set depends on ``entity_type``.
+    ``is_uploaded`` becomes true once the client confirms the direct upload to
+    storage finished; ``size`` is in bytes.
     """
 
     class EntityTypeContext(models.TextChoices):
+        """What the asset is attached to; drives the URL returned by ``asset_url``."""
+
+
         ISSUE_ATTACHMENT = "ISSUE_ATTACHMENT"
         ISSUE_DESCRIPTION = "ISSUE_DESCRIPTION"
         COMMENT_DESCRIPTION = "COMMENT_DESCRIPTION"
@@ -81,6 +104,8 @@ class FileAsset(BaseModel):
 
     @property
     def asset_url(self):
+        """Return the relative API URL that serves this asset, or ``None`` for unsupported types."""
+        # Public-ish images (logos, avatars, covers) are served by the static endpoint
         if (
             self.entity_type == self.EntityTypeContext.WORKSPACE_LOGO
             or self.entity_type == self.EntityTypeContext.USER_AVATAR
@@ -92,6 +117,7 @@ class FileAsset(BaseModel):
         if self.entity_type == self.EntityTypeContext.ISSUE_ATTACHMENT:
             return f"/api/assets/v2/workspaces/{self.workspace.slug}/projects/{self.project_id}/issues/{self.issue_id}/attachments/{self.id}/"  # noqa: E501
 
+        # Images embedded in rich-text content are served by the project-scoped endpoint
         if self.entity_type in [
             self.EntityTypeContext.ISSUE_DESCRIPTION,
             self.EntityTypeContext.COMMENT_DESCRIPTION,

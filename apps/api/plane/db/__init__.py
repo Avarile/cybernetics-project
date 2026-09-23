@@ -2,3 +2,4 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 # See the LICENSE file for details.
 
+"""Core database package: models, mixins, management commands and migrations for the Plane API."""

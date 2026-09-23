@@ -2,6 +2,14 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 # See the LICENSE file for details.
 
+"""Current-user ("me") account views.
+
+Covers the authenticated user's own record and settings (``UserEndpoint``),
+including the email-change flow (magic code cached in Redis, emails sent via
+Celery) and account deactivation, plus session status, onboarding/tour flags,
+activity feed, linked social accounts and profile preferences.
+"""
+
 # Python imports
 import uuid
 import json
@@ -57,11 +65,14 @@ logger = logging.getLogger("plane")
 
 
 class UserEndpoint(BaseViewSet):
+    """Operations on the requesting user's own account; every action targets ``request.user``."""
+
     serializer_class = UserSerializer
     model = User
     use_read_replica = True
 
     def get_object(self):
+        """Always operate on the authenticated user (no lookup by pk)."""
         return self.request.user
 
     def get_throttles(self):
@@ -75,21 +86,25 @@ class UserEndpoint(BaseViewSet):
     @method_decorator(cache_control(private=True, max_age=12))
     @method_decorator(vary_on_cookie)
     def retrieve(self, request):
+        """Return the current user; privately cached by the browser for 12s."""
         serialized_data = UserMeSerializer(request.user).data
         return Response(serialized_data, status=status.HTTP_200_OK)
 
     @method_decorator(cache_control(private=True, max_age=12))
     @method_decorator(vary_on_cookie)
     def retrieve_user_settings(self, request):
+        """Return the current user's settings payload (workspace defaults etc.)."""
         serialized_data = UserMeSettingsSerializer(request.user).data
         return Response(serialized_data, status=status.HTTP_200_OK)
 
     def retrieve_instance_admin(self, request):
+        """Report whether the current user is an admin of this (single) instance."""
         instance = Instance.objects.first()
         is_admin = InstanceAdmin.objects.filter(instance=instance, user=request.user).exists()
         return Response({"is_instance_admin": is_admin}, status=status.HTTP_200_OK)
 
     def partial_update(self, request, *args, **kwargs):
+        """Update fields of the current user via ``UserSerializer``."""
         return super().partial_update(request, *args, **kwargs)
 
     def _validate_new_email(self, user, new_email):
@@ -153,7 +168,7 @@ class UserEndpoint(BaseViewSet):
             # Use a special key prefix to distinguish from regular magic signin
             # Include user ID to bind the code to the specific user
             cache_key = f"magic_email_update_{user.id}_{new_email}"
-            ## Generate a random token
+            ## Generate a random token (6-digit code in 100000..999999)
             token = str(secrets.randbelow(900000) + 100000)
             # Store in cache with 10 minute expiration
             cache_data = json.dumps({"token": token})
@@ -250,6 +265,12 @@ class UserEndpoint(BaseViewSet):
         return Response(serialized_data, status=status.HTTP_200_OK)
 
     def deactivate(self, request):
+        """Deactivate the current user's account.
+
+        Refuses instance admins and users who are the sole admin of a project/workspace.
+        Otherwise deactivates memberships, deletes pending invites and sessions, resets
+        onboarding and password, marks the user inactive, emails them (Celery) and logs out.
+        """
         # Check all workspace user is active
         user = self.get_object()
 
@@ -263,6 +284,10 @@ class UserEndpoint(BaseViewSet):
         projects_to_deactivate = []
         workspaces_to_deactivate = []
 
+        # For each of the user's memberships, count other active admins (role=20).
+        # NOTE: the annotation is computed per membership row filtered to this user, so
+        # other_admin_exists is effectively always 0 and total_members always 1; the
+        # "only admin" guard below therefore likely never triggers.
         projects = ProjectMember.objects.filter(member=request.user, is_active=True).annotate(
             other_admin_exists=Count(
                 Case(
@@ -274,6 +299,7 @@ class UserEndpoint(BaseViewSet):
             total_members=Count("id"),
         )
 
+        # Allowed if another admin remains or the user is the only member
         for project in projects:
             if project.other_admin_exists > 0 or (project.total_members == 1):
                 project.is_active = False
@@ -330,7 +356,7 @@ class UserEndpoint(BaseViewSet):
         }
         profile.save()
 
-        # Reset password
+        # Reset password to a random unusable value; is_password_autoset lets them set a new one on return
         user.is_password_autoset = True
         user.set_password(uuid.uuid4().hex)
 
@@ -349,6 +375,8 @@ class UserEndpoint(BaseViewSet):
 
 
 class UserSessionEndpoint(BaseAPIView):
+    """Public endpoint reporting whether the request is authenticated (and the user if so)."""
+
     permission_classes = [AllowAny]
 
     def get(self, request):
@@ -363,6 +391,8 @@ class UserSessionEndpoint(BaseAPIView):
 
 
 class UpdateUserOnBoardedEndpoint(BaseAPIView):
+    """Set the ``is_onboarded`` flag on the current user's profile."""
+
     def patch(self, request):
         profile = Profile.objects.get(user_id=request.user.id)
         profile.is_onboarded = request.data.get("is_onboarded", False)
@@ -371,6 +401,8 @@ class UpdateUserOnBoardedEndpoint(BaseAPIView):
 
 
 class UpdateUserTourCompletedEndpoint(BaseAPIView):
+    """Set the ``is_tour_completed`` flag on the current user's profile."""
+
     def patch(self, request):
         profile = Profile.objects.get(user_id=request.user.id)
         profile.is_tour_completed = request.data.get("is_tour_completed", False)
@@ -379,12 +411,15 @@ class UpdateUserTourCompletedEndpoint(BaseAPIView):
 
 
 class UserActivityEndpoint(BaseAPIView, BasePaginator):
+    """Paginated feed of issue activities performed by the current user."""
+
     def get(self, request):
         queryset = IssueActivity.objects.filter(actor=request.user).select_related(
             "actor", "workspace", "issue", "project"
         )
 
         return self.paginate(
+            # Only allow whitelisted order_by fields to avoid arbitrary ordering/injection
             order_by=sanitize_order_by(
                 request.GET.get("order_by", "-created_at"),
                 ACTIVITY_ORDER_BY_ALLOWLIST,
@@ -397,6 +432,8 @@ class UserActivityEndpoint(BaseAPIView, BasePaginator):
 
 
 class AccountEndpoint(BaseAPIView):
+    """List, fetch or unlink the current user's connected auth provider accounts (OAuth)."""
+
     def get(self, request, pk=None):
         if pk:
             account = Account.objects.get(pk=pk, user=request.user)
@@ -414,6 +451,8 @@ class AccountEndpoint(BaseAPIView):
 
 
 class ProfileEndpoint(BaseAPIView):
+    """Read and partially update the current user's profile (preferences, onboarding state)."""
+
     @method_decorator(cache_control(private=True, max_age=12))
     @method_decorator(vary_on_cookie)
     def get(self, request):

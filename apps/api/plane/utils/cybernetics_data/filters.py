@@ -2,12 +2,17 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 # See the LICENSE file for details.
 
-"""Validation of ids and query payloads forwarded to Cybernetics-Data."""
+"""Validation of ids and query payloads forwarded to Cybernetics-Data.
+
+Used by the Cybernetics-Data proxy views to whitelist user-supplied ids, filters,
+sort orders and search terms before they reach ``CyberneticsDataClient``.
+"""
 
 # Python imports
 import json
 import re
 
+# Teable ids are a type prefix followed by an alphanumeric body (e.g. "tblXXXXXXXX")
 ID_PREFIXES = {
     "space": "spc",
     "base": "bse",
@@ -18,6 +23,7 @@ ID_PREFIXES = {
 }
 _ID_BODY = re.compile(r"^[A-Za-z0-9]{8,32}$")
 
+# Only these Teable filter operators are accepted; anything else is rejected
 FILTER_OPERATORS = frozenset(
     {
         "is",
@@ -44,6 +50,7 @@ FILTER_OPERATORS = frozenset(
         "isOnOrAfter",
     }
 )
+# Limits that keep forwarded queries small and cheap for the upstream service
 MAX_FILTER_DEPTH = 3
 MAX_FILTER_CONDITIONS = 20
 MAX_ORDER_ITEMS = 5
@@ -52,6 +59,8 @@ _SCALARS = (str, int, float, bool, type(None))
 
 
 class QueryValidationError(ValueError):
+    """Raised when a user-supplied id or query parameter fails validation."""
+
     pass
 
 
@@ -64,6 +73,7 @@ def validate_id(value, kind):
 
 
 def _validate_value(value):
+    """Allow only scalars, short scalar lists, or small flat dicts (date filters) as filter values."""
     if isinstance(value, _SCALARS):
         if isinstance(value, str) and len(value) > 1000:
             raise QueryValidationError("Filter value is too long")
@@ -81,6 +91,11 @@ def _validate_value(value):
 
 
 def _validate_filter_set(node, depth, counter):
+    """Recursively validate a ``{"conjunction", "filterSet"}`` node and return a rebuilt clean copy.
+
+    ``counter`` is a one-element list shared across recursion to cap the total number of conditions.
+    Unknown keys are dropped because each condition is rebuilt from fieldId/operator/value only.
+    """
     if depth > MAX_FILTER_DEPTH:
         raise QueryValidationError("Filter is nested too deeply")
     if not isinstance(node, dict):
@@ -93,6 +108,7 @@ def _validate_filter_set(node, depth, counter):
         raise QueryValidationError("filterSet must be a list")
     clean = []
     for item in items:
+        # Nested group -> recurse one level deeper
         if isinstance(item, dict) and "filterSet" in item:
             clean.append(_validate_filter_set(item, depth + 1, counter))
             continue
@@ -119,6 +135,7 @@ def parse_filter(raw):
     except ValueError:
         raise QueryValidationError("filter must be valid JSON")
     result = _validate_filter_set(data, 1, [0])
+    # An empty filter set is treated as "no filter"
     return result if result["filterSet"] else None
 
 
@@ -145,6 +162,7 @@ def parse_order_by(raw):
 
 
 def parse_search(raw):
+    """Return a stripped search term (max MAX_SEARCH_LENGTH chars) or None if blank."""
     if not raw:
         return None
     value = str(raw).strip()
@@ -154,6 +172,7 @@ def parse_search(raw):
 
 
 def parse_int(raw, default, minimum, maximum):
+    """Parse an integer query param, returning ``default`` when missing and clamping to [minimum, maximum]."""
     if raw in (None, ""):
         return default
     try:

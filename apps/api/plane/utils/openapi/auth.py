@@ -7,6 +7,9 @@ OpenAPI authentication extensions for drf-spectacular.
 
 This module provides authentication extensions that automatically register
 custom authentication classes with the OpenAPI schema generator.
+
+drf-spectacular discovers extensions on import, so this module is imported at
+startup (see ``plane.api.apps``) for the extension to take effect.
 """
 
 from drf_spectacular.extensions import OpenApiAuthenticationExtension

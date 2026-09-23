@@ -2,6 +2,15 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 # See the LICENSE file for details.
 
+"""Issue subscriber endpoints.
+
+Subscribers of an issue receive notifications about its activity. This viewset
+lets project members list candidate subscribers, remove a subscriber, and lets
+the current user subscribe / unsubscribe / check their own subscription.
+Routes live under ``.../projects/<project_id>/issues/<issue_id>/`` (e.g.
+``issue-subscribers/`` and ``subscribe/``).
+"""
+
 # Third Party imports
 from rest_framework.response import Response
 from rest_framework import status
@@ -14,12 +23,16 @@ from plane.db.models import IssueSubscriber, ProjectMember
 
 
 class IssueSubscriberViewSet(BaseViewSet):
+    """Manage ``IssueSubscriber`` rows for a single issue."""
+
     serializer_class = IssueSubscriberSerializer
     model = IssueSubscriber
 
     permission_classes = [ProjectEntityPermission]
 
     def get_permissions(self):
+        """Self-service actions only need project access (ProjectLitePermission);
+        managing other subscribers requires ProjectEntityPermission."""
         if self.action in ["subscribe", "unsubscribe", "subscription_status"]:
             self.permission_classes = [ProjectLitePermission]
         else:
@@ -28,12 +41,15 @@ class IssueSubscriberViewSet(BaseViewSet):
         return super(IssueSubscriberViewSet, self).get_permissions()
 
     def perform_create(self, serializer):
+        """Bind the new subscriber to the project and issue from the URL."""
         serializer.save(
             project_id=self.kwargs.get("project_id"),
             issue_id=self.kwargs.get("issue_id"),
         )
 
     def get_queryset(self):
+        """Subscribers of the URL's issue, limited to projects the requester is an
+        active member of and that are not archived."""
         return (
             super()
             .get_queryset()
@@ -50,6 +66,8 @@ class IssueSubscriberViewSet(BaseViewSet):
         )
 
     def list(self, request, slug, project_id, issue_id):
+        """Return all active project members (the pool of possible subscribers),
+        not the current subscribers of the issue."""
         members = ProjectMember.objects.filter(
             workspace__slug=slug, project_id=project_id, is_active=True
         ).select_related("member")
@@ -57,6 +75,7 @@ class IssueSubscriberViewSet(BaseViewSet):
         return Response(serializer.data, status=status.HTTP_200_OK)
 
     def destroy(self, request, slug, project_id, issue_id, subscriber_id):
+        """Remove the given user (``subscriber_id`` is a user id) from the issue's subscribers."""
         issue_subscriber = IssueSubscriber.objects.get(
             project=project_id,
             subscriber=subscriber_id,
@@ -67,6 +86,7 @@ class IssueSubscriberViewSet(BaseViewSet):
         return Response(status=status.HTTP_204_NO_CONTENT)
 
     def subscribe(self, request, slug, project_id, issue_id):
+        """Subscribe the requesting user to the issue; 400 if already subscribed."""
         if IssueSubscriber.objects.filter(
             issue_id=issue_id,
             subscriber=request.user,
@@ -85,6 +105,7 @@ class IssueSubscriberViewSet(BaseViewSet):
         return Response(serializer.data, status=status.HTTP_201_CREATED)
 
     def unsubscribe(self, request, slug, project_id, issue_id):
+        """Remove the requesting user's subscription to the issue."""
         issue_subscriber = IssueSubscriber.objects.get(
             project=project_id,
             subscriber=request.user,
@@ -95,6 +116,7 @@ class IssueSubscriberViewSet(BaseViewSet):
         return Response(status=status.HTTP_204_NO_CONTENT)
 
     def subscription_status(self, request, slug, project_id, issue_id):
+        """Return ``{"subscribed": bool}`` for the requesting user."""
         issue_subscriber = IssueSubscriber.objects.filter(
             issue=issue_id,
             subscriber=request.user,

@@ -9,10 +9,11 @@ from plane.api.serializers import WorkspaceLiteSerializer
 from plane.db.models import WorkspaceMember
 from plane.mcp.services.throttle import charge_api_key_rate_limit
 
-ROLE_NAMES = {20: "admin", 15: "member", 5: "guest"}
+ROLE_NAMES = {20: "admin", 15: "member", 5: "guest"}  # WorkspaceMember.role values
 
 
 def list_workspaces_for_user(user_id: str, token: str) -> list[dict]:
+    """Return the user's active workspace memberships (lite workspace data + role name), sorted by name; charges the rate limit."""
     charge_api_key_rate_limit(token)
     memberships = (
         WorkspaceMember.objects.filter(member_id=user_id, is_active=True, workspace__deleted_at__isnull=True)

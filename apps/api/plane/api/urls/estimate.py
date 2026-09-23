@@ -2,6 +2,8 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 # See the LICENSE file for details.
 
+"""Public API routes for project estimates and estimate points (/api/v1/)."""
+
 from django.urls import path
 
 from plane.api.views.estimate import (

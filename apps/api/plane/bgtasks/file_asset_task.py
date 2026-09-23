@@ -2,6 +2,8 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 # See the LICENSE file for details.
 
+"""Periodic Celery task that purges ``FileAsset`` rows whose upload was never completed."""
+
 # Python imports
 import os
 from datetime import timedelta
@@ -20,6 +22,7 @@ from plane.db.models import FileAsset
 @shared_task
 def delete_unuploaded_file_asset():
     """This task deletes unuploaded file assets older than a certain number of days."""
+    # Retention window configurable via UNUPLOADED_ASSET_DELETE_DAYS (default 7 days).
     FileAsset.objects.filter(
         Q(created_at__lt=timezone.now() - timedelta(days=int(os.environ.get("UNUPLOADED_ASSET_DELETE_DAYS", "7"))))
         & Q(is_uploaded=False)

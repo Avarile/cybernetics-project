@@ -2,6 +2,13 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 # See the LICENSE file for details.
 
+"""Celery task that crawls a work item (issue) link to fetch its page title and favicon.
+
+Enqueued when an IssueLink is created/updated; the result is stored in
+``IssueLink.metadata`` for link previews. All outbound requests are SSRF-hardened
+(scheme check, blocked-IP check, IP pinning, bounded redirects).
+"""
+
 # Python imports
 import logging
 import socket
@@ -23,6 +30,7 @@ from plane.utils.url_security import pinned_fetch, pinned_fetch_following_redire
 logger = logging.getLogger("plane.worker")
 
 
+# Base64-encoded generic "link" SVG icon used when no favicon can be fetched
 DEFAULT_FAVICON = "PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIyNCIgaGVpZ2h0PSIyNCIgdmlld0JveD0iMCAwIDI0IDI0IiBmaWxsPSJub25lIiBzdHJva2U9ImN1cnJlbnRDb2xvciIgc3Ryb2tlLXdpZHRoPSIyIiBzdHJva2UtbGluZWNhcD0icm91bmQiIHN0cm9rZS1saW5lam9pbj0icm91bmQiIGNsYXNzPSJsdWNpZGUgbHVjaWRlLWxpbmstaWNvbiBsdWNpZGUtbGluayI+PHBhdGggZD0iTTEwIDEzYTUgNSAwIDAgMCA3LjU0LjU0bDMtM2E1IDUgMCAwIDAtNy4wNy03LjA3bC0xLjcyIDEuNzEiLz48cGF0aCBkPSJNMTQgMTFhNSA1IDAgMCAwLTcuNTQtLjU0bC0zIDNhNSA1IDAgMCAwIDcuMDcgNy4wN2wxLjcxLTEuNzEiLz48L3N2Zz4="  # noqa: E501
 
 
@@ -110,7 +118,8 @@ def crawl_work_item_link_title_and_favicon(url: str) -> Dict[str, Any]:
         url (str): The URL to crawl
 
     Returns:
-        str: JSON string containing title and base64-encoded favicon
+        dict: title, base64 data-URI favicon, original url and favicon_url
+        (or an "error" key with null title/favicon on unexpected failure)
     """
     try:
         # Set up headers to mimic a real browser
@@ -209,11 +218,13 @@ def fetch_and_encode_favicon(
     Fetch favicon and encode it as base64.
 
     Args:
-        favicon_url: URL to the favicon
         headers: Request headers
+        soup: Parsed page HTML (may be None) used to locate the favicon
+        url: Page URL used to resolve relative favicon paths
 
     Returns:
-        str: Base64 encoded favicon with data URI prefix or None
+        dict: ``favicon_url`` and ``favicon_base64`` (a data URI; falls back to
+        DEFAULT_FAVICON with a None URL on failure)
     """
     try:
         favicon_url = find_favicon_url(soup, url)
@@ -247,6 +258,7 @@ def fetch_and_encode_favicon(
 
 @shared_task
 def crawl_work_item_link_title(id: str, url: str) -> None:
+    """Crawl ``url`` and save the title/favicon metadata onto IssueLink ``id``."""
     meta_data = crawl_work_item_link_title_and_favicon(url)
 
     try:

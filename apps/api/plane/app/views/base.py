@@ -2,6 +2,14 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 # See the LICENSE file for details.
 
+"""Base classes shared by all ``plane.app`` (web app) API views.
+
+``BaseViewSet`` and ``BaseAPIView`` wire in session authentication, the
+authenticated-user permission default, filtering/search backends, cursor
+pagination (``BasePaginator``), read-replica routing and per-user timezone
+activation, and translate common exceptions into JSON error responses.
+"""
+
 # Python imports
 import traceback
 
@@ -38,6 +46,7 @@ class TimezoneMixin:
     """
 
     def initial(self, request, *args, **kwargs):
+        """Activate the authenticated user's timezone for this request (UTC default otherwise)."""
         super().initial(request, *args, **kwargs)
         if request.user.is_authenticated:
             timezone.activate(zoneinfo.ZoneInfo(request.user.user_timezone))
@@ -46,6 +55,8 @@ class TimezoneMixin:
 
 
 class BaseViewSet(TimezoneMixin, ReadReplicaControlMixin, ModelViewSet, BasePaginator):
+    """Base ``ModelViewSet`` for app endpoints; subclasses set ``model`` and serializers."""
+
     model = None
 
     permission_classes = [IsAuthenticated]
@@ -61,6 +72,7 @@ class BaseViewSet(TimezoneMixin, ReadReplicaControlMixin, ModelViewSet, BasePagi
     use_read_replica = False
 
     def get_queryset(self):
+        """Default queryset: every row of ``self.model``; misconfigured views raise a 400."""
         try:
             return self.model.objects.all()
         except Exception as e:
@@ -76,6 +88,7 @@ class BaseViewSet(TimezoneMixin, ReadReplicaControlMixin, ModelViewSet, BasePagi
             response = super().handle_exception(exc)
             return response
         except Exception as e:
+            # Unhandled by DRF: map well-known Django errors to 4xx, everything else to 500.
             (print(e, traceback.format_exc()) if settings.DEBUG else print("Server Error"))
             if isinstance(e, IntegrityError):
                 return Response(
@@ -109,6 +122,7 @@ class BaseViewSet(TimezoneMixin, ReadReplicaControlMixin, ModelViewSet, BasePagi
             )
 
     def dispatch(self, request, *args, **kwargs):
+        """Run the view, logging the SQL query count in DEBUG, and convert any error into a response."""
         try:
             response = super().dispatch(request, *args, **kwargs)
 
@@ -124,10 +138,12 @@ class BaseViewSet(TimezoneMixin, ReadReplicaControlMixin, ModelViewSet, BasePagi
 
     @property
     def workspace_slug(self):
+        """Workspace slug from the URL kwargs, if present."""
         return self.kwargs.get("slug", None)
 
     @property
     def project_id(self):
+        """Project id from the URL kwargs (or ``pk`` on the ``project`` detail route)."""
         project_id = self.kwargs.get("project_id", None)
         if project_id:
             return project_id
@@ -137,16 +153,20 @@ class BaseViewSet(TimezoneMixin, ReadReplicaControlMixin, ModelViewSet, BasePagi
 
     @property
     def fields(self):
+        """Comma separated ``?fields=`` query param as a list, or None."""
         fields = [field for field in self.request.GET.get("fields", "").split(",") if field]
         return fields if fields else None
 
     @property
     def expand(self):
+        """Comma separated ``?expand=`` query param as a list, or None."""
         expand = [expand for expand in self.request.GET.get("expand", "").split(",") if expand]
         return expand if expand else None
 
 
 class BaseAPIView(TimezoneMixin, ReadReplicaControlMixin, APIView, BasePaginator):
+    """Base ``APIView`` for non-model endpoints; same auth, pagination and error handling as ``BaseViewSet``."""
+
     permission_classes = [IsAuthenticated]
 
     filter_backends = (DjangoFilterBackend, SearchFilter)
@@ -160,6 +180,7 @@ class BaseAPIView(TimezoneMixin, ReadReplicaControlMixin, APIView, BasePaginator
     use_read_replica = False
 
     def filter_queryset(self, queryset):
+        """Apply the configured filter backends (django-filter + search) to ``queryset``."""
         for backend in list(self.filter_backends):
             queryset = backend().filter_queryset(self.request, queryset, self)
         return queryset
@@ -173,6 +194,7 @@ class BaseAPIView(TimezoneMixin, ReadReplicaControlMixin, APIView, BasePaginator
             response = super().handle_exception(exc)
             return response
         except Exception as e:
+            # Unhandled by DRF: map well-known Django errors to 4xx, everything else to 500.
             if isinstance(e, IntegrityError):
                 return Response(
                     {"error": "The payload is not valid"},
@@ -204,6 +226,7 @@ class BaseAPIView(TimezoneMixin, ReadReplicaControlMixin, APIView, BasePaginator
             )
 
     def dispatch(self, request, *args, **kwargs):
+        """Run the view, logging the SQL query count in DEBUG, and convert any error into a response."""
         try:
             response = super().dispatch(request, *args, **kwargs)
 
@@ -219,18 +242,22 @@ class BaseAPIView(TimezoneMixin, ReadReplicaControlMixin, APIView, BasePaginator
 
     @property
     def workspace_slug(self):
+        """Workspace slug from the URL kwargs, if present."""
         return self.kwargs.get("slug", None)
 
     @property
     def project_id(self):
+        """Project id from the URL kwargs, if present."""
         return self.kwargs.get("project_id", None)
 
     @property
     def fields(self):
+        """Comma separated ``?fields=`` query param as a list, or None."""
         fields = [field for field in self.request.GET.get("fields", "").split(",") if field]
         return fields if fields else None
 
     @property
     def expand(self):
+        """Comma separated ``?expand=`` query param as a list, or None."""
         expand = [expand for expand in self.request.GET.get("expand", "").split(",") if expand]
         return expand if expand else None

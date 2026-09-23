@@ -2,6 +2,8 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 # See the LICENSE file for details.
 
+"""Middleware that turns oversize request bodies (``DATA_UPLOAD_MAX_MEMORY_SIZE``) into HTTP 413 responses."""
+
 from django.core.exceptions import RequestDataTooBig
 from django.http import JsonResponse
 
@@ -16,6 +18,7 @@ class RequestBodySizeLimitMiddleware:
         self.get_response = get_response
 
     def __call__(self, request):
+        """Read the body eagerly so Django's size check fires here; return 413 JSON if it is too big."""
         try:
             _ = request.body
         except RequestDataTooBig:

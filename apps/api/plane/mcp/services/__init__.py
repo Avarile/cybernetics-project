@@ -2,6 +2,10 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 # See the LICENSE file for details.
 
+"""Services for MCP tools that read the database directly (instead of via the REST loopback),
+plus the ``db_call`` helper for calling blocking ORM code from async tool handlers.
+"""
+
 # Third party imports
 from channels.db import database_sync_to_async
 

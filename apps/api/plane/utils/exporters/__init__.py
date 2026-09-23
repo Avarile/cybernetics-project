@@ -2,7 +2,11 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 # See the LICENSE file for details.
 
-"""Export utilities for various data formats."""
+"""Export utilities for various data formats.
+
+Public entry point for the export package: ``Exporter`` + schemas (what fields to
+export and how to serialize them) + formatters (how to render the file).
+"""
 
 from .exporter import Exporter
 from .formatters import BaseFormatter, CSVFormatter, JSONFormatter, XLSXFormatter

@@ -2,6 +2,8 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 # See the LICENSE file for details.
 
+"""Serializers for project estimates (estimate systems) and their estimate points."""
+
 # Module imports
 from .base import BaseSerializer
 
@@ -11,6 +13,8 @@ from rest_framework import serializers
 
 
 class EstimateSerializer(BaseSerializer):
+    """Estimate system (e.g. points/categories) configured for a project."""
+
     class Meta:
         model = Estimate
         fields = "__all__"
@@ -18,7 +22,10 @@ class EstimateSerializer(BaseSerializer):
 
 
 class EstimatePointSerializer(BaseSerializer):
+    """A single estimate point value belonging to an estimate."""
+
     def validate(self, data):
+        """Reject empty payloads and values longer than 20 characters."""
         if not data:
             raise serializers.ValidationError("Estimate points are required")
         value = data.get("value")
@@ -33,6 +40,8 @@ class EstimatePointSerializer(BaseSerializer):
 
 
 class EstimateReadSerializer(BaseSerializer):
+    """Estimate with its nested points (read-only), used for project-level reads."""
+
     points = EstimatePointSerializer(read_only=True, many=True)
 
     class Meta:
@@ -42,6 +51,8 @@ class EstimateReadSerializer(BaseSerializer):
 
 
 class WorkspaceEstimateSerializer(BaseSerializer):
+    """Estimate with its nested points (read-only), used for workspace-level listings."""
+
     points = EstimatePointSerializer(read_only=True, many=True)
 
     class Meta:

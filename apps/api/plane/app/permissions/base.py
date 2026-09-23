@@ -2,6 +2,13 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 # See the LICENSE file for details.
 
+"""Role definitions and the ``allow_permission`` view decorator.
+
+``allow_permission`` is the primary role-based access check for ``plane.app``
+views: it checks the requesting user's WorkspaceMember/ProjectMember role
+against an allowed list before calling the wrapped view method.
+"""
+
 from plane.db.models import WorkspaceMember, ProjectMember
 from functools import wraps
 from rest_framework.response import Response
@@ -11,12 +18,28 @@ from enum import Enum
 
 
 class ROLE(Enum):
+    """Membership role values stored on WorkspaceMember/ProjectMember ``role`` fields."""
+
     ADMIN = 20
     MEMBER = 15
     GUEST = 5
 
 
 def allow_permission(allowed_roles, level="PROJECT", creator=False, model=None):
+    """Decorator restricting a view method to members with one of ``allowed_roles``.
+
+    Args:
+        allowed_roles: list of ROLE members or raw role integers.
+        level: "WORKSPACE" checks WorkspaceMember role for ``kwargs["slug"]``;
+            anything else (default "PROJECT") checks ProjectMember role for
+            ``kwargs["project_id"]``.
+        creator: when True together with ``model``, the creator of the object
+            ``kwargs["pk"]`` is allowed regardless of role (must still be an
+            active workspace member).
+        model: model class used for the creator check.
+
+    Returns a 403 Response when no condition is satisfied.
+    """
     def decorator(view_func):
         @wraps(view_func)
         def _wrapped_view(instance, request, *args, **kwargs):

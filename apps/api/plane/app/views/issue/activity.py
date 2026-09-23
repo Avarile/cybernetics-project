@@ -2,6 +2,12 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 # See the LICENSE file for details.
 
+"""Work item activity feed endpoint.
+
+Returns the property-change history (``IssueActivity``) and/or comments of a
+work item for the activity panel. Reads go to the read replica.
+"""
+
 # Python imports
 from itertools import chain
 
@@ -22,12 +28,20 @@ from plane.db.models import IssueActivity, IssueComment, CommentReaction, Intake
 
 
 class IssueActivityEndpoint(BaseAPIView):
+    """Activity + comments timeline for a single work item."""
+
     permission_classes = [ProjectEntityPermission]
     use_read_replica = True
 
     @method_decorator(gzip_page)
     @allow_permission([ROLE.ADMIN, ROLE.MEMBER, ROLE.GUEST])
     def get(self, request, slug, project_id, issue_id):
+        """Return the work item's activity feed.
+
+        ``activity_type=issue-property`` returns only property changes (with intake
+        source data), ``issue-comment`` only comments; otherwise both are merged in
+        chronological order. ``created_at__gt`` fetches only newer entries.
+        """
         filters = {}
         if request.GET.get("created_at__gt", None) is not None:
             filters = {"created_at__gt": request.GET.get("created_at__gt")}
@@ -35,6 +49,7 @@ class IssueActivityEndpoint(BaseAPIView):
         issue_activities = (
             IssueActivity.objects.filter(issue_id=issue_id)
             .filter(
+                # Comment/reaction/vote/draft activities are excluded; comments are served separately.
                 ~Q(field__in=["comment", "vote", "reaction", "draft"]),
                 project__project_projectmember__member=self.request.user,
                 project__project_projectmember__is_active=True,

@@ -2,6 +2,12 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 # See the LICENSE file for details.
 
+"""Project invitation API.
+
+Project admins invite users by email (JWT token per invite), workspace
+members join projects directly, and invitees accept/decline an invite via
+a public (AllowAny) join endpoint.
+"""
 # Python imports
 import jwt
 from datetime import datetime
@@ -38,12 +44,14 @@ from plane.utils.host import base_host
 
 
 class ProjectInvitationsViewset(BaseViewSet):
+    """Admin-side management of email invitations to a project."""
     serializer_class = ProjectMemberInviteSerializer
     model = ProjectMemberInvite
 
     search_fields = []
 
     def get_queryset(self):
+        """Invitations for the project in the URL."""
         return self.filter_queryset(
             super()
             .get_queryset()
@@ -55,6 +63,11 @@ class ProjectInvitationsViewset(BaseViewSet):
 
     @allow_permission([ROLE.ADMIN])
     def create(self, request, slug, project_id):
+        """Create email invitations for ``request.data["emails"]`` (list of {email, role}).
+
+        Invitee roles must match their workspace role when that role is
+        guest (5) or admin (20). Invites are bulk-created with a signed JWT token.
+        """
         emails = request.data.get("emails", [])
 
         # Check if email is provided
@@ -62,6 +75,8 @@ class ProjectInvitationsViewset(BaseViewSet):
             return Response({"error": "Emails are required"}, status=status.HTTP_400_BAD_REQUEST)
 
         for email in emails:
+            # NOTE: ``.role`` is read directly off a QuerySet here, not a model
+            # instance.
             workspace_role = WorkspaceMember.objects.filter(
                 workspace__slug=slug, member__email=email.get("email"), is_active=True
             ).role
@@ -104,6 +119,8 @@ class ProjectInvitationsViewset(BaseViewSet):
         current_site = base_host(request=request, is_app=True)
 
         # Send invitations
+        # NOTE: ``.delay`` is called on the local list of invitations, not on
+        # a Celery task.
         for invitation in project_invitations:
             project_invitations.delay(
                 invitation.email,
@@ -117,10 +134,12 @@ class ProjectInvitationsViewset(BaseViewSet):
 
 
 class UserProjectInvitationsViewset(BaseViewSet):
+    """Current user's project invitations and direct project joining."""
     serializer_class = ProjectMemberInviteSerializer
     model = ProjectMemberInvite
 
     def get_queryset(self):
+        """Invitations addressed to the current user's email."""
         return self.filter_queryset(
             super()
             .get_queryset()
@@ -130,6 +149,12 @@ class UserProjectInvitationsViewset(BaseViewSet):
 
     @allow_permission([ROLE.ADMIN, ROLE.MEMBER], level="WORKSPACE")
     def create(self, request, slug):
+        """Join the projects in ``project_ids`` with the user's workspace role.
+
+        Secret projects can only be joined by workspace admins. Existing
+        memberships are reactivated; new ProjectMember and ProjectUserProperty
+        rows are created (duplicates ignored).
+        """
         project_ids = request.data.get("project_ids", [])
 
         # Get the workspace user role
@@ -184,9 +209,16 @@ class UserProjectInvitationsViewset(BaseViewSet):
 
 
 class ProjectJoinEndpoint(BaseAPIView):
+    """Public endpoint to view and respond to a project invitation."""
     permission_classes = [AllowAny]
 
     def post(self, request, slug, project_id, pk):
+        """Accept or decline an invitation; the body ``email`` must match the invite.
+
+        On acceptance, ensures an active workspace membership (role capped at
+        member/15) and an active project membership. An invite can only be
+        answered once.
+        """
         project_invite = ProjectMemberInvite.objects.get(pk=pk, project_id=project_id, workspace__slug=slug)
 
         email = request.data.get("email", "")
@@ -252,6 +284,7 @@ class ProjectJoinEndpoint(BaseAPIView):
         )
 
     def get(self, request, slug, project_id, pk):
+        """Return public details of a project invitation."""
         project_invitation = ProjectMemberInvite.objects.get(workspace__slug=slug, project_id=project_id, pk=pk)
         serializer = ProjectMemberInvitePublicSerializer(project_invitation)
         return Response(serializer.data, status=status.HTTP_200_OK)

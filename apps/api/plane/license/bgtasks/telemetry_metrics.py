@@ -2,6 +2,13 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 # See the LICENSE file for details.
 
+"""Instance telemetry: periodically pushes usage counts to an OpenTelemetry collector.
+
+The ``push_instance_metrics`` Celery task (scheduled via Celery beat) reads instance-wide
+and per-workspace object counts and exports them as OTLP observable gauges. Nothing is
+sent unless an Instance exists and ``is_telemetry_enabled`` is set.
+"""
+
 # Python imports
 import os
 import logging
@@ -33,9 +40,9 @@ from plane.db.models import (
 
 logger = logging.getLogger(__name__)
 
-WORKSPACE_METRICS_LIMIT = 1000
-FLUSH_TIMEOUT_MILLIS = 30000
-EXPORT_INTERVAL_MILLIS = 20000
+WORKSPACE_METRICS_LIMIT = 1000  # max workspaces reported per run
+FLUSH_TIMEOUT_MILLIS = 30000  # how long force_flush() may block
+EXPORT_INTERVAL_MILLIS = 20000  # periodic reader interval; the explicit flush does the real export
 
 
 def _create_otlp_metric_exporter():
@@ -120,6 +127,7 @@ def _collect_and_push_metrics() -> None:
         cycle_count = Cycle.objects.count()
         cycle_issue_count = CycleIssue.objects.count()
         module_issue_count = ModuleIssue.objects.count()
+        # Exclude private pages owned by bot users (system-generated) from the page counts.
         page_count = Page.objects.exclude(owned_by__is_bot=True, access=1).count()
 
         # Derive domain from WEB_URL env var (e.g. https://plane.acmecorp.com -> plane.acmecorp.com).
@@ -142,6 +150,8 @@ def _collect_and_push_metrics() -> None:
             "is_setup_done": str(instance.is_setup_done).lower(),
         }
 
+        # Observable-gauge callbacks run inside force_flush() below and just report the
+        # counts captured above (no DB access at export time).
         # Create gauge callbacks for instance-level metrics
         def users_callback(_options):
             yield metrics.Observation(user_count, instance_attrs)
@@ -279,6 +289,7 @@ def _collect_and_push_metrics() -> None:
             })
 
         def _ws_attrs(ws: dict) -> dict:
+            """Metric attributes identifying a workspace."""
             return {
                 "workspace_id": ws["workspace_id"],
                 "workspace_slug": ws["workspace_slug"],

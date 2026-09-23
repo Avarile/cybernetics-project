@@ -2,3 +2,5 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 # See the LICENSE file for details.
 
+"""Minimal web app serving the root health check and robots.txt."""
+

@@ -2,6 +2,14 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 # See the LICENSE file for details.
 
+"""Public issue endpoints for published project boards (``/api/public/anchor/<anchor>/...``).
+
+Covers the (optionally grouped) issue list, issue detail, and the interactive features a
+DeployBoard can enable: comments, issue/comment reactions and votes. Reads are public;
+writes require a signed-in user, and a non-member who interacts is recorded as a
+ProjectPublicMember. Writes queue ``issue_activity`` tasks like the main app does.
+"""
+
 # Python imports
 import json
 
@@ -71,9 +79,17 @@ from plane.utils.issue_filters import issue_filters
 
 
 class ProjectIssuesPublicEndpoint(BaseAPIView):
+    """List the issues of a published project, with optional grouping (no auth required)."""
+
     permission_classes = [AllowAny]
 
     def get(self, request, anchor):
+        """Return paginated issues of the project published under ``anchor``.
+
+        Supports the standard issue filters, ``order_by``, ``group_by`` and ``sub_group_by``
+        query params. Grouped responses use the grouped/sub-grouped offset paginators and
+        include empty groups (values from ``issue_group_values``).
+        """
         filters = issue_filters(request.query_params, "GET")
         order_by_param = request.GET.get("order_by", "-created_at")
 
@@ -96,6 +112,7 @@ class ProjectIssuesPublicEndpoint(BaseAPIView):
             )
             .prefetch_related(Prefetch("votes", queryset=IssueVote.objects.select_related("actor")))
             .annotate(
+                # An issue is in at most one active cycle; take it as a scalar.
                 cycle_id=Subquery(
                     CycleIssue.objects.filter(issue=OuterRef("id"), deleted_at__isnull=True).values("cycle_id")[:1]
                 )
@@ -167,6 +184,8 @@ class ProjectIssuesPublicEndpoint(BaseAPIView):
                         ),
                         group_by_field_name=group_by,
                         sub_group_by_field_name=sub_group_by,
+                        # Group counts include only accepted (1), declined (-1) or duplicate (2)
+                        # intake issues, or issues not from intake; never archived or draft ones.
                         count_filter=Q(
                             Q(issue_intake__status=1)
                             | Q(issue_intake__status=-1)
@@ -212,12 +231,15 @@ class ProjectIssuesPublicEndpoint(BaseAPIView):
 
 
 class IssueCommentPublicViewSet(BaseViewSet):
+    """Comments on a published issue: public read, authenticated write, only when comments are enabled on the board."""
+
     serializer_class = IssueCommentSerializer
     model = IssueComment
 
     filterset_fields = ["issue__id", "workspace__id"]
 
     def get_permissions(self):
+        """list/retrieve are public; other actions require authentication."""
         if self.action in ["list", "retrieve"]:
             self.permission_classes = [AllowAny]
         else:
@@ -226,6 +248,9 @@ class IssueCommentPublicViewSet(BaseViewSet):
         return super(IssueCommentPublicViewSet, self).get_permissions()
 
     def get_queryset(self):
+        """External (publicly visible) comments on the issue, oldest first, annotated with ``is_member``
+        (whether the requester is an active project member). Empty if comments are disabled.
+        """
         try:
             project_deploy_board = DeployBoard.objects.get(anchor=self.kwargs.get("anchor"), entity_name="project")
             if project_deploy_board.is_comments_enabled:
@@ -255,6 +280,7 @@ class IssueCommentPublicViewSet(BaseViewSet):
             return IssueComment.objects.none()
 
     def create(self, request, anchor, issue_id):
+        """Post an EXTERNAL comment as the current user and log a ``comment.activity.created`` activity."""
         project_deploy_board = DeployBoard.objects.get(anchor=anchor, entity_name="project")
 
         if not project_deploy_board.is_comments_enabled:
@@ -294,6 +320,7 @@ class IssueCommentPublicViewSet(BaseViewSet):
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
     def partial_update(self, request, anchor, issue_id, pk):
+        """Edit one of the current user's own comments and log the change."""
         project_deploy_board = DeployBoard.objects.get(anchor=anchor, entity_name="project")
 
         if not project_deploy_board.is_comments_enabled:
@@ -318,6 +345,7 @@ class IssueCommentPublicViewSet(BaseViewSet):
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
     def destroy(self, request, anchor, issue_id, pk):
+        """Delete one of the current user's own comments and log the deletion."""
         project_deploy_board = DeployBoard.objects.get(anchor=anchor, entity_name="project")
 
         if not project_deploy_board.is_comments_enabled:
@@ -340,10 +368,16 @@ class IssueCommentPublicViewSet(BaseViewSet):
 
 
 class IssueReactionPublicViewSet(BaseViewSet):
+    """Emoji reactions on a published issue (only when reactions are enabled on the board)."""
+
     serializer_class = IssueReactionSerializer
     model = IssueReaction
 
     def get_queryset(self):
+        """Reactions on the issue, newest first.
+
+        Note: filters by ``slug``/``project_id`` URL kwargs, which the anchor-based routes do not provide.
+        """
         try:
             project_deploy_board = DeployBoard.objects.get(
                 workspace__slug=self.kwargs.get("slug"),
@@ -364,6 +398,7 @@ class IssueReactionPublicViewSet(BaseViewSet):
             return IssueReaction.objects.none()
 
     def create(self, request, anchor, issue_id):
+        """Add a reaction by the current user to the issue and log it."""
         project_deploy_board = DeployBoard.objects.get(anchor=anchor, entity_name="project")
 
         if not project_deploy_board.is_reactions_enabled:
@@ -401,6 +436,7 @@ class IssueReactionPublicViewSet(BaseViewSet):
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
     def destroy(self, request, anchor, issue_id, reaction_code):
+        """Remove the current user's ``reaction_code`` reaction from the issue and log it."""
         project_deploy_board = DeployBoard.objects.get(anchor=anchor, entity_name="project")
 
         if not project_deploy_board.is_reactions_enabled:
@@ -428,10 +464,13 @@ class IssueReactionPublicViewSet(BaseViewSet):
 
 
 class CommentReactionPublicViewSet(BaseViewSet):
+    """Emoji reactions on comments of a published project (only when reactions are enabled)."""
+
     serializer_class = CommentReactionSerializer
     model = CommentReaction
 
     def get_queryset(self):
+        """Reactions on the comment within the published project, newest first; empty if reactions are disabled."""
         try:
             project_deploy_board = DeployBoard.objects.get(anchor=self.kwargs.get("anchor"), entity_name="project")
             if project_deploy_board.is_reactions_enabled:
@@ -449,6 +488,7 @@ class CommentReactionPublicViewSet(BaseViewSet):
             return CommentReaction.objects.none()
 
     def create(self, request, anchor, comment_id):
+        """Add a reaction by the current user to the comment and log it."""
         project_deploy_board = DeployBoard.objects.get(anchor=anchor, entity_name="project")
 
         if not project_deploy_board.is_reactions_enabled:
@@ -486,6 +526,7 @@ class CommentReactionPublicViewSet(BaseViewSet):
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
     def destroy(self, request, anchor, comment_id, reaction_code):
+        """Remove the current user's ``reaction_code`` reaction from the comment and log it."""
         project_deploy_board = DeployBoard.objects.get(anchor=anchor, entity_name="project")
         if not project_deploy_board.is_reactions_enabled:
             return Response(
@@ -520,10 +561,16 @@ class CommentReactionPublicViewSet(BaseViewSet):
 
 
 class IssueVotePublicViewSet(BaseViewSet):
+    """Up/down votes on a published issue; one vote per user per issue."""
+
     model = IssueVote
     serializer_class = IssueVoteSerializer
 
     def get_queryset(self):
+        """Votes on the issue within the published project.
+
+        Note: looks the DeployBoard up by ``workspace__slug=<anchor>``, which will not normally match.
+        """
         try:
             project_deploy_board = DeployBoard.objects.get(
                 workspace__slug=self.kwargs.get("anchor"), entity_name="project"
@@ -541,6 +588,7 @@ class IssueVotePublicViewSet(BaseViewSet):
             return IssueVote.objects.none()
 
     def create(self, request, anchor, issue_id):
+        """Create or update the current user's vote (``vote``, default 1) and log it."""
         project_deploy_board = DeployBoard.objects.get(anchor=anchor, entity_name="project")
         issue_vote, _ = IssueVote.objects.get_or_create(
             actor_id=request.user.id,
@@ -571,6 +619,7 @@ class IssueVotePublicViewSet(BaseViewSet):
         return Response(serializer.data, status=status.HTTP_201_CREATED)
 
     def destroy(self, request, anchor, issue_id):
+        """Remove the current user's vote on the issue and log it."""
         project_deploy_board = DeployBoard.objects.get(anchor=anchor, entity_name="project")
         issue_vote = IssueVote.objects.get(
             issue_id=issue_id,
@@ -592,9 +641,14 @@ class IssueVotePublicViewSet(BaseViewSet):
 
 
 class IssueRetrievePublicEndpoint(BaseAPIView):
+    """Return a single issue of a published project (no auth required)."""
+
     permission_classes = [AllowAny]
 
     def get(self, request, anchor, issue_id):
+        """Return the issue as a flat dict with id arrays (labels, assignees, modules), cycle id,
+        and ``vote_items``/``reaction_items`` JSON arrays with actor details; null if not found.
+        """
         deploy_board = DeployBoard.objects.get(anchor=anchor)
 
         issue_queryset = (
@@ -696,6 +750,7 @@ class IssueRetrievePublicEndpoint(BaseAPIView):
                     ),
                     distinct=True,
                 ),
+                # Note: the reaction actor's ``avatar_url`` below is computed from the *vote* actor's fields.
                 reaction_items=ArrayAgg(
                     Case(
                         When(

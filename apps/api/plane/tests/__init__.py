@@ -2,4 +2,6 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 # See the LICENSE file for details.
 
+"""Root test package for the Plane API (contract, unit and smoke suites; shared factories)."""
+
 # Test package initialization

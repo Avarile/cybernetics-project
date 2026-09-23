@@ -2,6 +2,14 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 # See the LICENSE file for details.
 
+"""Project estimate endpoints.
+
+An ``Estimate`` (type e.g. "points" or "categories") owns an ordered list of
+``EstimatePoint`` rows (``key`` = position, ``value`` = label/number). Work items
+reference an estimate point. Covers listing/creating estimates with their
+points in bulk and managing individual points.
+"""
+
 import random
 import string
 import json
@@ -27,13 +35,17 @@ from plane.bgtasks.issue_activities_task import issue_activity
 
 
 def generate_random_name(length=10):
+    """Return a random lowercase name, used when an estimate is created without one."""
     letters = string.ascii_lowercase
     return "".join(random.choice(letters) for i in range(length))
 
 
 class ProjectEstimatePointEndpoint(BaseAPIView):
+    """Estimate points of the project's currently active estimate."""
+
     @allow_permission([ROLE.ADMIN, ROLE.MEMBER])
     def get(self, request, slug, project_id):
+        """Return points of ``project.estimate``, or an empty list if no estimate is set."""
         project = Project.objects.get(workspace__slug=slug, pk=project_id)
         if project.estimate_id is not None:
             estimate_points = EstimatePoint.objects.filter(
@@ -47,11 +59,17 @@ class ProjectEstimatePointEndpoint(BaseAPIView):
 
 
 class BulkEstimatePointEndpoint(BaseViewSet):
+    """Create/read/update/delete estimates together with their points.
+
+    Writes invalidate the cached workspace estimates list.
+    """
+
     permission_classes = [ProjectEntityPermission]
     model = Estimate
     serializer_class = EstimateSerializer
 
     def list(self, request, slug, project_id):
+        """List all estimates of the project with their points."""
         estimates = (
             Estimate.objects.filter(workspace__slug=slug, project_id=project_id)
             .prefetch_related("points")
@@ -62,6 +80,7 @@ class BulkEstimatePointEndpoint(BaseViewSet):
 
     @invalidate_cache(path="/api/workspaces/:slug/estimates/", url_params=True, user=False)
     def create(self, request, slug, project_id):
+        """Create an estimate (``estimate`` object) and its ``estimate_points`` in one request."""
         estimate = request.data.get("estimate")
         estimate_name = estimate.get("name", generate_random_name())
         estimate_type = estimate.get("type", "categories")
@@ -101,12 +120,14 @@ class BulkEstimatePointEndpoint(BaseViewSet):
         return Response(serializer.data, status=status.HTTP_200_OK)
 
     def retrieve(self, request, slug, project_id, estimate_id):
+        """Return one estimate with its points."""
         estimate = Estimate.objects.get(pk=estimate_id, workspace__slug=slug, project_id=project_id)
         serializer = EstimateReadSerializer(estimate)
         return Response(serializer.data, status=status.HTTP_200_OK)
 
     @invalidate_cache(path="/api/workspaces/:slug/estimates/", url_params=True, user=False)
     def partial_update(self, request, slug, project_id, estimate_id):
+        """Update the estimate's name/type and the ``key``/``value`` of the given points (matched by id)."""
         if not len(request.data.get("estimate_points", [])):
             return Response(
                 {"error": "Estimate points are required"},
@@ -145,14 +166,18 @@ class BulkEstimatePointEndpoint(BaseViewSet):
 
     @invalidate_cache(path="/api/workspaces/:slug/estimates/", url_params=True, user=False)
     def destroy(self, request, slug, project_id, estimate_id):
+        """Delete an estimate."""
         estimate = Estimate.objects.get(pk=estimate_id, workspace__slug=slug, project_id=project_id)
         estimate.delete()
         return Response(status=status.HTTP_204_NO_CONTENT)
 
 
 class EstimatePointEndpoint(BaseViewSet):
+    """Create, update and delete individual estimate points."""
+
     @allow_permission([ROLE.ADMIN, ROLE.MEMBER])
     def create(self, request, slug, project_id, estimate_id):
+        """Add a point (``key``, ``value``) to an estimate of this project."""
         #  TODO: add a key validation if the same key already exists
         if not request.data.get("key") or not request.data.get("value"):
             return Response(
@@ -180,6 +205,7 @@ class EstimatePointEndpoint(BaseViewSet):
 
     @allow_permission([ROLE.ADMIN, ROLE.MEMBER])
     def partial_update(self, request, slug, project_id, estimate_id, estimate_point_id):
+        """Partially update an estimate point."""
         #  TODO: add a key validation if the same key already exists
         estimate_point = EstimatePoint.objects.get(
             pk=estimate_point_id,
@@ -195,6 +221,12 @@ class EstimatePointEndpoint(BaseViewSet):
 
     @allow_permission([ROLE.ADMIN, ROLE.MEMBER])
     def destroy(self, request, slug, project_id, estimate_id, estimate_point_id):
+        """Delete an estimate point.
+
+        Work items using it are moved to ``new_estimate_id`` (another point) or
+        cleared, with an activity logged for each. Keys of later points are shifted
+        down by one to keep the sequence contiguous. Returns the re-keyed points.
+        """
         new_estimate_id = request.data.get("new_estimate_id", None)
         estimate_points = EstimatePoint.objects.filter(
             estimate_id=estimate_id, project_id=project_id, workspace__slug=slug

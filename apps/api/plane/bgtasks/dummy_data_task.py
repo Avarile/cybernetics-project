@@ -2,6 +2,15 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 # See the LICENSE file for details.
 
+"""
+Celery task that seeds a workspace with a fake project for demos/load testing.
+
+``create_dummy_data`` creates one project (with the requesting user as admin)
+and fills it with Faker-generated members, states, labels, cycles, modules,
+pages, issues, intake issues and their relations. Each ``create_*`` helper
+writes with ``bulk_create`` and ignores conflicts.
+"""
+
 # Python imports
 import uuid
 import random
@@ -42,6 +51,7 @@ from plane.db.models.intake import SourceType
 
 
 def create_project(workspace, user_id):
+    """Create a randomly named project (intake enabled) and add ``user_id`` as an admin member (role 20)."""
     fake = Faker()
     name = fake.name()
     unique_id = str(uuid.uuid4())[:5]
@@ -61,6 +71,7 @@ def create_project(workspace, user_id):
 
 
 def create_project_members(workspace, project, members):
+    """Add the users with the given ``members`` emails to the project as admins."""
     members = User.objects.filter(email__in=members)
 
     _ = ProjectMember.objects.bulk_create(
@@ -80,6 +91,7 @@ def create_project_members(workspace, project, members):
 
 
 def create_states(workspace, project, user_id):
+    """Create the default Backlog/Todo/In Progress/Done/Cancelled states for the project."""
     states = [
         {
             "name": "Backlog",
@@ -124,6 +136,7 @@ def create_states(workspace, project, user_id):
 
 
 def create_labels(workspace, project, user_id):
+    """Create 50 random labels for the project."""
     fake = Faker()
     Faker.seed(0)
 
@@ -144,6 +157,11 @@ def create_labels(workspace, project, user_id):
 
 
 def create_cycles(workspace, project, user_id, cycle_count):
+    """Create random cycles (``cycle_count + 1`` of them) with non-overlapping-by-value date ranges.
+
+    Some cycles get no dates; for dated ones the end date is re-rolled until it is after the start
+    and the (start, end) pair hasn't been used yet.
+    """
     fake = Faker()
     Faker.seed(0)
 
@@ -189,6 +207,7 @@ def create_cycles(workspace, project, user_id, cycle_count):
 
 
 def create_modules(workspace, project, user_id, module_count):
+    """Create ``module_count`` random modules, some with start/target dates."""
     fake = Faker()
     Faker.seed(0)
 
@@ -219,6 +238,7 @@ def create_modules(workspace, project, user_id, module_count):
 
 
 def create_pages(workspace, project, user_id, pages_count):
+    """Create ``pages_count`` random pages owned by the user and link them to the project."""
     fake = Faker()
     Faker.seed(0)
 
@@ -247,6 +267,7 @@ def create_pages(workspace, project, user_id, pages_count):
 
 
 def create_page_labels(workspace, project, user_id, pages_count):
+    """Attach random project labels to half of the project's pages."""
     # labels
     labels = Label.objects.filter(project=project).values_list("id", flat=True)
     pages = random.sample(
@@ -265,6 +286,10 @@ def create_page_labels(workspace, project, user_id, pages_count):
 
 
 def create_issues(workspace, project, user_id, issue_count):
+    """Create ``issue_count`` random issues with sequential ids, plus ``IssueSequence`` and "created" activity rows.
+
+    Returns the created issues.
+    """
     fake = Faker()
     Faker.seed(0)
 
@@ -356,6 +381,10 @@ def create_issues(workspace, project, user_id, issue_count):
 
 
 def create_intake_issues(workspace, project, user_id, intake_issue_count):
+    """Create ``intake_issue_count`` issues and add them to the project's default intake with random statuses.
+
+    Intake status values: -2 pending, -1 rejected, 0 snoozed (gets ``snoozed_till``), 1 accepted, 2 duplicate.
+    """
     issues = create_issues(workspace, project, user_id, intake_issue_count)
     intake, create = Intake.objects.get_or_create(name="Intake", project=project, is_default=True)
     IntakeIssue.objects.bulk_create(
@@ -376,6 +405,11 @@ def create_intake_issues(workspace, project, user_id, intake_issue_count):
 
 
 def create_issue_parent(workspace, project, user_id, issue_count):
+    """Intended to make a quarter of the issues parents of other issues.
+
+    NOTE: ``parent_id`` is set on the loaded objects but they are never added to
+    ``bulk_sub_issues``, so the ``bulk_update`` call saves nothing.
+    """
     parent_count = issue_count / 4
 
     parent_issues = Issue.objects.filter(project=project).values_list("id", flat=True)[: int(parent_count)]
@@ -389,6 +423,7 @@ def create_issue_parent(workspace, project, user_id, issue_count):
 
 
 def create_issue_assignees(workspace, project, user_id, issue_count):
+    """Assign random project members to half of the project's issues."""
     # assignees
     assignees = ProjectMember.objects.filter(project=project).values_list("member_id", flat=True)
     issues = random.sample(
@@ -414,6 +449,7 @@ def create_issue_assignees(workspace, project, user_id, issue_count):
 
 
 def create_issue_labels(workspace, project, user_id, issue_count):
+    """Attach up to 5 random labels to every issue in the project."""
     # labels
     labels = Label.objects.filter(project=project).values_list("id", flat=True)
     # issues = random.sample(
@@ -437,6 +473,7 @@ def create_issue_labels(workspace, project, user_id, issue_count):
 
 
 def create_cycle_issues(workspace, project, user_id, issue_count):
+    """Add half of the project's issues to a random cycle each."""
     # assignees
     cycles = Cycle.objects.filter(project=project).values_list("id", flat=True)
     issues = random.sample(
@@ -455,6 +492,7 @@ def create_cycle_issues(workspace, project, user_id, issue_count):
 
 
 def create_module_issues(workspace, project, user_id, issue_count):
+    """Add every issue in the project to up to 5 random modules."""
     # assignees
     modules = Module.objects.filter(project=project).values_list("id", flat=True)
     # issues = random.sample(
@@ -495,6 +533,11 @@ def create_dummy_data(
     pages_count,
     intake_issue_count,
 ):
+    """Seed workspace ``slug`` with a new dummy project on behalf of the user with ``email``.
+
+    ``members`` is a list of emails to add to the project; the ``*_count`` args
+    control how many of each entity are generated.
+    """
     workspace = Workspace.objects.get(slug=slug)
 
     user = User.objects.get(email=email)

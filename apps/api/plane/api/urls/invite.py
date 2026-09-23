@@ -2,6 +2,8 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 # See the LICENSE file for details.
 
+"""Public API routes for workspace invitations, via a DRF router nested under the workspace slug."""
+
 # Django imports
 from django.urls import path, include
 

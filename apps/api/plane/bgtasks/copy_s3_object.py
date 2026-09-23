@@ -2,6 +2,15 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 # See the LICENSE file for details.
 
+"""
+Celery task that duplicates the files embedded in a page/issue description.
+
+Used when an entity is copied (e.g. duplicating a page or issue): every
+``<image-component src="<asset id>">`` in ``description_html`` gets a fresh
+``FileAsset`` + S3 object copy, the HTML is rewritten to point at the new asset
+ids, and the live server regenerates ``description_json``/``description_binary``.
+"""
+
 # Python imports
 import uuid
 import base64
@@ -20,6 +29,7 @@ from plane.utils.url import normalize_url_path
 
 
 def get_entity_id_field(entity_type, entity_id):
+    """Return the FK kwargs (e.g. ``{"issue_id": ...}``) linking a ``FileAsset`` of ``entity_type`` to its entity."""
     entity_mapping = {
         FileAsset.EntityTypeContext.WORKSPACE_LOGO: {"workspace_id": entity_id},
         FileAsset.EntityTypeContext.PROJECT_COVER: {"project_id": entity_id},
@@ -35,6 +45,7 @@ def get_entity_id_field(entity_type, entity_id):
 
 
 def extract_asset_ids(html, tag):
+    """Return the ``src`` values (asset ids) of all ``tag`` elements in ``html``; empty list on parse errors."""
     try:
         soup = BeautifulSoup(html, "html.parser")
         return [tag.get("src") for tag in soup.find_all(tag) if tag.get("src")]
@@ -44,6 +55,7 @@ def extract_asset_ids(html, tag):
 
 
 def replace_asset_ids(html, tag, duplicated_assets):
+    """Rewrite ``src`` of ``tag`` elements from old to new asset ids; returns the original HTML on errors."""
     try:
         soup = BeautifulSoup(html, "html.parser")
         for mention_tag in soup.find_all(tag):
@@ -57,6 +69,7 @@ def replace_asset_ids(html, tag, duplicated_assets):
 
 
 def update_description(entity, duplicated_assets, tag):
+    """Replace asset ids in ``entity.description_html``, save the entity and return the new HTML."""
     updated_html = replace_asset_ids(entity.description_html, tag, duplicated_assets)
     entity.description_html = updated_html
     entity.save()
@@ -65,6 +78,11 @@ def update_description(entity, duplicated_assets, tag):
 
 # Get the description binary and description from the live server
 def sync_with_external_service(entity_name, description_html):
+    """POST the HTML to the live server's ``/convert-document/`` endpoint.
+
+    Returns its JSON (``description_json``/``description_binary``) or ``{}`` if LIVE_URL
+    is unset or the call fails.
+    """
     try:
         data = {
             "description_html": description_html,
@@ -86,6 +104,10 @@ def sync_with_external_service(entity_name, description_html):
 
 
 def copy_assets(entity, entity_identifier, project_id, asset_ids, user_id):
+    """Create new ``FileAsset`` rows and S3 copies for ``asset_ids``, attached to ``entity_identifier``.
+
+    Returns a list of ``{"new_asset_id", "old_asset_id"}`` mappings.
+    """
     duplicated_assets = []
     workspace = entity.workspace
     storage = S3Storage()

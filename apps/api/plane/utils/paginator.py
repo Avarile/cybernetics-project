@@ -2,6 +2,21 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 # See the LICENSE file for details.
 
+"""
+Cursor-based pagination used by the app/API views.
+
+A cursor is serialized as ``"<value>:<offset>:<is_prev>"`` where ``value`` is
+the page size and ``offset`` is the zero-based page number. Paginators:
+
+- ``OffsetPaginator``: flat list pagination.
+- ``GroupedOffsetPaginator``: paginates each group independently (e.g. issues
+  grouped by state/priority/labels) using a ROW_NUMBER window per group.
+- ``SubGroupedOffsetPaginator``: same, but two levels deep (group + sub-group).
+
+``BasePaginator.paginate`` is the view mixin entry point that reads
+``cursor``/``per_page`` from the request and builds the JSON envelope.
+"""
+
 # Python imports
 import math
 from collections import defaultdict
@@ -19,6 +34,11 @@ from rest_framework.response import Response
 
 
 class Cursor:
+    """
+    Pagination cursor: ``value`` (page size), ``offset`` (page number),
+    ``is_prev`` (direction) and ``has_results`` (truthiness of the cursor).
+    """
+
     # The cursor value
     def __init__(self, value, offset=0, is_prev=False, has_results=None):
         self.value = value
@@ -59,6 +79,13 @@ class Cursor:
 
 
 class CursorResult(Sequence):
+    """
+    A page of results plus its next/prev cursors.
+
+    ``hits`` is the total item count and ``max_hits`` the total number of
+    pages (for grouped pagination: pages needed for the largest group).
+    """
+
     def __init__(self, results, next, prev, hits=None, max_hits=None):
         self.results = results
         self.next = next
@@ -87,6 +114,8 @@ MAX_LIMIT = 1000
 
 
 class BadPaginationError(Exception):
+    """Raised for invalid offsets; converted to a DRF ParseError by ``BasePaginator``."""
+
     pass
 
 
@@ -122,6 +151,11 @@ class OffsetPaginator:
         self.total_count_queryset = total_count_queryset
 
     def get_result(self, limit=1000, cursor=None):
+        """
+        Return a ``CursorResult`` for the page described by ``cursor``.
+
+        Fetches ``limit + 1`` rows to detect whether a next page exists.
+        """
         # offset is page #
         # value is page limit
         if cursor is None:
@@ -133,6 +167,7 @@ class OffsetPaginator:
         # queryset
         queryset = self.queryset
         if self.key:
+            # Nulls always sort last; created_at is a tie-breaker for stable pages
             queryset = queryset.order_by(
                 (F(*self.key).desc(nulls_last=True) if self.desc else F(*self.key).asc(nulls_last=True)),
                 "-created_at",
@@ -188,11 +223,22 @@ class OffsetPaginator:
         )
 
     def process_results(self, results):
+        """Hook for subclasses to post-process a page (e.g. group it); not used for flat pagination."""
         raise NotImplementedError
 
 
 class GroupedOffsetPaginator(OffsetPaginator):
-    # Field mappers - list m2m fields here
+    """
+    Paginates a queryset per group: each page returns up to ``limit`` rows for
+    every value of ``group_by_field_name``, shaped as
+    ``{group_id: {"results": [...], "total_results": n}}``.
+
+    ``group_by_fields`` lists all group values so empty groups still appear;
+    ``count_filter`` is a Q applied when counting items per group.
+    """
+
+    # Field mappers - list m2m fields here. For m2m group-by fields an item can
+    # appear in several groups; the mapped key receives the item's group ids.
     FIELD_MAPPER = {
         "labels__id": "label_ids",
         "assignees__id": "assignee_ids",
@@ -221,6 +267,12 @@ class GroupedOffsetPaginator(OffsetPaginator):
         self.count_filter = count_filter
 
     def get_result(self, limit=50, cursor=None):
+        """
+        Return a ``CursorResult`` holding up to ``limit`` rows per group.
+
+        Rows are numbered within each group (ROW_NUMBER partitioned by the group
+        field) and filtered to the page's row-number window.
+        """
         # offset is page #
         # value is page limit
         if cursor is None:
@@ -233,6 +285,7 @@ class GroupedOffsetPaginator(OffsetPaginator):
 
         page = cursor.offset
         offset = cursor.offset * cursor.value
+        # row_number is 1-based, so rows in (offset, stop) exclusive form this page
         stop = offset + (cursor.value or limit) + 1
 
         # Check if the offset is greater than the max offset
@@ -304,6 +357,7 @@ class GroupedOffsetPaginator(OffsetPaginator):
 
     def __get_total_dict(self):
         # Convert the total into dictionary of keys as group name and value as the total
+        # (a group whose filtered count is 0 is still counted as 1, preserving the original behaviour)
         total_group_dict = {}
         for group in self.__get_total_queryset():
             total_group_dict[str(group.get(self.group_by_field_name))] = total_group_dict.get(
@@ -348,6 +402,7 @@ class GroupedOffsetPaginator(OffsetPaginator):
         for result in results:
             result_id = result["id"]
             group_ids = list(result_group_mapping[str(result_id)])
+            # e.g. result["label_ids"] = [...]; "None" means the item has no related rows
             result[self.FIELD_MAPPER.get(self.group_by_field_name)] = [] if "None" in group_ids else group_ids
             # If a result belongs to multiple groups, add it to each group
             for group_id in group_ids:
@@ -375,6 +430,7 @@ class GroupedOffsetPaginator(OffsetPaginator):
         return processed_results
 
     def process_results(self, results):
+        """Group a page of rows into ``{group_id: {"results", "total_results"}}``."""
         # Process results
         if results:
             if self.group_by_field_name in self.FIELD_MAPPER:
@@ -387,6 +443,13 @@ class GroupedOffsetPaginator(OffsetPaginator):
 
 
 class SubGroupedOffsetPaginator(OffsetPaginator):
+    """
+    Two-level variant of ``GroupedOffsetPaginator``: rows are numbered per
+    (group, sub-group) pair and results are shaped as
+    ``{group: {"results": {sub_group: {"results": [...], "total_results": n}},
+    "total_results": n}}``.
+    """
+
     # Field mappers this are the fields that are m2m
     FIELD_MAPPER = {
         "labels__id": "label_ids",
@@ -422,6 +485,7 @@ class SubGroupedOffsetPaginator(OffsetPaginator):
         self.count_filter = count_filter
 
     def get_result(self, limit=30, cursor=None):
+        """Return a ``CursorResult`` holding up to ``limit`` rows per (group, sub-group)."""
         # offset is page #
         # value is page limit
         if cursor is None:
@@ -611,6 +675,8 @@ class SubGroupedOffsetPaginator(OffsetPaginator):
 
     def __query_grouper(self, results):
         # Single grouper
+        # Note: assumes every row's group/sub-group key exists in the field dict
+        # (a missing key raises KeyError)
         processed_results = self.__get_field_dict()
         for result in results:
             group_value = str(result.get(self.group_by_field_name))
@@ -620,6 +686,7 @@ class SubGroupedOffsetPaginator(OffsetPaginator):
         return processed_results
 
     def process_results(self, results):
+        """Nest a page of rows into the group -> sub-group structure."""
         if results:
             if self.group_by_field_name in self.FIELD_MAPPER or self.sub_group_by_field_name in self.FIELD_MAPPER:
                 # if the grouping is done through m2m then
@@ -640,6 +707,7 @@ class BasePaginator:
 
     # get the per page parameter from request
     def get_per_page(self, request, default_per_page=1000, max_per_page=1000):
+        """Read ``per_page`` from the query string; raises ParseError if invalid or above the max."""
         try:
             per_page = int(request.GET.get("per_page", default_per_page))
         except ValueError:
@@ -670,11 +738,19 @@ class BasePaginator:
         total_count_queryset=None,
         **paginator_kwargs,
     ):
-        """Paginate the request"""
+        """Paginate the request
+
+        Builds (or uses the given) paginator, fetches the page for the request's
+        cursor, then applies ``on_results`` (e.g. serialization), grouping
+        (when ``group_by_field_name`` is set) and ``controller`` in that order.
+        Returns a DRF Response with the standard pagination envelope.
+        Extra ``paginator_kwargs`` (queryset, order_by, ...) go to ``paginator_cls``.
+        """
         per_page = self.get_per_page(request, default_per_page, max_per_page)
         # Convert the cursor value to integer and float from string
         input_cursor = None
         try:
+            # Default cursor: first page with the requested page size
             input_cursor = cursor_cls.from_string(request.GET.get(self.cursor_name, f"{per_page}:0:0"))
         except ValueError:
             raise ParseError(detail="Invalid cursor parameter.")

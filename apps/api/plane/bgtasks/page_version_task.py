@@ -2,6 +2,13 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 # See the LICENSE file for details.
 
+"""Celery task that maintains PageVersion history for page descriptions.
+
+Enqueued when a page is updated. Consecutive edits by the same user within
+``PAGE_VERSION_TASK_TIMEOUT`` seconds are merged into one version, and only the
+latest 20 versions are kept per page.
+"""
+
 # Python imports
 import json
 
@@ -16,10 +23,16 @@ from django.utils import timezone
 from plane.db.models import Page, PageVersion
 from plane.utils.exception_logger import log_exception
 
+# Window (seconds) during which a user's edits amend their latest version instead of creating a new one
 PAGE_VERSION_TASK_TIMEOUT = 600
 
 @shared_task
 def track_page_version(page_id, existing_instance, user_id):
+    """Create or amend a PageVersion if the page's description_html changed.
+
+    ``existing_instance`` is a JSON string of the page before the update. Also
+    prunes the oldest version once a page has more than 20. Errors are logged.
+    """
     try:
         # Get the page
         page = Page.objects.get(id=page_id)

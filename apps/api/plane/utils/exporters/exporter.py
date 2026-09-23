@@ -2,6 +2,8 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 # See the LICENSE file for details.
 
+"""Format-agnostic ``Exporter`` that pairs an ``ExportSchema`` with a CSV/JSON/XLSX formatter."""
+
 from typing import Any, Dict, List, Type, Union
 
 from django.db.models import QuerySet

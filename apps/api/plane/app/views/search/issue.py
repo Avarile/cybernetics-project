@@ -2,6 +2,13 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 # See the LICENSE file for details.
 
+"""Issue picker search endpoint.
+
+Backs the "select work items" modals (add parent, add sub-issue, add relation,
+add to cycle/module, etc.). The query-string flags narrow the candidate set so
+that issues which would be invalid for the requested operation are excluded.
+"""
+
 # Django imports
 from django.db.models import Q, QuerySet
 
@@ -16,6 +23,9 @@ from plane.utils.issue_search import search_issues
 
 
 class IssueSearchEndpoint(BaseAPIView):
+    """Search issues in a project (or workspace) the user is an active member of,
+    applying operation-specific exclusion filters. Returns at most 100 rows."""
+
     def filter_issues_by_project(self, project_id: int, issues: QuerySet) -> QuerySet:
         """
         Filter issues by project
@@ -39,6 +49,9 @@ class IssueSearchEndpoint(BaseAPIView):
         Search issues and epics by query excluding the parent
         """
 
+        # Used when picking a parent: exclude the issue itself, its current
+        # parent and its direct children (which would create a cycle).
+
         issue = Issue.issue_objects.filter(pk=issue_id).first()
         if issue:
             issues = issues.filter(~Q(pk=issue_id), ~Q(pk=issue.parent_id), ~Q(parent_id=issue_id))
@@ -56,6 +69,7 @@ class IssueSearchEndpoint(BaseAPIView):
             .distinct()
         )
 
+        # Flatten (issue_id, related_issue_id) pairs into one list of ids to exclude
         related_issue_ids = [item for sublist in related_issue_ids for item in sublist]
         related_issue_ids.append(issue_id)
 
@@ -68,6 +82,9 @@ class IssueSearchEndpoint(BaseAPIView):
         """
         Filter root issues only
         """
+        # Used when picking sub-issues: only parentless issues other than this
+        # one (and never its own parent) are valid candidates.
+        # NOTE: if ``issue_id`` doesn't match an issue, ``issue.parent`` below raises AttributeError.
         issue = Issue.issue_objects.filter(pk=issue_id).first()
         if issue:
             issues = issues.filter(~Q(pk=issue_id), parent__isnull=True)
@@ -97,6 +114,13 @@ class IssueSearchEndpoint(BaseAPIView):
         return issues
 
     def get(self, request, slug, project_id):
+        """Search candidate issues.
+
+        Query params (string flags compared against "true"): ``search``,
+        ``workspace_search``, ``parent``, ``issue_relation``, ``sub_issue``,
+        ``cycle``, ``module`` (module id), ``target_date`` ("none" = only issues
+        without a target date) and ``issue_id`` (the issue the picker is for).
+        """
         query = request.query_params.get("search", False)
         workspace_search = request.query_params.get("workspace_search", "false")
         parent = request.query_params.get("parent", "false")
@@ -138,6 +162,7 @@ class IssueSearchEndpoint(BaseAPIView):
         if target_date == "none":
             issues = self.filter_issues_without_target_date(issues)
 
+        # Guests (role 5) may only see issues they created
         if ProjectMember.objects.filter(
             project_id=project_id, member=self.request.user, is_active=True, role=5
         ).exists():

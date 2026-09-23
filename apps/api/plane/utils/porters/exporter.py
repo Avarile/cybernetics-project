@@ -2,6 +2,12 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 # See the LICENSE file for details.
 
+"""
+``DataExporter``: serializes a queryset with a DRF serializer and encodes it
+with a pluggable formatter (CSV/JSON/XLSX). Used by the issue export
+background task (``plane/bgtasks/export_task.py``).
+"""
+
 from typing import Dict, List, Union
 from .formatters import BaseFormatter, CSVFormatter, JSONFormatter, XLSXFormatter
 
@@ -51,7 +57,7 @@ class DataExporter:
         """Create formatter instance with appropriate options."""
         formatter_class = self.FORMATTERS[format_type]
 
-        # Apply format-specific options
+        # Apply format-specific options (XLSX cells can't hold lists, so join them)
         if format_type == "xlsx":
             return formatter_class(list_joiner=", ")
         else:
@@ -95,7 +101,11 @@ class DataExporter:
         return formatter.encode(data)
 
     def to_file(self, queryset, filepath: str, formatter: BaseFormatter) -> str:
-        """Export to file (legacy interface)"""
+        """Export to file (legacy interface)
+
+        Writes in text mode, so it only works with string formatters (CSV/JSON),
+        not XLSX which returns bytes.
+        """
         content = self.to_string(queryset, formatter)
         with open(filepath, 'w', encoding='utf-8') as f:
             f.write(content)

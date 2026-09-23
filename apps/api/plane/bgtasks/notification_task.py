@@ -2,6 +2,16 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 # See the LICENSE file for details.
 
+"""Celery task that fans out in-app notifications and email notification logs for issue activity.
+
+Enqueued by ``issue_activities_task`` after issue activities are recorded. It:
+- diffs @mentions in the issue description / comments and subscribes mentioned users,
+- creates Notification rows for subscribers, assignees, creators and mentioned users,
+- creates EmailNotificationLog rows (honouring UserNotificationPreference), which are
+  later batched into emails by ``email_notification_task``,
+- keeps IssueMention rows in sync with the description.
+"""
+
 # Python imports
 import json
 import uuid
@@ -35,6 +45,7 @@ from bs4 import BeautifulSoup
 
 
 def update_mentions_for_issue(issue, project, new_mentions, removed_mention):
+    """Create IssueMention rows for ``new_mentions`` and delete those for ``removed_mention``."""
     aggregated_issue_mentions = []
     for mention_id in new_mentions:
         aggregated_issue_mentions.append(
@@ -51,6 +62,7 @@ def update_mentions_for_issue(issue, project, new_mentions, removed_mention):
 
 
 def get_new_mentions(requested_instance, current_instance):
+    """Return user IDs mentioned in the new description but not in the old one."""
     # requested_data is the newer instance of the current issue
     # current_instance is the older instance of the current issue, saved in the database
 
@@ -67,6 +79,7 @@ def get_new_mentions(requested_instance, current_instance):
 
 # Get Removed Mention
 def get_removed_mentions(requested_instance, current_instance):
+    """Return user IDs mentioned in the old description but no longer in the new one."""
     # requested_data is the newer instance of the current issue
     # current_instance is the older instance of the current issue, saved in the database
 
@@ -82,6 +95,11 @@ def get_removed_mentions(requested_instance, current_instance):
 
 # Adds mentions as subscribers
 def extract_mentions_as_subscribers(project_id, issue_id, mentions):
+    """Build unsaved IssueSubscriber objects for mentioned users.
+
+    A user is only included if they are an active project member and are not
+    already a subscriber, assignee or the creator of the issue.
+    """
     # mentions is an array of User IDs representing the FILTERED set of mentioned users
 
     bulk_mention_subscribers = []
@@ -113,6 +131,11 @@ def extract_mentions_as_subscribers(project_id, issue_id, mentions):
 
 # Parse Issue Description & extracts mentions
 def extract_mentions(issue_instance):
+    """Parse ``description_html`` from a JSON-encoded issue and return unique mentioned user IDs.
+
+    Mentions are ``<mention-component entity_name="user_mention">`` tags; returns []
+    on any parse error.
+    """
     try:
         # issue_instance has to be a dictionary passed, containing the description_html and other set of activity data. # noqa: E501
         mentions = []
@@ -131,6 +154,7 @@ def extract_mentions(issue_instance):
 
 # =========== Comment Parsing and notification Functions ======================
 def extract_comment_mentions(comment_value):
+    """Return unique user IDs mentioned in a comment's HTML (``[]`` on parse error)."""
     try:
         mentions = []
         soup = BeautifulSoup(comment_value, "html.parser")
@@ -143,6 +167,7 @@ def extract_comment_mentions(comment_value):
 
 
 def get_new_comment_mentions(new_value, old_value):
+    """Return user IDs mentioned in ``new_value`` that were not in ``old_value`` (all if no old value)."""
     mentions_newer = extract_comment_mentions(new_value)
     if old_value is None:
         return mentions_newer
@@ -155,6 +180,7 @@ def get_new_comment_mentions(new_value, old_value):
 
 
 def create_mention_notification(project, notification_comment, issue, actor_id, mention_id, issue_id, activity):
+    """Build an unsaved "mentioned" in-app Notification for ``mention_id`` about ``activity``."""
     return Notification(
         workspace=project.workspace,
         sender="in_app:issue_activities:mentioned",
@@ -198,6 +224,18 @@ def notifications(
     requested_data,
     current_instance,
 ):
+    """Create notifications and email logs for a batch of issue activities.
+
+    Args:
+        type: activity event type; cycle/module/reaction/vote/draft events are ignored.
+        subscriber: if truthy, the actor is subscribed to the issue.
+        issue_activities_created: JSON string of the IssueActivity dicts just created.
+        requested_data / current_instance: JSON strings of the new / old issue payloads,
+            used to diff description mentions.
+
+    Side effects: bulk-creates IssueSubscriber, Notification, EmailNotificationLog
+    and IssueMention rows. Errors are printed and swallowed.
+    """
     try:
         issue_activities_created = (
             json.loads(issue_activities_created) if issue_activities_created is not None else None
@@ -227,7 +265,7 @@ def notifications(
             2. From the latest set of mentions, extract the users which are not a subscribers & make them subscribers
             """
 
-            # get the list of active project members
+            # get the list of active project members (only they may receive notifications)
             project_members = ProjectMember.objects.filter(project_id=project_id, is_active=True).values_list(
                 "member_id", flat=True
             )
@@ -308,6 +346,7 @@ def notifications(
 
             issue_subscribers = list(set(issue_subscribers) - {uuid.UUID(actor_id)})
 
+            # The sender string records *why* the user is notified (creator > assignee > subscriber)
             for subscriber in issue_subscribers:
                 if issue.created_by_id and issue.created_by_id == subscriber:
                     sender = "in_app:issue_activities:created"
@@ -327,7 +366,7 @@ def notifications(
                     if issue_activity.get("field") == "description":
                         continue
 
-                    # Check if the value should be sent or not
+                    # Check if the value should be sent or not, based on the user's email preferences
                     send_email = False
                     if issue_activity.get("field") == "state" and preference.state_change:
                         send_email = True
@@ -519,6 +558,8 @@ def notifications(
                             )
                         bulk_notifications.append(notification)
 
+            # Description mentions: if the latest activity is the actor's description edit,
+            # notify against that activity; otherwise notify once per created activity.
             for mention_id in new_mentions:
                 if mention_id != actor_id:
                     preference = UserNotificationPreference.objects.get(user_id=mention_id)

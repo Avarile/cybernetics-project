@@ -2,7 +2,11 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 # See the LICENSE file for details.
 
-"""Test Settings"""
+"""Test Settings
+
+Used by the pytest suite: DEBUG on, emails captured in memory (``django.core.mail.outbox``)
+and the ``plane.tests`` app installed.
+"""
 
 from .common import *  # noqa
 

@@ -2,6 +2,8 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 # See the LICENSE file for details.
 
+"""Event name constants for product analytics (workspace membership and lifecycle events)."""
+
 USER_JOINED_WORKSPACE = "user_joined_workspace"
 USER_INVITED_TO_WORKSPACE = "user_invited_to_workspace"
 WORKSPACE_CREATED = "workspace_created"

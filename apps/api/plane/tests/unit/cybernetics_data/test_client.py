@@ -2,6 +2,13 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 # See the LICENSE file for details.
 
+"""Unit tests for ``plane.utils.cybernetics_data.client`` (the Teable HTTP client).
+
+``pinned_fetch`` is patched throughout, so no network traffic happens. Covers base-URL
+normalisation, request shape, upstream error mapping, redirect/transport/body hardening,
+response shape guards, endpoint paths and query-string serialisation.
+"""
+
 import ipaddress
 import json
 from unittest.mock import MagicMock, patch
@@ -25,6 +32,7 @@ from plane.utils.cybernetics_data.client import (
     normalize_base_url,
 )
 
+# Patch targets: the SSRF-safe fetcher and the error logger used by the client.
 FETCH = "plane.utils.cybernetics_data.client.pinned_fetch"
 LOG = "plane.utils.cybernetics_data.client.log_exception"
 TOKEN = "cybernetics_abc123_c2lnbmF0dXJl"
@@ -32,6 +40,7 @@ BASE = "https://data.example.com"
 
 
 def _response(status_code=200, body=None, raw=None, chunks=None):
+    """Build a mock streamed response; ``chunks`` overrides ``raw``/``body`` (JSON-encoded)."""
     response = MagicMock()
     response.status_code = status_code
     if chunks is None:
@@ -41,20 +50,25 @@ def _response(status_code=200, body=None, raw=None, chunks=None):
 
 
 def _client(**kwargs):
+    """Create a client against the fake ``BASE`` URL with the test token."""
     return CyberneticsDataClient(BASE, TOKEN, **kwargs)
 
 
 def _query(mock_fetch):
+    """Return ``(path, [(key, value), ...])`` of the URL passed to the mocked fetcher."""
     url = mock_fetch.call_args.args[1]
     return urlsplit(url).path, parse_qsl(urlsplit(url).query, keep_blank_values=True)
 
 
 def _values(params, key):
+    """Return all values for ``key`` in a parsed query list (keys may repeat)."""
     return [v for k, v in params if k == key]
 
 
 @pytest.mark.unit
 class TestNormalizeBaseUrl:
+    """``normalize_base_url``: strips whitespace/trailing ``/api``, rejects unsafe URLs."""
+
     @pytest.mark.parametrize(
         "value,expected",
         [
@@ -87,6 +101,7 @@ class TestNormalizeBaseUrl:
         ],
     )
     def test_invalid(self, value):
+        """Missing scheme, non-http(s), embedded credentials, query/fragment and empty hosts are rejected."""
         with pytest.raises(ValueError):
             normalize_base_url(value, require_https=True)
 
@@ -100,6 +115,7 @@ class TestNormalizeBaseUrl:
         [(True, False, False), (True, True, True), (False, False, True), (False, True, True)],
     )
     def test_default_reads_settings(self, settings, require_https, debug, http_allowed):
+        """Without an explicit flag, plain http is allowed only if HTTPS is not required or DEBUG is on."""
         settings.CYBERNETICS_DATA_REQUIRE_HTTPS = require_https
         settings.DEBUG = debug
         if http_allowed:
@@ -111,6 +127,8 @@ class TestNormalizeBaseUrl:
 
 @pytest.mark.unit
 class TestClientTransport:
+    """Outgoing request shape: headers, timeout, streaming and SSRF allowlists."""
+
     def test_request_shape(self):
         client = _client(timeout=5)
         with patch(FETCH, return_value=_response(body=[])) as mock_fetch:
@@ -129,6 +147,7 @@ class TestClientTransport:
         assert kwargs["stream"] is True
 
     def test_allowlists_come_from_settings(self, settings):
+        """IP/host allowlists are forwarded from settings to ``pinned_fetch``."""
         networks = [ipaddress.ip_network("10.0.0.0/8")]
         settings.CYBERNETICS_DATA_ALLOWED_IPS = networks
         settings.CYBERNETICS_DATA_ALLOWED_HOSTS = ["data.example.com"]
@@ -148,6 +167,7 @@ class TestClientTransport:
         assert mock_fetch.call_args.args[1] == "https://data.example.com/api/space"
 
     def test_repr_hides_token(self):
+        """The API token must never leak via ``repr`` (e.g. into logs or tracebacks)."""
         client = _client()
         assert TOKEN not in repr(client)
         assert BASE in repr(client)
@@ -155,6 +175,8 @@ class TestClientTransport:
 
 @pytest.mark.unit
 class TestErrorMapping:
+    """Upstream HTTP statuses map to typed ``Cybernetics*`` exceptions with a safe message."""
+
     @pytest.mark.parametrize(
         "status_code,exc",
         [
@@ -178,6 +200,7 @@ class TestErrorMapping:
         assert info.value.upstream_status == status_code
 
     def test_unauthorized_is_not_http_401(self):
+        """An upstream 401 is surfaced as 424 so the frontend does not treat it as a Plane logout."""
         assert CyberneticsUnauthorized.http_status == 424
 
     def test_message_is_truncated(self):
@@ -191,6 +214,7 @@ class TestErrorMapping:
         [b"<html>oops</html>", b"[1, 2]", b'{"message": ""}', b'{"message": 42}', b'{"other": 1}', b"", None],
     )
     def test_extract_message_fallback(self, body):
+        """Non-JSON, non-dict or missing/blank/non-string messages fall back to a generic text."""
         assert _extract_message(body, 500) == "Cybernetics-Data responded with HTTP 500"
 
     def test_extract_message_uses_upstream_message(self):
@@ -199,8 +223,11 @@ class TestErrorMapping:
 
 @pytest.mark.unit
 class TestRedirects:
+    """Redirects are refused (they could bypass the SSRF host pinning)."""
+
     @pytest.mark.parametrize("status_code", [301, 302, 307, 308])
     def test_redirect_is_rejected(self, status_code):
+        """3xx responses raise without reading the body and the connection is closed."""
         response = _response(status_code, raw=b"")
         with patch(FETCH, return_value=response):
             with pytest.raises(CyberneticsUnreachable) as info:
@@ -212,6 +239,8 @@ class TestRedirects:
 
 @pytest.mark.unit
 class TestTransportFailures:
+    """Network-level failures all surface as ``CyberneticsUnreachable``."""
+
     @pytest.mark.parametrize(
         "error,logged",
         [
@@ -221,12 +250,14 @@ class TestTransportFailures:
         ],
     )
     def test_transport_errors(self, error, logged):
+        """SSRF blocks (``ValueError``) are not logged; timeouts/connection errors are."""
         with patch(FETCH, side_effect=error), patch(LOG) as mock_log:
             with pytest.raises(CyberneticsUnreachable):
                 _client().list_spaces()
         assert mock_log.called is logged
 
     def test_error_while_streaming(self):
+        """A failure mid-stream is logged and the response is still closed."""
         response = _response()
         response.iter_content.side_effect = requests.exceptions.ChunkedEncodingError()
         with patch(FETCH, return_value=response), patch(LOG) as mock_log:
@@ -238,7 +269,10 @@ class TestTransportFailures:
 
 @pytest.mark.unit
 class TestBody:
+    """Response body handling: size cap, chunk joining, JSON parsing, empty bodies."""
+
     def test_size_cap(self):
+        """Bodies larger than ``MAX_RESPONSE_BYTES`` are rejected and the connection closed."""
         client = _client()
         client.MAX_RESPONSE_BYTES = 10
         response = _response(chunks=[b"[1,2,3,", b"4,5,6,7]"])
@@ -259,6 +293,7 @@ class TestBody:
                 _client().list_spaces()
 
     def test_empty_body_gives_empty_defaults(self):
+        """An empty body yields an empty list/dict/records payload per endpoint."""
         with patch(FETCH, return_value=_response(raw=b"")):
             assert _client().list_spaces() == []
         with patch(FETCH, return_value=_response(raw=b"")):
@@ -269,6 +304,8 @@ class TestBody:
 
 @pytest.mark.unit
 class TestShapeGuards:
+    """``_expect_list``/``_expect_dict`` reject payloads of the wrong JSON shape."""
+
     def test_expect_list(self):
         assert _expect_list(None) == []
         assert _expect_list([{"id": 1}]) == [{"id": 1}]
@@ -297,6 +334,8 @@ class TestShapeGuards:
 
 @pytest.mark.unit
 class TestEndpoints:
+    """Each client method hits the expected Teable path with the expected default query."""
+
     @pytest.mark.parametrize(
         "call,body,path,params",
         [
@@ -344,6 +383,7 @@ class TestEndpoints:
         assert _query(mock_fetch) == (path, params)
 
     def test_path_segments_are_quoted(self):
+        """IDs are percent-encoded so they cannot inject path segments or query strings."""
         with patch(FETCH, return_value=_response(body=[])) as mock_fetch:
             _client().list_tables("bse/../x")
         assert _query(mock_fetch)[0] == "/api/base/bse%2F..%2Fx/table"
@@ -354,12 +394,16 @@ class TestEndpoints:
 
 @pytest.mark.unit
 class TestQuerySerialisation:
+    """Serialisation of list/count/get query params (search, filter, sort, projection, paging)."""
+
     def _params(self, **kwargs):
+        """Call ``list_records`` with ``kwargs`` and return the parsed query list."""
         with patch(FETCH, return_value=_response(body={"records": []})) as mock_fetch:
             _client().list_records("tblAAAAAAAA", **kwargs)
         return _query(mock_fetch)[1]
 
     def test_list_records_all_params(self):
+        """All params are emitted in order; JSON params use compact separators (no spaces)."""
         flt = {"conjunction": "and", "filterSet": [{"fieldId": "fldAAAAAAAA", "operator": "is", "value": "x"}]}
         order = [{"fieldId": "fldAAAAAAAA", "order": "desc"}]
         params = self._params(
@@ -376,6 +420,7 @@ class TestQuerySerialisation:
         assert params == [
             ("fieldKeyType", "id"),
             ("viewId", "viwAAAAAAAA"),
+            # Teable's search tuple: [value, fieldId, hideNotMatchRow].
             ("search[]", "acme"),
             ("search[]", "fldAAAAAAAA"),
             ("search[]", "true"),
@@ -392,16 +437,20 @@ class TestQuerySerialisation:
 
     @pytest.mark.parametrize("take,expected", [(0, "1"), (-5, "1"), (1, "1"), (200, "200"), (999, "200")])
     def test_take_is_clamped(self, take, expected):
+        """``take`` is clamped to the range 1..200."""
         assert dict(self._params(take=take))["take"] == expected
 
     @pytest.mark.parametrize("skip,expected", [(-3, "0"), (0, "0"), (25, "25")])
     def test_skip_is_clamped(self, skip, expected):
+        """Negative ``skip`` is clamped to 0."""
         assert dict(self._params(skip=skip))["skip"] == expected
 
     def test_search_all_fields(self):
+        """Search without a field sends an empty field id (search across all fields)."""
         assert _values(self._params(search="acme"), "search[]") == ["acme", "", "true"]
 
     def test_no_search(self):
+        """``search_field`` alone does not emit a search; optional params are omitted when unset."""
         params = self._params(search_field="fldAAAAAAAA")
         assert "search[]" not in dict(params)
         assert "filter" not in dict(params)
@@ -431,5 +480,6 @@ class TestQuerySerialisation:
 
     @pytest.mark.parametrize("body", [{}, {"rowCount": None}, None])
     def test_row_count_missing(self, body):
+        """A missing or null ``rowCount`` is treated as 0."""
         with patch(FETCH, return_value=_response(body=body)):
             assert _client().row_count("tblAAAAAAAA") == 0

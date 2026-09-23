@@ -2,6 +2,12 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 # See the LICENSE file for details.
 
+"""Unit tests for ``plane.mcp.auth``: token extraction and the ASGI ``MCPAuthMiddleware``.
+
+The middleware guards the MCP endpoint (``/api/mcp``): it validates the Plane API token and
+exposes the authenticated caller to tools via a context variable (``get_caller``).
+"""
+
 import pytest
 
 from plane.mcp import auth
@@ -9,6 +15,7 @@ from plane.mcp.auth import MCPAuthMiddleware, extract_token, get_caller
 
 
 def http_scope(headers=None, client=("10.0.0.1", 1234)):
+    """Build a minimal ASGI HTTP scope for ``/api/mcp`` with the given request headers."""
     return {
         "type": "http",
         "path": "/api/mcp",
@@ -19,6 +26,7 @@ def http_scope(headers=None, client=("10.0.0.1", 1234)):
 
 
 async def run_middleware(app, scope):
+    """Drive an ASGI app with an empty request body and return all messages it sent."""
     sent = []
 
     async def receive():
@@ -33,6 +41,8 @@ async def run_middleware(app, scope):
 
 @pytest.mark.unit
 class TestExtractToken:
+    """``extract_token`` reads ``Authorization: Bearer`` first, then ``X-Api-Key``."""
+
     def test_bearer_token(self):
         assert extract_token(http_scope({"Authorization": "Bearer plane_api_abc"})) == "plane_api_abc"
 
@@ -52,13 +62,17 @@ class TestExtractToken:
 
     @pytest.mark.parametrize("headers", [{}, {"Authorization": "Bearer "}, {"X-Api-Key": "  "}])
     def test_missing_token(self, headers):
+        """Absent or blank credentials yield ``None``."""
         assert extract_token(http_scope(headers)) is None
 
 
 @pytest.mark.unit
 class TestMCPAuthMiddleware:
+    """Request gating and caller context handling of ``MCPAuthMiddleware``."""
+
     @pytest.fixture
     def inner(self):
+        """Downstream ASGI app that records ``get_caller()`` on each call and replies 200."""
         calls = []
 
         async def app(scope, receive, send):
@@ -71,6 +85,7 @@ class TestMCPAuthMiddleware:
 
     @pytest.mark.anyio
     async def test_missing_token_returns_401(self, inner):
+        """No token: 401 with a ``WWW-Authenticate`` challenge and the inner app is never called."""
         sent = await run_middleware(MCPAuthMiddleware(inner), http_scope())
 
         assert sent[0]["status"] == 401
@@ -88,6 +103,7 @@ class TestMCPAuthMiddleware:
 
     @pytest.mark.anyio
     async def test_valid_token_exposes_caller(self, inner, mocker):
+        """The caller context carries user id, token and forwarded host/proto/IP/user agent."""
         mocker.patch.object(auth, "validate_token", mocker.AsyncMock(return_value="user-1"))
         scope = http_scope(
             {
@@ -112,6 +128,7 @@ class TestMCPAuthMiddleware:
 
     @pytest.mark.anyio
     async def test_caller_is_reset_after_request(self, inner, mocker):
+        """The context variable is cleared after the request, so the caller cannot leak."""
         mocker.patch.object(auth, "validate_token", mocker.AsyncMock(return_value="user-1"))
 
         await run_middleware(MCPAuthMiddleware(inner), http_scope({"X-Api-Key": "plane_api_abc"}))
@@ -121,6 +138,7 @@ class TestMCPAuthMiddleware:
 
     @pytest.mark.anyio
     async def test_client_address_used_when_not_forwarded(self, inner, mocker):
+        """Without ``X-Forwarded-For`` the ASGI client address is used."""
         mocker.patch.object(auth, "validate_token", mocker.AsyncMock(return_value="user-1"))
 
         await run_middleware(MCPAuthMiddleware(inner), http_scope({"X-Api-Key": "k"}, client=("192.0.2.7", 5)))

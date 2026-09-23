@@ -2,6 +2,13 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 # See the LICENSE file for details.
 
+"""IP address helpers: SSRF protection for outbound requests and client IP lookup.
+
+Used by webhook delivery, link/URL previews and other server-side fetches to
+reject URLs that resolve to private/internal networks, and by auth/logging code
+(via ``plane.utils.host.user_ip``) to record the requester's IP.
+"""
+
 # Python imports
 import ipaddress
 import socket
@@ -197,6 +204,12 @@ def validate_url(url, allowed_ips=None, allowed_hosts=None):
 
 
 def get_client_ip(request):
+    """Return the client IP from X-Forwarded-For (first hop) or REMOTE_ADDR.
+
+    X-Forwarded-For is client-controlled unless set by a trusted proxy, so the
+    value is informational and must not be used for security decisions.
+    """
+    # The left-most X-Forwarded-For entry is the original client when behind proxies
     x_forwarded_for = request.META.get("HTTP_X_FORWARDED_FOR")
     if x_forwarded_for:
         ip = x_forwarded_for.split(",")[0]

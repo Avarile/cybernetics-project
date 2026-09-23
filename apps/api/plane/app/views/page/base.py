@@ -2,6 +2,14 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 # See the LICENSE file for details.
 
+"""Project page (rich-text document) API views.
+
+Covers page CRUD, lock/unlock, access (public/private) changes, archive/
+unarchive (recursively for sub-pages), summary counts, favorites, the
+binary (Yjs/collaborative) description stream and page duplication.
+Content changes queue ``page_transaction`` (mention/log extraction) and
+``track_page_version`` background tasks.
+"""
 # Python imports
 import json
 from datetime import datetime
@@ -57,6 +65,11 @@ from plane.app.permissions import ProjectPagePermission
 
 
 def unarchive_archive_page_and_descendants(page_id, archived_at):
+    """Set ``archived_at`` on a page and all its descendants in one SQL statement.
+
+    Pass a timestamp to archive or ``None`` to unarchive. Uses a recursive CTE
+    over ``pages.parent_id`` to collect the subtree.
+    """
     # Your SQL query
     sql = """
     WITH RECURSIVE descendants AS (
@@ -73,12 +86,19 @@ def unarchive_archive_page_and_descendants(page_id, archived_at):
 
 
 class PageViewSet(BaseViewSet):
+    """CRUD and lifecycle actions for pages within a project."""
     serializer_class = PageSerializer
     model = Page
     permission_classes = [ProjectPagePermission]
     search_fields = ["name"]
 
     def get_queryset(self):
+        """Top-level pages of the project visible to the user.
+
+        Restricted to active members of non-archived projects, and to pages
+        that are public (access=0) or owned by the user. Annotated with
+        favorite flag, label ids and project ids.
+        """
         subquery = UserFavorite.objects.filter(
             user=self.request.user,
             entity_type="page",
@@ -127,6 +147,7 @@ class PageViewSet(BaseViewSet):
         )
 
     def create(self, request, slug, project_id):
+        """Create a page owned by the requester and queue its page transaction."""
         serializer = PageSerializer(
             data=request.data,
             context={
@@ -152,6 +173,11 @@ class PageViewSet(BaseViewSet):
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
     def partial_update(self, request, slug, project_id, page_id):
+        """Update page fields; locked pages are rejected.
+
+        Validates that a new ``parent`` belongs to the same project, and only
+        the owner may change ``access``.
+        """
         try:
             page = Page.objects.get(
                 pk=page_id,
@@ -200,6 +226,11 @@ class PageViewSet(BaseViewSet):
             )
 
     def retrieve(self, request, slug, project_id, page_id=None):
+        """Return page detail plus ids of issues referenced in the page.
+
+        Guests without ``guest_view_all_features`` may only view their own
+        pages. Records a recent visit unless ``track_visit=false``.
+        """
         page = self.get_queryset().filter(pk=page_id).first()
         project = Project.objects.get(pk=project_id)
         track_visit = request.query_params.get("track_visit", "true").lower() == "true"
@@ -209,6 +240,7 @@ class PageViewSet(BaseViewSet):
         the requesting user then dont show the page
         """
 
+        # role=5 is the project guest role.
         if (
             ProjectMember.objects.filter(
                 workspace__slug=slug,
@@ -244,6 +276,7 @@ class PageViewSet(BaseViewSet):
             return Response(data, status=status.HTTP_200_OK)
 
     def lock(self, request, slug, project_id, page_id):
+        """Lock a page so it can no longer be edited."""
         page = Page.objects.get(
             pk=page_id,
             workspace__slug=slug,
@@ -256,6 +289,7 @@ class PageViewSet(BaseViewSet):
         return Response(status=status.HTTP_204_NO_CONTENT)
 
     def unlock(self, request, slug, project_id, page_id):
+        """Unlock a previously locked page."""
         page = Page.objects.get(
             pk=page_id,
             workspace__slug=slug,
@@ -269,6 +303,7 @@ class PageViewSet(BaseViewSet):
         return Response(status=status.HTTP_204_NO_CONTENT)
 
     def access(self, request, slug, project_id, page_id):
+        """Change page access (0 = public, 1 = private); owner only."""
         access = request.data.get("access", 0)
         page = Page.objects.get(
             pk=page_id,
@@ -289,6 +324,7 @@ class PageViewSet(BaseViewSet):
         return Response(status=status.HTTP_204_NO_CONTENT)
 
     def list(self, request, slug, project_id):
+        """List the project's pages; guests without full view see only their own."""
         queryset = self.get_queryset()
         project = Project.objects.get(pk=project_id)
         if (
@@ -306,6 +342,10 @@ class PageViewSet(BaseViewSet):
         return Response(pages, status=status.HTTP_200_OK)
 
     def archive(self, request, slug, project_id, page_id):
+        """Archive a page and its descendants; owner or project admin only.
+
+        Also removes favorites pointing at the page.
+        """
         page = Page.objects.get(
             pk=page_id,
             workspace__slug=slug,
@@ -314,6 +354,7 @@ class PageViewSet(BaseViewSet):
         )
 
         # only the owner or admin can archive the page
+        # role__lte=15 matches non-admin members/guests; they must own the page.
         if (
             ProjectMember.objects.filter(
                 project_id=project_id, member=request.user, is_active=True, role__lte=15
@@ -337,6 +378,7 @@ class PageViewSet(BaseViewSet):
         return Response({"archived_at": str(datetime.now())}, status=status.HTTP_200_OK)
 
     def unarchive(self, request, slug, project_id, page_id):
+        """Unarchive a page and its descendants; owner or project admin only."""
         page = Page.objects.get(
             pk=page_id,
             workspace__slug=slug,
@@ -366,6 +408,10 @@ class PageViewSet(BaseViewSet):
         return Response(status=status.HTTP_204_NO_CONTENT)
 
     def destroy(self, request, slug, project_id, page_id):
+        """Permanently delete an archived page; owner or project admin (role 20) only.
+
+        Detaches child pages and removes related favorites and recent visits.
+        """
         page = Page.objects.get(
             pk=page_id,
             workspace__slug=slug,
@@ -419,6 +465,7 @@ class PageViewSet(BaseViewSet):
         return Response(status=status.HTTP_204_NO_CONTENT)
 
     def summary(self, request, slug, project_id):
+        """Return counts of public, private and archived top-level pages visible to the user."""
         queryset = (
             Page.objects.filter(workspace__slug=slug)
             .filter(
@@ -470,10 +517,12 @@ class PageViewSet(BaseViewSet):
 
 
 class PageFavoriteViewSet(BaseViewSet):
+    """Add/remove a page from the requesting user's favorites."""
     model = UserFavorite
 
     @allow_permission([ROLE.ADMIN, ROLE.MEMBER])
     def create(self, request, slug, project_id, page_id):
+        """Mark the page as a favorite for the current user."""
         _ = UserFavorite.objects.create(
             project_id=project_id,
             entity_identifier=page_id,
@@ -484,6 +533,7 @@ class PageFavoriteViewSet(BaseViewSet):
 
     @allow_permission([ROLE.ADMIN, ROLE.MEMBER])
     def destroy(self, request, slug, project_id, page_id):
+        """Remove the page from the user's favorites (hard delete)."""
         page_favorite = UserFavorite.objects.get(
             project=project_id,
             user=request.user,
@@ -496,9 +546,11 @@ class PageFavoriteViewSet(BaseViewSet):
 
 
 class PagesDescriptionViewSet(BaseViewSet):
+    """Read/write the binary collaborative-editor state of a page description."""
     permission_classes = [ProjectPagePermission]
 
     def retrieve(self, request, slug, project_id, page_id):
+        """Stream the page's ``description_binary`` as an octet-stream download."""
         page = Page.objects.get(
             Q(owned_by=self.request.user) | Q(access=0),
             pk=page_id,
@@ -519,6 +571,10 @@ class PagesDescriptionViewSet(BaseViewSet):
         return response
 
     def partial_update(self, request, slug, project_id, page_id):
+        """Save a new description (binary/html) for an unlocked, unarchived page.
+
+        Queues a page transaction (when html changes) and a page version snapshot.
+        """
         page = Page.objects.get(
             Q(owned_by=self.request.user) | Q(access=0),
             pk=page_id,
@@ -576,9 +632,16 @@ class PagesDescriptionViewSet(BaseViewSet):
 
 
 class PageDuplicateEndpoint(BaseAPIView):
+    """Duplicate a page into all projects the original belongs to."""
     permission_classes = [ProjectPagePermission]
 
     def post(self, request, slug, project_id, page_id):
+        """Create a "(Copy)" of the page owned by the requester.
+
+        Private pages can only be duplicated by their owner. The binary state
+        is reset, and S3 assets referenced by the description are copied in the
+        background.
+        """
         page = Page.objects.get(
             pk=page_id,
             workspace__slug=slug,
@@ -593,6 +656,7 @@ class PageDuplicateEndpoint(BaseAPIView):
         # get all the project ids where page is present
         project_ids = ProjectPage.objects.filter(page_id=page_id).values_list("project_id", flat=True)
 
+        # Clearing pk makes save() insert a new row copying the loaded fields.
         page.pk = None
         page.name = f"{page.name} (Copy)"
         page.description_binary = None

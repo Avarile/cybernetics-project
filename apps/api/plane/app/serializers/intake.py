@@ -2,6 +2,12 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 # See the LICENSE file for details.
 
+"""Serializers for project intake (triage inbox) and intake issues.
+
+An ``IntakeIssue`` wraps an ``Issue`` submitted to a project's intake and tracks
+its triage status (e.g. accepted = 1), duplicate target and snooze date.
+"""
+
 # Third party frameworks
 from rest_framework import serializers
 
@@ -15,6 +21,8 @@ from plane.db.models import Intake, IntakeIssue, Issue, StateGroup, State
 
 
 class IntakeSerializer(BaseSerializer):
+    """Project intake with the annotated count of pending intake issues."""
+
     project_detail = ProjectLiteSerializer(source="project", read_only=True)
     pending_issue_count = serializers.IntegerField(read_only=True)
 
@@ -25,6 +33,12 @@ class IntakeSerializer(BaseSerializer):
 
 
 class IntakeIssueSerializer(BaseSerializer):
+    """Intake issue with a nested summary of the underlying issue.
+
+    Accepting (status 1) moves the issue out of the TRIAGE state into the
+    project's default state.
+    """
+
     issue = IssueIntakeSerializer(read_only=True)
 
     class Meta:
@@ -66,6 +80,7 @@ class IntakeIssueSerializer(BaseSerializer):
         return attrs
 
     def update(self, instance, validated_data):
+        """Save the intake issue; on acceptance, move a TRIAGE-state issue to the project's default state."""
         # Update the intake issue
         instance = super().update(instance, validated_data)
 
@@ -84,6 +99,7 @@ class IntakeIssueSerializer(BaseSerializer):
         return instance
 
     def to_representation(self, instance):
+        """Copy the annotated ``label_ids`` onto the nested issue before serializing."""
         # Pass the annotated fields to the Issue instance if they exist
         if hasattr(instance, "label_ids"):
             instance.issue.label_ids = instance.label_ids
@@ -91,6 +107,8 @@ class IntakeIssueSerializer(BaseSerializer):
 
 
 class IntakeIssueDetailSerializer(BaseSerializer):
+    """Intake issue detail with full issue details and the duplicate target summary."""
+
     issue = IssueDetailSerializer(read_only=True)
     duplicate_issue_detail = IssueIntakeSerializer(read_only=True, source="duplicate_to")
 
@@ -108,6 +126,7 @@ class IntakeIssueDetailSerializer(BaseSerializer):
         read_only_fields = ["project", "workspace"]
 
     def to_representation(self, instance):
+        """Copy annotated ``assignee_ids``/``label_ids`` onto the nested issue before serializing."""
         # Pass the annotated fields to the Issue instance if they exist
         if hasattr(instance, "assignee_ids"):
             instance.issue.assignee_ids = instance.assignee_ids
@@ -118,6 +137,8 @@ class IntakeIssueDetailSerializer(BaseSerializer):
 
 
 class IntakeIssueLiteSerializer(BaseSerializer):
+    """Minimal read-only intake issue representation (used when nesting under issues)."""
+
     class Meta:
         model = IntakeIssue
         fields = ["id", "status", "duplicate_to", "snoozed_till", "source"]
@@ -125,6 +146,8 @@ class IntakeIssueLiteSerializer(BaseSerializer):
 
 
 class IssueStateIntakeSerializer(BaseSerializer):
+    """Issue representation with state/project/label/assignee details and its intake records."""
+
     state_detail = StateLiteSerializer(read_only=True, source="state")
     project_detail = ProjectLiteSerializer(read_only=True, source="project")
     label_details = LabelLiteSerializer(read_only=True, source="labels", many=True)

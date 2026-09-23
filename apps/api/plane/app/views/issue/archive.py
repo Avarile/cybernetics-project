@@ -2,6 +2,13 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 # See the LICENSE file for details.
 
+"""Archived work item endpoints.
+
+Lists and retrieves archived work items of a project, archives a single
+work item or a batch (only allowed in completed/cancelled state groups) and
+restores (unarchives) them. Every change is logged as issue activity.
+"""
+
 # Python imports
 import copy
 import json
@@ -51,6 +58,8 @@ from plane.utils.filters import IssueFilterSet
 
 
 class IssueArchiveViewSet(BaseViewSet):
+    """List/retrieve archived work items and archive/unarchive single work items."""
+
     serializer_class = IssueFlatSerializer
     model = Issue
 
@@ -58,6 +67,7 @@ class IssueArchiveViewSet(BaseViewSet):
     filterset_class = IssueFilterSet
 
     def apply_annotations(self, issues):
+        """Add list-view annotations: current cycle id, link/attachment/sub-issue counts, prefetches."""
         return (
             issues.annotate(
                 cycle_id=Subquery(
@@ -95,6 +105,7 @@ class IssueArchiveViewSet(BaseViewSet):
         )
 
     def get_queryset(self):
+        """Archived, non-epic work items of the URL's project."""
         return (
             Issue.objects.filter(Q(type__isnull=True) | Q(type__is_epic=False))
             .filter(archived_at__isnull=False)
@@ -105,6 +116,11 @@ class IssueArchiveViewSet(BaseViewSet):
     @method_decorator(gzip_page)
     @allow_permission([ROLE.ADMIN, ROLE.MEMBER])
     def list(self, request, slug, project_id):
+        """List archived work items with filters, ordering and optional (sub-)grouping.
+
+        ``show_sub_issues=false`` hides child work items. ``group_by`` and
+        ``sub_group_by`` must differ.
+        """
         filters = issue_filters(request.query_params, "GET")
         show_sub_issues = request.GET.get("show_sub_issues", "true")
 
@@ -120,6 +136,7 @@ class IssueArchiveViewSet(BaseViewSet):
         issue_queryset = issue_queryset.filter(**filters)
 
         # Total count queryset
+        # Keep an un-annotated copy for counting totals cheaply.
         total_issue_queryset = copy.deepcopy(issue_queryset)
 
         # Applying annotations to the issue queryset
@@ -170,6 +187,8 @@ class IssueArchiveViewSet(BaseViewSet):
                         ),
                         group_by_field_name=group_by,
                         sub_group_by_field_name=sub_group_by,
+                        # Only count accepted (1), rejected (-1) and duplicate (2) intake items or
+                        # regular (non-intake) work items that are not archived or drafts.
                         count_filter=Q(
                             Q(issue_intake__status=1)
                             | Q(issue_intake__status=-1)
@@ -219,6 +238,7 @@ class IssueArchiveViewSet(BaseViewSet):
 
     @allow_permission([ROLE.ADMIN, ROLE.MEMBER])
     def retrieve(self, request, slug, project_id, pk=None):
+        """Return one archived work item with reactions, links and the user's subscription flag."""
         issue = (
             self.get_queryset()
             .filter(pk=pk)
@@ -255,6 +275,7 @@ class IssueArchiveViewSet(BaseViewSet):
 
     @allow_permission([ROLE.ADMIN, ROLE.MEMBER])
     def archive(self, request, slug, project_id, pk=None):
+        """Archive a work item; only completed or cancelled work items can be archived."""
         issue = Issue.issue_objects.get(workspace__slug=slug, project_id=project_id, pk=pk)
         if issue.state.group not in ["completed", "cancelled"]:
             return Response(
@@ -279,6 +300,7 @@ class IssueArchiveViewSet(BaseViewSet):
 
     @allow_permission([ROLE.ADMIN, ROLE.MEMBER])
     def unarchive(self, request, slug, project_id, pk=None):
+        """Restore an archived work item by clearing ``archived_at``."""
         issue = Issue.objects.get(
             workspace__slug=slug,
             project_id=project_id,
@@ -303,10 +325,16 @@ class IssueArchiveViewSet(BaseViewSet):
 
 
 class BulkArchiveIssuesEndpoint(BaseAPIView):
+    """Archive many work items at once."""
+
     permission_classes = [ProjectEntityPermission]
 
     @allow_permission([ROLE.ADMIN, ROLE.MEMBER])
     def post(self, request, slug, project_id):
+        """Archive ``issue_ids``; fails with ``INVALID_ARCHIVE_STATE_GROUP`` if any is not completed/cancelled.
+
+        Note: activities for items checked before a failing item are already queued.
+        """
         issue_ids = request.data.get("issue_ids", [])
 
         if not len(issue_ids):

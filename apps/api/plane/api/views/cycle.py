@@ -2,6 +2,14 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 # See the LICENSE file for details.
 
+"""Public API endpoints for cycles (routes in plane/api/urls/cycle.py).
+
+Covers cycle CRUD, archive/unarchive, adding/removing work items to a cycle and
+transferring unfinished work items to another cycle. Writes enqueue
+``model_activity`` (webhooks) and ``issue_activity`` (activity feed /
+notifications) Celery tasks. Access is enforced by ProjectEntityPermission.
+"""
+
 # Python imports
 import json
 
@@ -88,6 +96,7 @@ class CycleListCreateAPIEndpoint(BaseAPIView):
     use_read_replica = True
 
     def get_queryset(self):
+        """Cycles of the project visible to an active project member, annotated with work-item counts."""
         return (
             Cycle.objects.filter(workspace__slug=self.kwargs.get("slug"))
             .filter(project_id=self.kwargs.get("project_id"))
@@ -98,6 +107,8 @@ class CycleListCreateAPIEndpoint(BaseAPIView):
             .select_related("project")
             .select_related("workspace")
             .select_related("owned_by")
+            # Per-state-group counts only include live (non-archived, non-draft) work items
+            # whose cycle link has not been soft-deleted.
             .annotate(
                 total_issues=Count(
                     "issue_cycle",
@@ -196,6 +207,8 @@ class CycleListCreateAPIEndpoint(BaseAPIView):
         """
         project = Project.objects.get(workspace__slug=slug, pk=project_id)
         queryset = self.get_queryset().filter(archived_at__isnull=True)
+        # cycle_view: current | upcoming | completed | draft | incomplete | (default) all.
+        # "current" is returned unpaginated; the others are paginated.
         cycle_view = request.GET.get("cycle_view", "all")
 
         # Current Cycle
@@ -303,6 +316,7 @@ class CycleListCreateAPIEndpoint(BaseAPIView):
         Create a new development cycle with specified name, description, and date range.
         Supports external ID tracking for integration purposes.
         """
+        # Dates must be given together or not at all (a draft cycle has neither).
         if (request.data.get("start_date", None) is None and request.data.get("end_date", None) is None) or (
             request.data.get("start_date", None) is not None and request.data.get("end_date", None) is not None
         ):
@@ -310,6 +324,7 @@ class CycleListCreateAPIEndpoint(BaseAPIView):
                 data=request.data, context={"request": request, "project_id": project_id}
             )
             if serializer.is_valid():
+                # Idempotency for integrations: 409 if external_source/external_id already used.
                 if (
                     request.data.get("external_id")
                     and request.data.get("external_source")
@@ -368,6 +383,7 @@ class CycleDetailAPIEndpoint(BaseAPIView):
     use_read_replica = True
 
     def get_queryset(self):
+        """Cycles of the project visible to an active project member, annotated with work-item counts."""
         return (
             Cycle.objects.filter(workspace__slug=self.kwargs.get("slug"))
             .filter(project_id=self.kwargs.get("project_id"))
@@ -378,6 +394,8 @@ class CycleDetailAPIEndpoint(BaseAPIView):
             .select_related("project")
             .select_related("workspace")
             .select_related("owned_by")
+            # Per-state-group counts only include live (non-archived, non-draft) work items
+            # whose cycle link has not been soft-deleted.
             .annotate(
                 total_issues=Count(
                     "issue_cycle",
@@ -509,6 +527,8 @@ class CycleDetailAPIEndpoint(BaseAPIView):
 
         request_data = request.data
 
+        # Once a cycle has ended only its sort_order may change.
+        # NOTE: the serializer below is given request.data, not the narrowed request_data.
         if cycle.end_date is not None and cycle.end_date < timezone.now():
             if "sort_order" in request_data:
                 # Can only change sort order
@@ -572,6 +592,7 @@ class CycleDetailAPIEndpoint(BaseAPIView):
         Only admins or the cycle creator can perform this action.
         """
         cycle = Cycle.objects.get(workspace__slug=slug, project_id=project_id, pk=pk)
+        # role=20 is the project Admin role.
         if cycle.owned_by_id != request.user.id and (
             not ProjectMember.objects.filter(
                 workspace__slug=slug,
@@ -586,6 +607,7 @@ class CycleDetailAPIEndpoint(BaseAPIView):
                 status=status.HTTP_403_FORBIDDEN,
             )
 
+        # Snapshot the linked work items before deletion so the activity log can reference them.
         cycle_issues = list(CycleIssue.objects.filter(cycle_id=self.kwargs.get("pk")).values_list("issue", flat=True))
 
         issue_activity.delay(
@@ -617,6 +639,7 @@ class CycleArchiveUnarchiveAPIEndpoint(BaseAPIView):
     use_read_replica = True
 
     def get_queryset(self):
+        """Archived cycles of the project, annotated with work-item counts and estimate sums."""
         return (
             Cycle.objects.filter(workspace__slug=self.kwargs.get("slug"))
             .filter(project_id=self.kwargs.get("project_id"))
@@ -628,6 +651,8 @@ class CycleArchiveUnarchiveAPIEndpoint(BaseAPIView):
             .select_related("project")
             .select_related("workspace")
             .select_related("owned_by")
+            # Per-state-group counts only include live (non-archived, non-draft) work items
+            # whose cycle link has not been soft-deleted.
             .annotate(
                 total_issues=Count(
                     "issue_cycle",
@@ -693,6 +718,7 @@ class CycleArchiveUnarchiveAPIEndpoint(BaseAPIView):
                     ),
                 )
             )
+            # Estimate totals sum the estimate point keys of the cycle's work items.
             .annotate(total_estimates=Sum("issue_cycle__issue__estimate_point__key"))
             .annotate(
                 completed_estimates=Sum(
@@ -810,7 +836,9 @@ class CycleIssueListCreateAPIEndpoint(BaseAPIView):
     use_read_replica = True
 
     def get_queryset(self):
+        """CycleIssue links of the cycle, annotated with each work item's sub-issue count."""
         return (
+            # Correlated subquery: number of child work items of each linked issue.
             CycleIssue.objects.annotate(
                 sub_issues_count=Issue.issue_objects.filter(parent=OuterRef("issue_id"))
                 .order_by()
@@ -855,6 +883,7 @@ class CycleIssueListCreateAPIEndpoint(BaseAPIView):
         Returns paginated results with work item details, assignees, and labels.
         """
         # List
+        # order_by is restricted to an allowlist to avoid ordering by arbitrary fields.
         order_by = sanitize_order_by(request.GET.get("order_by", "created_at"), ISSUE_ORDER_BY_ALLOWLIST, "created_at")
         issues = (
             Issue.issue_objects.filter(issue_cycle__cycle_id=cycle_id, issue_cycle__deleted_at__isnull=True)
@@ -874,6 +903,7 @@ class CycleIssueListCreateAPIEndpoint(BaseAPIView):
             .prefetch_related("assignees")
             .prefetch_related("labels")
             .order_by(order_by)
+            # link_count / attachment_count are correlated COUNT subqueries per work item.
             .annotate(
                 link_count=IssueLink.objects.filter(issue=OuterRef("id"))
                 .order_by()
@@ -940,6 +970,7 @@ class CycleIssueListCreateAPIEndpoint(BaseAPIView):
             )
 
         # Get all CycleWorkItems already created
+        # Work items already in *other* cycles are moved here; the rest get new CycleIssue rows.
         cycle_issues = list(CycleIssue.objects.filter(~Q(cycle_id=cycle_id), issue_id__in=issues))
         existing_issues = [
             str(cycle_issue.issue_id) for cycle_issue in cycle_issues if str(cycle_issue.issue_id) in issues
@@ -1032,6 +1063,7 @@ class CycleIssueDetailAPIEndpoint(BaseAPIView):
     use_read_replica = True
 
     def get_queryset(self):
+        """CycleIssue links of the cycle, annotated with each work item's sub-issue count."""
         return (
             CycleIssue.objects.annotate(
                 sub_issues_count=Issue.issue_objects.filter(parent=OuterRef("issue_id"))
@@ -1198,6 +1230,7 @@ class TransferCycleIssueAPIEndpoint(BaseAPIView):
             )
 
         # Call the utility function to handle the transfer
+        # (moves only unfinished work items and records a progress snapshot).
         result = transfer_cycle_issues(
             slug=slug,
             project_id=project_id,

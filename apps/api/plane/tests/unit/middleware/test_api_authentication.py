@@ -21,6 +21,8 @@ from plane.db.models import APIToken
 
 @pytest.mark.unit
 class TestAPIKeyAuthentication:
+    """``validate_api_token`` against real ``APIToken`` rows (requires the test DB)."""
+
     @pytest.mark.django_db
     def test_validate_api_token_authenticates_active_user(self, create_user):
         token = APIToken.objects.create(

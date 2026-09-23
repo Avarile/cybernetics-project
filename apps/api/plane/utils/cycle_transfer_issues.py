@@ -2,6 +2,14 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 # See the LICENSE file for details.
 
+"""Shared logic for transferring unfinished work items out of a cycle.
+
+Before moving issues, the source cycle's final progress (state-group counts,
+assignee/label distributions and burndown charts) is frozen into
+``Cycle.progress_snapshot`` so completed-cycle analytics stay stable afterwards.
+Used by both the app cycle views and the public API cycle views.
+"""
+
 # Python imports
 import json
 
@@ -53,6 +61,10 @@ def transfer_cycle_issues(
 
     Returns:
         dict: Response data with success or error message
+
+    Side effects:
+        Saves ``progress_snapshot`` on the source cycle, bulk-updates ``CycleIssue.cycle_id``
+        and queues an ``issue_activity`` Celery task for the moved issues.
     """
     # Get the new cycle
     new_cycle = Cycle.objects.filter(workspace__slug=slug, project_id=project_id, pk=new_cycle_id).first()
@@ -64,7 +76,7 @@ def transfer_cycle_issues(
             "error": "The cycle where the issues are transferred is already completed",
         }
 
-    # Get the old cycle with issue counts
+    # Get the old cycle with issue counts; every count excludes archived, draft and soft-deleted rows
     old_cycle = (
         Cycle.objects.filter(workspace__slug=slug, project_id=project_id, pk=cycle_id)
         .annotate(
@@ -147,7 +159,7 @@ def transfer_cycle_issues(
             "error": "Source cycle not found",
         }
 
-    # Check if project uses estimates
+    # Check if project uses estimates (only point-based estimates get the estimate distribution)
     estimate_type = Project.objects.filter(
         workspace__slug=slug,
         pk=project_id,
@@ -431,7 +443,7 @@ def transfer_cycle_issues(
     }
     current_cycle.save(update_fields=["progress_snapshot"])
 
-    # Get issues to transfer (only incomplete issues)
+    # Get issues to transfer (only incomplete issues; completed/cancelled stay in the old cycle)
     cycle_issues = CycleIssue.objects.filter(
         cycle_id=cycle_id,
         project_id=project_id,
@@ -457,7 +469,7 @@ def transfer_cycle_issues(
     # Bulk update cycle issues
     cycle_issues = CycleIssue.objects.bulk_update(updated_cycles, ["cycle_id"], batch_size=100)
 
-    # Capture Issue Activity
+    # Capture Issue Activity (one bulk activity entry listing every moved issue)
     issue_activity.delay(
         type="cycle.activity.created",
         requested_data=json.dumps({"cycles_list": []}),

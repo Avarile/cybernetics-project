@@ -2,6 +2,8 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 # See the LICENSE file for details.
 
+"""Applies the public API's per-key rate limit to MCP reads that bypass ``/api/v1``."""
+
 # Django imports
 from django.http import HttpRequest
 
@@ -17,6 +19,7 @@ def charge_api_key_rate_limit(token: str) -> None:
     Count a direct-read tool call against the caller's public API rate limit,
     so MCP reads that don't go through /api/v1 share the same per-key budget.
     """
+    # ApiKeyRateThrottle keys on the X-Api-Key header, so a bare request carrying it is enough.
     request = HttpRequest()
     request.META["HTTP_X_API_KEY"] = token
     throttle = ApiKeyRateThrottle()

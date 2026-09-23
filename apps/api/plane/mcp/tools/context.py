@@ -2,6 +2,12 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 # See the LICENSE file for details.
 
+"""MCP tools for orienting the caller: current user, their workspaces and workspace members.
+
+Note: each tool function's docstring is sent to MCP clients as the tool description,
+so edit those docstrings as user-facing text.
+"""
+
 # Module imports
 from plane.mcp.auth import get_caller
 from plane.mcp.client import api
@@ -28,6 +34,7 @@ async def list_workspace_members(workspace_slug: WorkspaceSlug) -> dict:
 
 
 def register(tool) -> None:
+    """Register this module's tools (all read-only)."""
     tool(read_only=True, title="Get current user")(get_current_user)
     tool(read_only=True, title="List workspaces")(list_workspaces)
     tool(read_only=True, title="List workspace members")(list_workspace_members)

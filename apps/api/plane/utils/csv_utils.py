@@ -2,6 +2,11 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 # See the LICENSE file for details.
 
+"""Helpers that neutralise spreadsheet formula injection in CSV/XLSX exports.
+
+Used by the issue exporters (``plane.utils.exporters``) before writing cell values.
+"""
+
 # Utility functions for safe spreadsheet exports (CSV and XLSX)
 # Characters that trigger formula evaluation in spreadsheet applications
 _CSV_FORMULA_TRIGGERS = frozenset(("=", "+", "-", "@", "\t", "\r", "\n"))

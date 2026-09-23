@@ -2,7 +2,10 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 # See the LICENSE file for details.
 
-"""Export schemas for various data types."""
+"""Export schemas for various data types.
+
+Re-exports the declarative field types from ``base`` and the concrete ``IssueExportSchema``.
+"""
 
 from .base import (
     BooleanField,

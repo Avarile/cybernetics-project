@@ -2,6 +2,12 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 # See the LICENSE file for details.
 
+"""MCP tools for projects and project metadata (states, labels, members).
+
+Note: each tool function's docstring is sent to MCP clients as the tool description,
+so edit those docstrings as user-facing text.
+"""
+
 # Python imports
 from typing import Annotated, Optional
 from uuid import UUID
@@ -14,7 +20,7 @@ from plane.mcp.client import api
 from plane.mcp.schemas import Cursor, PerPage, ProjectId, WorkspaceSlug
 from plane.mcp.tools.common import compact, page_params, project_path
 
-PROJECT_LIST_FIELDS = "id,identifier,name,description,network,archived_at,created_at"
+PROJECT_LIST_FIELDS = "id,identifier,name,description,network,archived_at,created_at"  # compact ?fields= projection for list_projects
 
 
 async def list_projects(workspace_slug: WorkspaceSlug, cursor: Cursor = None, per_page: PerPage = 50) -> dict:
@@ -57,6 +63,7 @@ async def create_label(
 
 
 def register(tool) -> None:
+    """Register this module's tools."""
     tool(read_only=True, title="List projects")(list_projects)
     tool(read_only=True, title="Get project")(get_project)
     tool(read_only=True, title="List states")(list_states)

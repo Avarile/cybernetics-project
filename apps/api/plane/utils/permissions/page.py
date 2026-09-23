@@ -2,6 +2,14 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 # See the LICENSE file for details.
 
+"""
+DRF permission class for project pages.
+
+Combines project membership/role with page ownership and visibility
+(public vs. private). The underscore-prefixed methods are hooks that can be
+overridden (e.g. by feature-flagged editions) to extend access rules.
+"""
+
 from plane.db.models import ProjectMember, Page
 from plane.app.permissions import ROLE
 
@@ -39,6 +47,7 @@ class ProjectPagePermission(BasePermission):
             return False
 
         if page_id:
+            # Note: raises Page.DoesNotExist if the page is not in this workspace
             page = Page.objects.get(id=page_id, workspace__slug=slug)
 
             # Allow access if the user is the owner of the page
@@ -55,6 +64,8 @@ class ProjectPagePermission(BasePermission):
     def _check_project_member_access(self, request, slug, project_id):
         """
         Check if the user is a project member.
+
+        Returns the member's role value, or None if not an active member.
         """
         return (
             ProjectMember.objects.filter(
@@ -85,9 +96,10 @@ class ProjectPagePermission(BasePermission):
         return False
 
     def _check_project_action_access(self, request, role):
+        """Map the HTTP method to the project roles allowed to perform it."""
         method = request.method
 
-        # Only admins can create (POST) pages
+        # Only admins and members can create (POST) pages
         if method == "POST":
             if role in [ADMIN, MEMBER]:
                 return True

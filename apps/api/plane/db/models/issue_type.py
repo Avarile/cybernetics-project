@@ -2,6 +2,12 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 # See the LICENSE file for details.
 
+"""Work item type models.
+
+``IssueType`` defines a workspace-level work item type (e.g. the epic type via
+``is_epic``); ``ProjectIssueType`` enables a type within a specific project.
+"""
+
 # Django imports
 from django.db import models
 from django.db.models import Q
@@ -12,6 +18,8 @@ from .base import BaseModel
 
 
 class IssueType(BaseModel):
+    """A workspace-scoped work item type; ``level`` orders types in a hierarchy."""
+
     workspace = models.ForeignKey("db.Workspace", related_name="issue_types", on_delete=models.CASCADE)
     name = models.CharField(max_length=255)
     description = models.TextField(blank=True)
@@ -33,6 +41,8 @@ class IssueType(BaseModel):
 
 
 class ProjectIssueType(ProjectBaseModel):
+    """Enables an ``IssueType`` in a project (unique per project among non-deleted rows)."""
+
     issue_type = models.ForeignKey("db.IssueType", related_name="project_issue_types", on_delete=models.CASCADE)
     level = models.PositiveIntegerField(default=0)
     is_default = models.BooleanField(default=False)

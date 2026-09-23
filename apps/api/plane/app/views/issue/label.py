@@ -2,6 +2,12 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 # See the LICENSE file for details.
 
+"""Project label endpoints.
+
+Label CRUD (project admins only for writes) plus a bulk-create endpoint used
+by importers. Writes invalidate the cached workspace labels list.
+"""
+
 # Python imports
 import random
 
@@ -21,11 +27,14 @@ from plane.utils.cache import invalidate_cache
 
 
 class LabelViewSet(BaseViewSet):
+    """CRUD for a project's labels, ordered by ``sort_order``."""
+
     serializer_class = LabelSerializer
     model = Label
     permission_classes = [ProjectBasePermission]
 
     def get_queryset(self):
+        """Labels of the URL's project that the user is a member of."""
         return self.filter_queryset(
             super()
             .get_queryset()
@@ -42,6 +51,7 @@ class LabelViewSet(BaseViewSet):
     @invalidate_cache(path="/api/workspaces/:slug/labels/", url_params=True, user=False, multiple=True)
     @allow_permission([ROLE.ADMIN])
     def create(self, request, slug, project_id):
+        """Create a label; duplicate names in the project return 400."""
         try:
             serializer = LabelSerializer(data=request.data, context={"project_id": project_id})
             if serializer.is_valid():
@@ -57,6 +67,7 @@ class LabelViewSet(BaseViewSet):
     @invalidate_cache(path="/api/workspaces/:slug/labels/", url_params=True, user=False)
     @allow_permission([ROLE.ADMIN])
     def partial_update(self, request, *args, **kwargs):
+        """Update a label, rejecting a name already used by another label in the project."""
         # Check if the label name is unique within the project
         if (
             "name" in request.data
@@ -84,12 +95,16 @@ class LabelViewSet(BaseViewSet):
     @invalidate_cache(path="/api/workspaces/:slug/labels/", url_params=True, user=False)
     @allow_permission([ROLE.ADMIN])
     def destroy(self, request, *args, **kwargs):
+        """Delete a label (admins only)."""
         return super().destroy(request, *args, **kwargs)
 
 
 class BulkCreateIssueLabelsEndpoint(BaseAPIView):
+    """Bulk-create labels (e.g. during an import)."""
+
     @allow_permission([ROLE.ADMIN])
     def post(self, request, slug, project_id):
+        """Create labels from ``label_data`` with random colors; name conflicts are silently skipped."""
         label_data = request.data.get("label_data", [])
 
         project = Project.objects.get(pk=project_id)

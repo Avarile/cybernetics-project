@@ -2,6 +2,13 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 # See the LICENSE file for details.
 
+"""Publish ("deploy board") settings.
+
+A ``DeployBoard`` represents a publicly shared entity (project, view, page,
+intake, ...) served by the public "space" app. The random ``anchor`` is the
+public identifier used in the published URL.
+"""
+
 # Python imports
 from uuid import uuid4
 
@@ -13,10 +20,19 @@ from .workspace import WorkspaceBaseModel
 
 
 def get_anchor():
+    """Generate a random, unguessable public anchor for a published entity."""
     return uuid4().hex
 
 
 class DeployBoard(WorkspaceBaseModel):
+    """Public publishing configuration for one entity.
+
+    ``entity_name``/``entity_identifier`` form a generic reference to the
+    published object; the ``is_*_enabled`` flags control what anonymous/public
+    viewers may do (comment, react, vote, see activity).
+    """
+
+    # Note: "cycle" is labelled "Task" in this fork's UI
     TYPE_CHOICES = (
         ("project", "Project"),
         ("issue", "Issue"),
@@ -44,6 +60,7 @@ class DeployBoard(WorkspaceBaseModel):
 
     class Meta:
         unique_together = ["entity_name", "entity_identifier", "deleted_at"]
+        # Only one active publish config per entity (soft-deleted rows excluded)
         constraints = [
             models.UniqueConstraint(
                 fields=["entity_name", "entity_identifier"],

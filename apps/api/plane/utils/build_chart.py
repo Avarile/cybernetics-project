@@ -2,6 +2,13 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 # See the LICENSE file for details.
 
+"""Builds chart payloads for workspace/project analytics from an Issue queryset.
+
+build_analytics_chart groups issues by an x-axis property (state, label, assignee, cycle,
+date, ...) and optionally a second group_by property, counting distinct issues per bucket.
+The response is {"data": [...], "schema": {group_key: group_name}}.
+"""
+
 from typing import Dict, Any, Tuple, Optional, List, Union
 
 
@@ -17,6 +24,7 @@ from plane.db.models import Issue
 from rest_framework.exceptions import ValidationError
 
 
+# Allowed x_axis / group_by values (validated in build_analytics_chart).
 x_axis_mapper = {
     "STATES": "STATES",
     "STATE_GROUPS": "STATE_GROUPS",
@@ -35,6 +43,7 @@ x_axis_mapper = {
 
 
 def get_y_axis_filter(y_axis: str) -> Dict[str, Any]:
+    """Return extra filter kwargs for the given y-axis metric (empty dict if unknown)."""
     filter_mapping = {
         "WORK_ITEM_COUNT": {"id": F("id")},
     }
@@ -42,6 +51,10 @@ def get_y_axis_filter(y_axis: str) -> Dict[str, Any]:
 
 
 def get_x_axis_field() -> Dict[str, Tuple[str, str, Optional[Dict[str, Any]]]]:
+    """Map each x-axis key to (id_field, name_field, extra_filter).
+
+    extra_filter excludes soft-deleted rows of the through tables for M2M relations.
+    """
     return {
         "STATES": ("state__id", "state__name", None),
         "STATE_GROUPS": ("state__group", "state__group", None),
@@ -78,6 +91,11 @@ def get_x_axis_field() -> Dict[str, Tuple[str, str, Optional[Dict[str, Any]]]]:
 def process_grouped_data(
     data: List[Dict[str, Any]],
 ) -> Tuple[List[Dict[str, Any]], Dict[str, str]]:
+    """Pivot grouped rows into one dict per x-axis key.
+
+    Each output row has key, name, total count and a count per group key. Also returns a
+    schema mapping group key -> group display name. Empty keys/names become "none"/"None".
+    """
     response = {}
     schema = {}
 
@@ -104,6 +122,7 @@ def build_number_chart_response(
     y_axis: str,
     aggregate_func: Aggregate,
 ) -> List[Dict[str, Any]]:
+    """Return a single aggregated value as a one-item chart series."""
     count = queryset.filter(**y_axis_filter).aggregate(total=aggregate_func).get("total", 0)
     return [{"key": y_axis, "name": y_axis, "count": count}]
 
@@ -116,6 +135,7 @@ def build_grouped_chart_response(
     group_name_field: str,
     aggregate_func: Aggregate,
 ) -> Tuple[List[Dict[str, Any]], Dict[str, str]]:
+    """Aggregate by (x-axis key, group key) ordered by count desc, then pivot the rows."""
     data = (
         queryset.annotate(
             key=F(id_field),
@@ -133,6 +153,7 @@ def build_grouped_chart_response(
 def build_simple_chart_response(
     queryset: QuerySet, id_field: str, name_field: str, aggregate_func: Aggregate
 ) -> List[Dict[str, Any]]:
+    """Aggregate by x-axis key only and return [{key, name, count}] ordered by key."""
     data = (
         queryset.annotate(key=F(id_field), display_name=F(name_field) if name_field else F(id_field))
         .values("key", "display_name")
@@ -156,6 +177,10 @@ def build_analytics_chart(
     group_by: Optional[str] = None,
     date_filter: Optional[str] = None,
 ) -> Dict[str, Union[List[Dict[str, Any]], Dict[str, str]]]:
+    """Build the analytics chart payload for `x_axis`, optionally grouped by `group_by`.
+
+    Raises ValidationError for unknown axis names. `date_filter` is currently unused.
+    """
     # Validate x_axis
     if x_axis not in x_axis_mapper:
         raise ValidationError(f"Invalid x_axis field: {x_axis}")

@@ -2,6 +2,13 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 # See the LICENSE file for details.
 
+"""Request logging middleware.
+
+``RequestLoggerMiddleware`` writes one structured log line per request to the
+``plane.api.request`` logger; ``APITokenLogMiddleware`` records requests made with an
+``X-Api-Key`` (public API calls) via the ``process_logs`` Celery task.
+"""
+
 # Python imports
 import hashlib
 import hmac
@@ -24,6 +31,8 @@ api_logger = logging.getLogger("plane.api.request")
 
 
 class RequestLoggerMiddleware:
+    """Log method, path, status, duration, client IP, user agent and user id for every request."""
+
     def __init__(self, get_response):
         self.get_response = get_response
 
@@ -37,6 +46,7 @@ class RequestLoggerMiddleware:
         return True
 
     def __call__(self, request):
+        """Time the downstream handler, then emit the log line (health checks excluded)."""
         # get the start time
         start_time = time.time()
 
@@ -86,6 +96,11 @@ class APITokenLogMiddleware:
         self.get_response = get_response
 
     def __call__(self, request):
+        """Pass the request through, then queue a log record if it carried an API key.
+
+        ``request.body`` is read before the view runs because it can't be accessed after the
+        stream has been consumed.
+        """
         request_body = request.body
         response = self.get_response(request)
         self.process_request(request, response, request_body)
@@ -128,6 +143,11 @@ class APITokenLogMiddleware:
         return str(redacted)
 
     def process_request(self, request, response, request_body):
+        """Queue an API request log (``process_logs.delay``) for requests with an ``X-Api-Key`` header.
+
+        The raw key is never stored: it is replaced by an HMAC-SHA256 identifier keyed with
+        ``SECRET_KEY``, and sensitive headers are redacted. Errors are logged, never raised.
+        """
         api_key_header = "X-Api-Key"
         api_key = request.headers.get(api_key_header)
 

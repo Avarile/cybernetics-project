@@ -2,6 +2,16 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 # See the LICENSE file for details.
 
+"""
+Celery task that records issue activity (the history/timeline shown on an issue).
+
+API views queue ``issue_activity`` with an event ``type`` and JSON snapshots of the
+requested change and current instance. The matching handler below diffs them and
+appends unsaved ``IssueActivity`` objects to ``issue_activities``; they are then
+bulk-created and, if requested, passed to the notification task (in-app/email).
+Every handler shares the same signature so they can be dispatched from a mapper.
+"""
+
 # Python imports
 import json
 
@@ -39,6 +49,10 @@ from plane.utils.uuid import is_valid_uuid
 
 
 def extract_ids(data: dict | None, primary_key: str, fallback_key: str) -> set[str]:
+    """Return ids from ``data[primary_key]`` (or ``data[fallback_key]`` if absent) as a set of strings.
+
+    Supports both internal (``label_ids``) and external API (``labels``) payload keys.
+    """
     if not data:
         return set()
     if primary_key in data:
@@ -57,6 +71,7 @@ def track_name(
     issue_activities,
     epoch,
 ):
+    """Append an activity if the issue name changed."""
     if current_instance.get("name") != requested_data.get("name"):
         issue_activities.append(
             IssueActivity(
@@ -85,7 +100,13 @@ def track_description(
     issue_activities,
     epoch,
 ):
+    """Record a description change, collapsing consecutive edits.
+
+    If the latest activity on the issue is a description edit by the same actor, only its
+    ``created_at`` is bumped instead of adding a new row (avoids one activity per autosave).
+    """
     if current_instance.get("description_html") != requested_data.get("description_html"):
+        # Merge rapid successive description edits by the same actor into one activity.
         last_activity = IssueActivity.objects.filter(issue_id=issue_id).order_by("-created_at").first()
         if (
             last_activity is not None
@@ -122,6 +143,10 @@ def track_parent(
     issue_activities,
     epoch,
 ):
+    """Append an activity when the parent issue changes, storing ``PROJ-123`` style identifiers.
+
+    Silently ignores invalid UUIDs.
+    """
     current_parent_id = current_instance.get("parent_id") or current_instance.get("parent")
     requested_parent_id = requested_data.get("parent_id") or requested_data.get("parent")
 
@@ -168,6 +193,7 @@ def track_priority(
     issue_activities,
     epoch,
 ):
+    """Append an activity if the priority changed."""
     if current_instance.get("priority") != requested_data.get("priority"):
         issue_activities.append(
             IssueActivity(
@@ -196,6 +222,7 @@ def track_state(
     issue_activities,
     epoch,
 ):
+    """Append an activity if the state changed, storing old/new state names and ids (invalid UUIDs -> None)."""
     current_state_id = current_instance.get("state_id") or current_instance.get("state")
     requested_state_id = requested_data.get("state_id") or requested_data.get("state")
 
@@ -237,6 +264,7 @@ def track_target_date(
     issue_activities,
     epoch,
 ):
+    """Append an activity if the target (due) date changed."""
     if current_instance.get("target_date") != requested_data.get("target_date"):
         issue_activities.append(
             IssueActivity(
@@ -267,6 +295,7 @@ def track_start_date(
     issue_activities,
     epoch,
 ):
+    """Append an activity if the start date changed."""
     if current_instance.get("start_date") != requested_data.get("start_date"):
         issue_activities.append(
             IssueActivity(
@@ -297,6 +326,7 @@ def track_labels(
     issue_activities,
     epoch,
 ):
+    """Append one activity per label added or removed (diffing requested vs current label ids)."""
     # Labels
     requested_labels = extract_ids(requested_data, "label_ids", "labels")
     current_labels = extract_ids(current_instance, "label_ids", "labels")
@@ -364,6 +394,10 @@ def track_assignees(
     issue_activities,
     epoch,
 ):
+    """Append one activity per assignee added or removed.
+
+    Side effect: newly added assignees are subscribed to the issue (``IssueSubscriber``).
+    """
     # Assignees
     requested_assignees = extract_ids(requested_data, "assignee_ids", "assignees")
     current_assignees = extract_ids(current_instance, "assignee_ids", "assignees")
@@ -440,6 +474,7 @@ def track_estimate_points(
     issue_activities,
     epoch,
 ):
+    """Append an activity if the estimate point changed; field is ``estimate_<estimate type>``."""
     if current_instance.get("estimate_point") != requested_data.get("estimate_point"):
         old_estimate = (
             EstimatePoint.objects.filter(pk=current_instance.get("estimate_point")).first()
@@ -485,6 +520,10 @@ def track_archive_at(
     issue_activities,
     epoch,
 ):
+    """Append an archive/restore activity when ``archived_at`` changes.
+
+    Automation-driven archives (``automation`` flag) are recorded as "archive", manual ones as "manual_archive".
+    """
     if current_instance.get("archived_at") != requested_data.get("archived_at"):
         if requested_data.get("archived_at") is None:
             issue_activities.append(
@@ -534,6 +573,7 @@ def track_closed_to(
     issue_activities,
     epoch,
 ):
+    """Append a state-change activity for an issue auto-closed by project automation (``closed_to`` = state id)."""
     if requested_data.get("closed_to") is not None:
         updated_state = State.objects.get(pk=requested_data.get("closed_to"), project_id=project_id)
         issue_activities.append(
@@ -564,6 +604,10 @@ def create_issue_activity(
     issue_activities,
     epoch,
 ):
+    """Create the "created the issue" activity immediately (dated to the issue creation, attributed to its creator).
+
+    Also records initial assignees if ``assignee_ids`` were provided.
+    """
     issue = Issue.objects.get(pk=issue_id)
     issue_activity = IssueActivity.objects.create(
         issue_id=issue_id,
@@ -601,6 +645,10 @@ def update_issue_activity(
     issue_activities,
     epoch,
 ):
+    """Dispatch each changed key in ``requested_data`` to its ``track_*`` function.
+
+    Keys without a tracker are ignored. Both internal and external API key names are supported.
+    """
     ISSUE_ACTIVITY_MAPPER = {
         "name": track_name,
         "parent_id": track_parent,
@@ -649,6 +697,7 @@ def delete_issue_activity(
     issue_activities,
     epoch,
 ):
+    """Append a "deleted the issue" activity."""
     issue_activities.append(
         IssueActivity(
             project_id=project_id,
@@ -673,6 +722,7 @@ def create_comment_activity(
     issue_activities,
     epoch,
 ):
+    """Append a "created a comment" activity with the comment HTML."""
     requested_data = json.loads(requested_data) if requested_data is not None else None
     current_instance = json.loads(current_instance) if current_instance is not None else None
 
@@ -703,6 +753,7 @@ def update_comment_activity(
     issue_activities,
     epoch,
 ):
+    """Append an activity if the comment HTML changed."""
     requested_data = json.loads(requested_data) if requested_data is not None else None
     current_instance = json.loads(current_instance) if current_instance is not None else None
 
@@ -736,6 +787,7 @@ def delete_comment_activity(
     issue_activities,
     epoch,
 ):
+    """Append a "deleted the comment" activity."""
     requested_data = json.loads(requested_data) if requested_data is not None else None
     issue_activities.append(
         IssueActivity(
@@ -762,6 +814,11 @@ def create_cycle_issue_activity(
     issue_activities,
     epoch,
 ):
+    """Record issues added to or moved between cycles.
+
+    ``current_instance`` carries ``updated_cycle_issues`` (moves, old/new cycle ids) and
+    ``created_cycle_issues`` (serialized new CycleIssue rows). Touches each issue's ``updated_at``.
+    """
     requested_data = json.loads(requested_data) if requested_data is not None else None
     current_instance = json.loads(current_instance) if current_instance is not None else None
 
@@ -829,6 +886,7 @@ def delete_cycle_issue_activity(
     issue_activities,
     epoch,
 ):
+    """Record removal of ``requested_data['issues']`` from a cycle (uses ``cycle_name`` if the cycle is gone)."""
     requested_data = json.loads(requested_data) if requested_data is not None else None
     current_instance = json.loads(current_instance) if current_instance is not None else None
 
@@ -868,6 +926,7 @@ def create_module_issue_activity(
     issue_activities,
     epoch,
 ):
+    """Record the issue being added to ``requested_data['module_id']`` and touch its ``updated_at``."""
     requested_data = json.loads(requested_data) if requested_data is not None else None
     module = Module.objects.filter(pk=requested_data.get("module_id")).first()
     issue = Issue.objects.filter(pk=issue_id).first()
@@ -901,6 +960,7 @@ def delete_module_issue_activity(
     issue_activities,
     epoch,
 ):
+    """Record the issue being removed from a module and touch its ``updated_at``."""
     requested_data = json.loads(requested_data) if requested_data is not None else None
     current_instance = json.loads(current_instance) if current_instance is not None else None
     module_name = current_instance.get("module_name")
@@ -935,6 +995,7 @@ def create_link_activity(
     issue_activities,
     epoch,
 ):
+    """Append a "created a link" activity with the URL."""
     requested_data = json.loads(requested_data) if requested_data is not None else None
     current_instance = json.loads(current_instance) if current_instance is not None else None
 
@@ -964,6 +1025,7 @@ def update_link_activity(
     issue_activities,
     epoch,
 ):
+    """Append an activity if the link URL changed."""
     requested_data = json.loads(requested_data) if requested_data is not None else None
     current_instance = json.loads(current_instance) if current_instance is not None else None
 
@@ -996,6 +1058,7 @@ def delete_link_activity(
     issue_activities,
     epoch,
 ):
+    """Append a "deleted the link" activity with the old URL."""
     current_instance = json.loads(current_instance) if current_instance is not None else None
 
     issue_activities.append(
@@ -1015,6 +1078,7 @@ def delete_link_activity(
 
 
 def _cybernetics_record_label(data):
+    """Human-readable label for an attached cybernetics database record: ``"<table> / <record>"`` or just the record."""
     table_name = (data or {}).get("table_name") or ""
     record_name = (data or {}).get("record_name") or (data or {}).get("record_id") or ""
     return f"{table_name} / {record_name}" if table_name else record_name
@@ -1030,6 +1094,7 @@ def create_cybernetics_record_activity(
     issue_activities,
     epoch,
 ):
+    """Append an activity for a cybernetics database record attached to the issue."""
     requested_data = json.loads(requested_data) if requested_data is not None else None
 
     issue_activities.append(
@@ -1058,6 +1123,7 @@ def delete_cybernetics_record_activity(
     issue_activities,
     epoch,
 ):
+    """Append an activity for a cybernetics database record detached from the issue."""
     current_instance = json.loads(current_instance) if current_instance is not None else None
 
     issue_activities.append(
@@ -1087,6 +1153,7 @@ def create_attachment_activity(
     issue_activities,
     epoch,
 ):
+    """Append a "created an attachment" activity (asset path from ``current_instance``)."""
     requested_data = json.loads(requested_data) if requested_data is not None else None
     current_instance = json.loads(current_instance) if current_instance is not None else None
 
@@ -1116,6 +1183,7 @@ def delete_attachment_activity(
     issue_activities,
     epoch,
 ):
+    """Append a "deleted the attachment" activity."""
     issue_activities.append(
         IssueActivity(
             issue_id=issue_id,
@@ -1140,6 +1208,7 @@ def create_issue_reaction_activity(
     issue_activities,
     epoch,
 ):
+    """Append an activity for a reaction added to the issue by ``actor_id``."""
     requested_data = json.loads(requested_data) if requested_data is not None else None
     if requested_data and requested_data.get("reaction") is not None:
         issue_reaction = (
@@ -1180,6 +1249,7 @@ def delete_issue_reaction_activity(
     issue_activities,
     epoch,
 ):
+    """Append an activity for a reaction removed from the issue."""
     current_instance = json.loads(current_instance) if current_instance is not None else None
     if current_instance and current_instance.get("reaction") is not None:
         issue_activities.append(
@@ -1210,8 +1280,10 @@ def create_comment_reaction_activity(
     issue_activities,
     epoch,
 ):
+    """Append an activity (on the comment's issue) for a reaction added to a comment by ``actor_id``."""
     requested_data = json.loads(requested_data) if requested_data is not None else None
     if requested_data and requested_data.get("reaction") is not None:
+        # NOTE: this picks the actor's first reaction with this emoji in the project, not a specific comment's.
         comment_reaction_id, comment_id = (
             CommentReaction.objects.filter(
                 reaction=requested_data.get("reaction"),
@@ -1251,6 +1323,7 @@ def delete_comment_reaction_activity(
     issue_activities,
     epoch,
 ):
+    """Append an activity (on the comment's issue) for a reaction removed from a comment."""
     current_instance = json.loads(current_instance) if current_instance is not None else None
     if current_instance and current_instance.get("reaction") is not None:
         issue_id = (
@@ -1287,6 +1360,7 @@ def create_issue_vote_activity(
     issue_activities,
     epoch,
 ):
+    """Append an activity for a vote added on the issue."""
     requested_data = json.loads(requested_data) if requested_data is not None else None
     if requested_data and requested_data.get("vote") is not None:
         issue_activities.append(
@@ -1317,6 +1391,7 @@ def delete_issue_vote_activity(
     issue_activities,
     epoch,
 ):
+    """Append an activity for a vote removed from the issue."""
     current_instance = json.loads(current_instance) if current_instance is not None else None
     if current_instance and current_instance.get("vote") is not None:
         issue_activities.append(
@@ -1347,8 +1422,10 @@ def create_issue_relation_activity(
     issue_activities,
     epoch,
 ):
+    """Record new relations on both sides: this issue, plus the inverse relation on each related issue."""
     requested_data = json.loads(requested_data) if requested_data is not None else None
     current_instance = json.loads(current_instance) if current_instance is not None else None
+    # Only handled for new relations (no current instance); each related issue gets a mirrored activity.
     if current_instance is None and requested_data.get("issues") is not None:
         for related_issue in requested_data.get("issues"):
             issue = Issue.objects.get(pk=related_issue)
@@ -1396,6 +1473,7 @@ def delete_issue_relation_activity(
     issue_activities,
     epoch,
 ):
+    """Record a removed relation on both issues (blocking/blocked_by are swapped for the related issue)."""
     requested_data = json.loads(requested_data) if requested_data is not None else None
     current_instance = json.loads(current_instance) if current_instance is not None else None
     issue = Issue.objects.get(pk=requested_data.get("related_issue"))
@@ -1450,6 +1528,7 @@ def create_draft_issue_activity(
     issue_activities,
     epoch,
 ):
+    """Append a "drafted the issue" activity."""
     issue_activities.append(
         IssueActivity(
             issue_id=issue_id,
@@ -1474,6 +1553,7 @@ def update_draft_issue_activity(
     issue_activities,
     epoch,
 ):
+    """Append "created the issue" when a draft is published (``is_draft`` False), else "updated the draft issue"."""
     requested_data = json.loads(requested_data) if requested_data is not None else None
     current_instance = json.loads(current_instance) if current_instance is not None else None
     if requested_data.get("is_draft") is not None and requested_data.get("is_draft") is False:
@@ -1513,6 +1593,7 @@ def delete_draft_issue_activity(
     issue_activities,
     epoch,
 ):
+    """Append a "deleted the draft issue" activity."""
     issue_activities.append(
         IssueActivity(
             project_id=project_id,
@@ -1536,6 +1617,7 @@ def create_intake_activity(
     issue_activities,
     epoch,
 ):
+    """Append an activity when an intake issue's status changes (statuses mapped to human-readable names)."""
     requested_data = json.loads(requested_data) if requested_data is not None else None
     current_instance = json.loads(current_instance) if current_instance is not None else None
     status_dict = {
@@ -1577,6 +1659,14 @@ def issue_activity(
     origin=None,
     intake=None,
 ):
+    """Celery entry point: record activity rows for an issue event and optionally fan out notifications.
+
+    ``type`` (e.g. ``"issue.activity.updated"``) selects the handler from ``ACTIVITY_MAPPER``;
+    ``requested_data``/``current_instance`` are JSON strings of the new and old values.
+    Side effects: bumps the issue's ``updated_at``, caches the request ``origin`` in Redis
+    (used as the base URL for notification emails), bulk-creates ``IssueActivity`` rows and,
+    if ``notification`` is True, queues the ``notifications`` task.
+    """
     try:
         issue_activities = []
 
@@ -1591,6 +1681,7 @@ def issue_activity(
             if origin:
                 ri = redis_instance()
                 # set the request origin in redis
+                # Cached for 10 minutes; email_notification_task reads it to build links in the email.
                 ri.set(str(issue_id), origin, ex=600)
             issue = Issue.objects.filter(pk=issue_id).first()
             if issue:

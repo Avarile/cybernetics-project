@@ -2,6 +2,15 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 # See the LICENSE file for details.
 
+"""
+Email/password sign-in and sign-up views for the space (public project) frontend.
+
+Routes: ``POST /auth/spaces/sign-in/`` and ``POST /auth/spaces/sign-up/``. Unlike
+the app variants these don't run the invitation workflow, and on success they
+redirect to the validated ``next_path`` on the space host (falling back to the
+space root if the URL isn't on an allowed host).
+"""
+
 # Django imports
 from django.core.exceptions import ValidationError
 from django.core.validators import validate_email
@@ -23,7 +32,10 @@ from plane.utils.path_validator import get_safe_redirect_url, validate_next_path
 
 
 class SignInAuthSpaceEndpoint(View):
+    """Sign in an existing user with email and password from the space frontend."""
+
     def post(self, request):
+        """Validate input, authenticate via ``EmailProvider``, log in and redirect back to the space."""
         next_path = request.POST.get("next_path")
         # Check instance configuration
         instance = Instance.objects.first()
@@ -95,6 +107,7 @@ class SignInAuthSpaceEndpoint(View):
             # redirect to referer path
             next_path = validate_next_path(next_path=next_path)
             url = f"{base_host(request=request, is_space=True).rstrip('/')}{next_path}"
+            # Guard against open redirects: only follow next_path if the final URL is on an allowed host.
             if url_has_allowed_host_and_scheme(url, allowed_hosts=get_allowed_hosts()):
                 return HttpResponseRedirect(url)
             else:
@@ -108,7 +121,10 @@ class SignInAuthSpaceEndpoint(View):
 
 
 class SignUpAuthSpaceEndpoint(View):
+    """Create a new account with email and password from the space frontend."""
+
     def post(self, request):
+        """Validate input, create the user via ``EmailProvider``, log in and redirect back to the space."""
         next_path = request.POST.get("next_path")
         # Check instance configuration
         instance = Instance.objects.first()

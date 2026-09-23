@@ -2,6 +2,14 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 # See the LICENSE file for details.
 
+"""Project settings endpoints for the Cybernetics-Data connection.
+
+Admins save the base URL + API token (stored encrypted, only a hint and
+fingerprint are exposed), toggle the integration and test the connection.
+New connection details are verified upstream before being saved unless
+``skip_verification`` is set.
+"""
+
 # Django imports
 from django.utils import timezone
 
@@ -35,6 +43,7 @@ _BLOCKING_STATUSES = {"unauthorized", "unreachable", "error"}
 
 
 def _stored_token(integration):
+    """Decrypt the integration's stored API token; raise ``TokenUnreadable`` if it cannot be decrypted."""
     try:
         return decrypt_token(integration.api_token_encrypted)
     except TokenDecryptionError:
@@ -42,6 +51,7 @@ def _stored_token(integration):
 
 
 def _record_verification(integration, result):
+    """Copy a ``verify_connection`` result onto the integration (caller saves it)."""
     integration.last_verified_at = timezone.now()
     integration.last_verified_status = result["status"]
     integration.last_verified_message = result["message"][:1000]
@@ -51,16 +61,19 @@ class ProjectCyberneticsDataEndpoint(CyberneticsDataErrorMixin, BaseAPIView):
     """Read / save / disconnect the project's Cybernetics-Data connection."""
 
     def get_throttles(self):
+        """Throttle only PUT, which may call Cybernetics-Data to verify the connection."""
         # Saving may verify the connection upstream.
         if self.request.method == "PUT":
             return [CyberneticsDataProxyThrottle()]
         return super().get_throttles()
 
     def _get_integration(self, slug, project_id):
+        """Return the project's integration row, or None if not configured."""
         return ProjectCyberneticsDataIntegration.objects.filter(workspace__slug=slug, project_id=project_id).first()
 
     @allow_permission([ROLE.ADMIN, ROLE.MEMBER, ROLE.GUEST])
     def get(self, request, slug, project_id):
+        """Return the integration config; guests only get ``is_configured`` / ``is_enabled``."""
         integration = self._get_integration(slug, project_id)
         if integration is None:
             return Response({"is_configured": False}, status=status.HTTP_200_OK)
@@ -74,6 +87,12 @@ class ProjectCyberneticsDataEndpoint(CyberneticsDataErrorMixin, BaseAPIView):
 
     @allow_permission([ROLE.ADMIN])
     def put(self, request, slug, project_id):
+        """Create or update the connection (project admins only).
+
+        A token is required when creating or when the URL changes. Changed
+        connection details are verified first and blocking statuses abort the save;
+        if verification is skipped, the previous verification result is cleared.
+        """
         serializer = ProjectCyberneticsDataIntegrationWriteSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         data = serializer.validated_data
@@ -128,6 +147,7 @@ class ProjectCyberneticsDataEndpoint(CyberneticsDataErrorMixin, BaseAPIView):
 
     @allow_permission([ROLE.ADMIN])
     def delete(self, request, slug, project_id):
+        """Disconnect: wipe the encrypted token and soft-delete the integration (admins only)."""
         integration = self._get_integration(slug, project_id)
         if integration is not None:
             # Soft-deleted rows are kept, so purge the secret before deleting.
@@ -146,6 +166,11 @@ class ProjectCyberneticsDataTestEndpoint(CyberneticsDataErrorMixin, BaseAPIView)
 
     @allow_permission([ROLE.ADMIN])
     def post(self, request, slug, project_id):
+        """Test a URL/token pair and return the verification result.
+
+        The verification status is persisted only when testing the stored,
+        unchanged connection.
+        """
         serializer = CyberneticsConnectionTestSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         data = serializer.validated_data

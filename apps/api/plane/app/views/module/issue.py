@@ -2,6 +2,13 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 # See the LICENSE file for details.
 
+"""Module <-> issue relationship API.
+
+Lists the issues of a module (filterable, orderable, grouped/sub-grouped
+pagination), bulk-adds issues to a module, bulk-adds/removes modules on an
+issue, and removes an issue from a module. Every link change queues an
+issue activity background task (which also drives notifications).
+"""
 # Python imports
 import copy
 import json
@@ -43,6 +50,7 @@ from plane.utils.host import base_host
 
 
 class ModuleIssueViewSet(BaseViewSet):
+    """Manage and list issues belonging to a module."""
     serializer_class = ModuleIssueSerializer
     model = ModuleIssue
     webhook_event = "module_issue"
@@ -51,8 +59,10 @@ class ModuleIssueViewSet(BaseViewSet):
     filterset_class = IssueFilterSet
 
     def apply_annotations(self, issues):
+        """Annotate issues with cycle id, link/attachment/sub-issue counts and prefetch relations."""
         return (
             issues.annotate(
+                # An issue belongs to at most one active cycle; take the first match.
                 cycle_id=Subquery(
                     CycleIssue.objects.filter(issue=OuterRef("id"), deleted_at__isnull=True).values("cycle_id")[:1]
                 )
@@ -82,6 +92,7 @@ class ModuleIssueViewSet(BaseViewSet):
         )
 
     def get_queryset(self):
+        """Issues linked to the module in the URL via non-deleted ModuleIssue rows."""
         return (
             Issue.issue_objects.filter(
                 project_id=self.kwargs.get("project_id"),
@@ -94,6 +105,11 @@ class ModuleIssueViewSet(BaseViewSet):
     @method_decorator(gzip_page)
     @allow_permission([ROLE.ADMIN, ROLE.MEMBER])
     def list(self, request, slug, project_id, module_id):
+        """List module issues with filters, ordering and optional grouping.
+
+        ``group_by`` / ``sub_group_by`` query params select grouped or
+        sub-grouped pagination; both being equal is rejected with 400.
+        """
         filters = issue_filters(request.query_params, "GET")
         issue_queryset = self.get_queryset()
 
@@ -103,6 +119,8 @@ class ModuleIssueViewSet(BaseViewSet):
         # Apply legacy filters
         issue_queryset = issue_queryset.filter(**filters)
 
+        # Copy taken before annotations so group totals are counted on the
+        # filtered-but-unannotated queryset.
         # Total count queryset
         total_issue_queryset = copy.deepcopy(issue_queryset)
 
@@ -158,6 +176,8 @@ class ModuleIssueViewSet(BaseViewSet):
                         ),
                         group_by_field_name=group_by,
                         sub_group_by_field_name=sub_group_by,
+                        # Count only accepted/declined/duplicate intake issues or
+                        # non-intake issues, excluding archived and draft ones.
                         count_filter=Q(
                             Q(issue_intake__status=1)
                             | Q(issue_intake__status=-1)
@@ -209,6 +229,11 @@ class ModuleIssueViewSet(BaseViewSet):
     @allow_permission([ROLE.ADMIN, ROLE.MEMBER])
     # create multiple issues inside a module
     def create_module_issues(self, request, slug, project_id, module_id):
+        """Bulk-add the issues in ``request.data["issues"]`` to a module.
+
+        Existing links are ignored (``ignore_conflicts``); queues a
+        "module.activity.created" issue activity per issue.
+        """
         issues = request.data.get("issues", [])
         if not issues:
             return Response({"error": "Issues are required"}, status=status.HTTP_400_BAD_REQUEST)
@@ -256,6 +281,10 @@ class ModuleIssueViewSet(BaseViewSet):
     @allow_permission([ROLE.ADMIN, ROLE.MEMBER])
     # add multiple module inside an issue and remove multiple modules from an issue
     def create_issue_modules(self, request, slug, project_id, issue_id):
+        """Add ``modules`` to and remove ``removed_modules`` from an issue.
+
+        Queues a created/deleted module issue activity for each change.
+        """
         modules = request.data.get("modules", [])
         removed_modules = request.data.get("removed_modules", [])
         project = Project.objects.get(pk=project_id)
@@ -324,6 +353,7 @@ class ModuleIssueViewSet(BaseViewSet):
 
     @allow_permission([ROLE.ADMIN, ROLE.MEMBER])
     def destroy(self, request, slug, project_id, module_id, issue_id):
+        """Remove an issue from a module and log a "module.activity.deleted" activity."""
         module_issue = ModuleIssue.objects.filter(
             workspace__slug=slug,
             project_id=project_id,

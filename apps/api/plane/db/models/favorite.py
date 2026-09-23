@@ -2,6 +2,13 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 # See the LICENSE file for details.
 
+"""User favorites (sidebar "Favorites" section).
+
+Favorites reference any entity (project, cycle, module, view, page, ...)
+generically via ``entity_type``/``entity_identifier`` and can be grouped into
+user-created folders.
+"""
+
 from django.conf import settings
 
 # Django imports
@@ -18,10 +25,13 @@ class UserFavorite(WorkspaceBaseModel):
 
     user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="favorites")
     entity_type = models.CharField(max_length=100)
+    # Null for folders, which do not point at an entity
     entity_identifier = models.UUIDField(null=True, blank=True)
     name = models.CharField(max_length=255, blank=True, null=True)
     is_folder = models.BooleanField(default=False)
+    # Float ordering key so items can be reordered by inserting between neighbours
     sequence = models.FloatField(default=65535)
+    # Folder containing this favorite (null = top level)
     parent = models.ForeignKey(
         "self",
         on_delete=models.CASCADE,
@@ -50,6 +60,7 @@ class UserFavorite(WorkspaceBaseModel):
         ]
 
     def save(self, *args, **kwargs):
+        """On create, place the favorite after the current largest ``sequence`` in the workspace."""
         if self._state.adding:
             if self.project:
                 largest_sequence = UserFavorite.objects.filter(workspace=self.project.workspace).aggregate(

@@ -2,3 +2,4 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 # See the LICENSE file for details.
 
+"""Contract tests: HTTP-level tests of the app (``/api/``), public API (``/api/v1/``) and MCP endpoints."""

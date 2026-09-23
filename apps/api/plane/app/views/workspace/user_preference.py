@@ -2,6 +2,12 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 # See the LICENSE file for details.
 
+"""Per-user workspace sidebar navigation preferences.
+
+Each user has one WorkspaceUserPreference row per navigation key (drafts, your work, stickies, ...)
+storing whether it is pinned and its sort order.
+"""
+
 # Module imports
 from ..base import BaseAPIView
 from plane.db.models.workspace import WorkspaceUserPreference
@@ -16,6 +22,8 @@ from rest_framework import status
 
 
 class WorkspaceUserPreferenceViewSet(BaseAPIView):
+    """Read and bulk-update the current user's sidebar preferences in a workspace."""
+
     model = WorkspaceUserPreference
     use_read_replica = True
 
@@ -24,6 +32,7 @@ class WorkspaceUserPreferenceViewSet(BaseAPIView):
 
     @allow_permission([ROLE.ADMIN, ROLE.MEMBER, ROLE.GUEST], level="WORKSPACE")
     def get(self, request, slug):
+        """Return a `{key: {is_pinned, sort_order}}` map, lazily creating rows for missing keys."""
         workspace = Workspace.objects.get(slug=slug)
 
         get_preference = WorkspaceUserPreference.objects.filter(user=request.user, workspace_id=workspace.id)
@@ -36,6 +45,9 @@ class WorkspaceUserPreferenceViewSet(BaseAPIView):
             if preference not in get_preference.values_list("key", flat=True):
                 create_preference_keys.append(preference)
 
+                # Missing keys are created with spaced sort orders; DRAFTS, YOUR_WORK and STICKIES
+                # are pinned by default. Previously collected keys are re-sent each iteration,
+                # which ignore_conflicts=True makes harmless.
                 preference = WorkspaceUserPreference.objects.bulk_create(
                     [
                         WorkspaceUserPreference(
@@ -80,6 +92,7 @@ class WorkspaceUserPreferenceViewSet(BaseAPIView):
 
     @allow_permission([ROLE.ADMIN, ROLE.MEMBER, ROLE.GUEST], level="WORKSPACE")
     def patch(self, request, slug):
+        """Bulk update: body is a list of `{key, is_pinned?, sort_order?}`; unknown keys are skipped."""
         for data in request.data:
             key = data.pop("key", None)
             if not key:

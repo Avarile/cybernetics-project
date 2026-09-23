@@ -2,6 +2,9 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 # See the LICENSE file for details.
 
+"""URL routes for in-app notifications (list, read/unread, archive, unread counts, mark all read)
+and the current user's notification preferences."""
+
 from django.urls import path
 
 

@@ -2,6 +2,8 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 # See the LICENSE file for details.
 
+"""Serializers for modules (feature groupings of work items), module-issue links, module links and per-user module properties."""
+
 # Third Party imports
 from rest_framework import serializers
 
@@ -24,6 +26,12 @@ from plane.db.models import (
 
 
 class ModuleWriteSerializer(BaseSerializer):
+    """Create/update serializer for modules.
+
+    Enforces unique module names per project and manages ModuleMember rows from
+    ``member_ids``. Requires ``context["project"]`` on create.
+    """
+
     lead_id = serializers.PrimaryKeyRelatedField(
         source="lead", queryset=User.objects.all(), required=False, allow_null=True
     )
@@ -48,11 +56,13 @@ class ModuleWriteSerializer(BaseSerializer):
         ]
 
     def to_representation(self, instance):
+        """Add the module's member ids to the output."""
         data = super().to_representation(instance)
         data["member_ids"] = [str(member.id) for member in instance.members.all()]
         return data
 
     def validate(self, data):
+        """Ensure start_date does not exceed target_date."""
         if (
             data.get("start_date", None) is not None
             and data.get("target_date", None) is not None
@@ -62,6 +72,7 @@ class ModuleWriteSerializer(BaseSerializer):
         return data
 
     def create(self, validated_data):
+        """Create the module in ``context["project"]`` and add its members."""
         members = validated_data.pop("member_ids", None)
         project = self.context["project"]
 
@@ -92,6 +103,7 @@ class ModuleWriteSerializer(BaseSerializer):
         return module
 
     def update(self, instance, validated_data):
+        """Update the module; ``member_ids`` when provided fully replaces the member list."""
         members = validated_data.pop("member_ids", None)
         module_name = validated_data.get("name")
         if module_name:
@@ -121,6 +133,8 @@ class ModuleWriteSerializer(BaseSerializer):
 
 
 class ModuleFlatSerializer(BaseSerializer):
+    """Plain module serializer without computed fields (used when nesting)."""
+
     class Meta:
         model = Module
         fields = "__all__"
@@ -135,7 +149,10 @@ class ModuleFlatSerializer(BaseSerializer):
 
 
 class ModuleIssueSerializer(BaseSerializer):
+    """Module-issue link with nested module details and annotated ``sub_issues_count``."""
+
     module_detail = ModuleFlatSerializer(read_only=True, source="module")
+    # NOTE: issue_detail uses ProjectLiteSerializer on the issue, so only fields shared with Project are output
     issue_detail = ProjectLiteSerializer(read_only=True, source="issue")
     sub_issues_count = serializers.IntegerField(read_only=True)
 
@@ -154,6 +171,8 @@ class ModuleIssueSerializer(BaseSerializer):
 
 
 class ModuleLinkSerializer(BaseSerializer):
+    """External link attached to a module; URLs are normalized and must be unique per module."""
+
     class Meta:
         model = ModuleLink
         fields = "__all__"
@@ -168,6 +187,7 @@ class ModuleLinkSerializer(BaseSerializer):
         ]
 
     def to_internal_value(self, data):
+        """Prefix ``http://`` to URLs without a scheme before field validation."""
         # Modify the URL before validation by appending http:// if missing
         url = data.get("url", "")
         if url and not url.startswith(("http://", "https://")):
@@ -176,6 +196,7 @@ class ModuleLinkSerializer(BaseSerializer):
         return super().to_internal_value(data)
 
     def validate_url(self, value):
+        """Validate URL syntax with Django's URLValidator."""
         # Use Django's built-in URLValidator for validation
         url_validator = URLValidator()
         try:
@@ -186,12 +207,14 @@ class ModuleLinkSerializer(BaseSerializer):
         return value
 
     def create(self, validated_data):
+        """Create the link, rejecting a URL that already exists on the same module."""
         validated_data["url"] = self.validate_url(validated_data.get("url"))
         if ModuleLink.objects.filter(url=validated_data.get("url"), module_id=validated_data.get("module_id")).exists():
             raise serializers.ValidationError({"error": "URL already exists."})
         return super().create(validated_data)
 
     def update(self, instance, validated_data):
+        """Update the link, rejecting a URL that already exists on another link of the same module."""
         validated_data["url"] = self.validate_url(validated_data.get("url"))
         if (
             ModuleLink.objects.filter(url=validated_data.get("url"), module_id=instance.module_id)
@@ -204,6 +227,11 @@ class ModuleLinkSerializer(BaseSerializer):
 
 
 class ModuleSerializer(DynamicBaseSerializer):
+    """Read serializer for modules with member ids, favorite flag and annotated issue/estimate counts.
+
+    The computed fields are expected to be annotated on the queryset by the view.
+    """
+
     member_ids = serializers.ListField(child=serializers.UUIDField(), required=False, allow_null=True)
     is_favorite = serializers.BooleanField(read_only=True)
     total_issues = serializers.IntegerField(read_only=True)
@@ -255,6 +283,8 @@ class ModuleSerializer(DynamicBaseSerializer):
 
 
 class ModuleDetailSerializer(ModuleSerializer):
+    """Module detail: list fields plus links, sub-issue count and per-state-group estimate points."""
+
     link_module = ModuleLinkSerializer(read_only=True, many=True)
     sub_issues = serializers.IntegerField(read_only=True)
     backlog_estimate_points = serializers.FloatField(read_only=True)
@@ -274,6 +304,8 @@ class ModuleDetailSerializer(ModuleSerializer):
 
 
 class ModuleUserPropertiesSerializer(BaseSerializer):
+    """Per-user display/filter preferences for a module."""
+
     class Meta:
         model = ModuleUserProperties
         fields = "__all__"

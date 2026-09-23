@@ -2,3 +2,4 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 # See the LICENSE file for details.
 
+"""Unit tests for custom Django middleware (API authentication, DB read-replica routing)."""

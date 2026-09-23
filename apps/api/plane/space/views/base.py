@@ -2,6 +2,13 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 # See the LICENSE file for details.
 
+"""Base view classes for the public (space) API.
+
+Same shape as the app's base views: session auth, per-user timezone activation,
+filter/pagination helpers and uniform JSON error handling. Public endpoints override
+``permission_classes`` with ``AllowAny``.
+"""
+
 # Python imports
 import zoneinfo
 from django.conf import settings
@@ -35,6 +42,7 @@ class TimezoneMixin:
     """
 
     def initial(self, request, *args, **kwargs):
+        """Activate the user's timezone for this request (or reset to default for anonymous users)."""
         super().initial(request, *args, **kwargs)
         if request.user.is_authenticated:
             timezone.activate(zoneinfo.ZoneInfo(request.user.user_timezone))
@@ -43,6 +51,8 @@ class TimezoneMixin:
 
 
 class BaseViewSet(TimezoneMixin, ModelViewSet, BasePaginator):
+    """Base ModelViewSet for space endpoints; requires authentication unless overridden."""
+
     model = None
 
     permission_classes = [IsAuthenticated]
@@ -56,6 +66,7 @@ class BaseViewSet(TimezoneMixin, ModelViewSet, BasePaginator):
     search_fields = []
 
     def get_queryset(self):
+        """Return all rows of ``self.model``; misconfigured views raise a 400 APIException."""
         try:
             return self.model.objects.all()
         except Exception as e:
@@ -71,6 +82,7 @@ class BaseViewSet(TimezoneMixin, ModelViewSet, BasePaginator):
             response = super().handle_exception(exc)
             return response
         except Exception as e:
+            # Map common Django/DB errors to 4xx responses; anything else is logged and returned as 500.
             if isinstance(e, IntegrityError):
                 return Response(
                     {"error": "The payload is not valid"},
@@ -103,6 +115,7 @@ class BaseViewSet(TimezoneMixin, ModelViewSet, BasePaginator):
             )
 
     def dispatch(self, request, *args, **kwargs):
+        """Run the view, converting uncaught exceptions to error responses; logs query count when DEBUG."""
         try:
             response = super().dispatch(request, *args, **kwargs)
 
@@ -118,10 +131,12 @@ class BaseViewSet(TimezoneMixin, ModelViewSet, BasePaginator):
 
     @property
     def workspace_slug(self):
+        """Workspace slug from the URL kwargs, if any."""
         return self.kwargs.get("slug", None)
 
     @property
     def project_id(self):
+        """Project id from URL kwargs, or ``pk`` on the route named "project"."""
         project_id = self.kwargs.get("project_id", None)
         if project_id:
             return project_id
@@ -131,6 +146,8 @@ class BaseViewSet(TimezoneMixin, ModelViewSet, BasePaginator):
 
 
 class BaseAPIView(TimezoneMixin, APIView, BasePaginator):
+    """Base APIView for space endpoints; requires authentication unless overridden."""
+
     permission_classes = [IsAuthenticated]
 
     filter_backends = (DjangoFilterBackend, SearchFilter)
@@ -142,6 +159,7 @@ class BaseAPIView(TimezoneMixin, APIView, BasePaginator):
     authentication_classes = [BaseSessionAuthentication]
 
     def filter_queryset(self, queryset):
+        """Apply every configured filter backend (DjangoFilter, search) to ``queryset``."""
         for backend in list(self.filter_backends):
             queryset = backend().filter_queryset(self.request, queryset, self)
         return queryset
@@ -155,6 +173,7 @@ class BaseAPIView(TimezoneMixin, APIView, BasePaginator):
             response = super().handle_exception(exc)
             return response
         except Exception as e:
+            # Map common Django/DB errors to 4xx responses; anything else is logged and returned as 500.
             if isinstance(e, IntegrityError):
                 return Response(
                     {"error": "The payload is not valid"},
@@ -186,6 +205,7 @@ class BaseAPIView(TimezoneMixin, APIView, BasePaginator):
             )
 
     def dispatch(self, request, *args, **kwargs):
+        """Run the view, converting uncaught exceptions to error responses; logs query count when DEBUG."""
         try:
             response = super().dispatch(request, *args, **kwargs)
 
@@ -201,8 +221,10 @@ class BaseAPIView(TimezoneMixin, APIView, BasePaginator):
 
     @property
     def workspace_slug(self):
+        """Workspace slug from the URL kwargs, if any."""
         return self.kwargs.get("slug", None)
 
     @property
     def project_id(self):
+        """Project id from the URL kwargs, if any."""
         return self.kwargs.get("project_id", None)

@@ -1,4 +1,7 @@
 #!/bin/bash
+# Local/dev entrypoint for the API container (used by Dockerfile.dev).
+# Waits for Postgres and migrations, registers/configures the instance, ensures the
+# storage bucket exists, clears cache, then starts Django's autoreloading dev server.
 set -e
 python manage.py wait_for_db
 # Wait for migrations
@@ -8,6 +11,8 @@ python manage.py wait_for_migrations
 #!/bin/bash
 
 # Collect system information
+# The machine signature is a hash of host details; register_instance uses it to
+# identify this installation.
 HOSTNAME=$(hostname)
 MAC_ADDRESS=$(ip link show | awk '/ether/ {print $2}' | head -n 1)
 CPU_INFO=$(cat /proc/cpuinfo)

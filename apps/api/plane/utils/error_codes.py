@@ -2,6 +2,11 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 # See the LICENSE file for details.
 
+"""Numeric application error codes returned in API error payloads (``error_code``).
+
+Codes are grouped by domain: 40xx/41xx issues, 47xx pages, 48xx Cybernetics-Data integration.
+"""
+
 ERROR_CODES = {
     # issues
     "INVALID_ARCHIVE_STATE_GROUP": 4091,

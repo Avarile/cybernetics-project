@@ -2,6 +2,15 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 # See the LICENSE file for details.
 
+"""File asset endpoints (v2) built on S3 presigned uploads.
+
+Upload flow: the client POSTs metadata, a ``FileAsset`` row is created and a
+presigned POST is returned; the client uploads directly to object storage and
+then PATCHes the asset to mark it uploaded (which links it to its entity, e.g.
+user avatar, workspace logo, project cover). Reads redirect to short-lived
+presigned GET URLs. Deletes are soft deletes (``is_deleted`` / ``deleted_at``).
+"""
+
 # Python imports
 import uuid
 
@@ -31,6 +40,7 @@ class UserAssetsV2Endpoint(BaseAPIView):
     """This endpoint is used to upload user profile images."""
 
     def asset_delete(self, asset_id):
+        """Soft-delete an asset by id; no-op if it does not exist."""
         asset = FileAsset.objects.filter(id=asset_id).first()
         if asset is None:
             return
@@ -40,6 +50,11 @@ class UserAssetsV2Endpoint(BaseAPIView):
         return
 
     def entity_asset_save(self, asset_id, entity_type, asset, request):
+        """Point the user's avatar/cover at the newly uploaded asset.
+
+        The previous asset is soft-deleted, the legacy URL field is cleared and the
+        cached ``/api/users/me/`` responses are invalidated.
+        """
         # User Avatar
         if entity_type == FileAsset.EntityTypeContext.USER_AVATAR:
             user = User.objects.get(id=asset.user_id)
@@ -79,6 +94,7 @@ class UserAssetsV2Endpoint(BaseAPIView):
         return
 
     def entity_asset_delete(self, entity_type, asset, request):
+        """Unlink the asset from the user's avatar/cover and invalidate cached user responses."""
         # User Avatar
         if entity_type == FileAsset.EntityTypeContext.USER_AVATAR:
             user = User.objects.get(id=asset.user_id)
@@ -108,6 +124,11 @@ class UserAssetsV2Endpoint(BaseAPIView):
         return
 
     def post(self, request):
+        """Create a user avatar/cover asset and return a presigned upload payload.
+
+        Only ``USER_AVATAR`` / ``USER_COVER`` entity types and common image MIME
+        types are accepted; size is capped at ``FILE_SIZE_LIMIT``.
+        """
         # get the asset key
         name = sanitize_filename(request.data.get("name")) or "unnamed"
         type = request.data.get("type", "image/jpeg")
@@ -169,6 +190,10 @@ class UserAssetsV2Endpoint(BaseAPIView):
         )
 
     def patch(self, request, asset_id):
+        """Mark the asset as uploaded and attach it to the user's avatar/cover.
+
+        Storage metadata is fetched asynchronously (Celery) if not yet present.
+        """
         # get the asset id
         asset = FileAsset.objects.get(id=asset_id, user_id=request.user.id)
         # get the storage metadata
@@ -190,6 +215,7 @@ class UserAssetsV2Endpoint(BaseAPIView):
         return Response(status=status.HTTP_204_NO_CONTENT)
 
     def delete(self, request, asset_id):
+        """Soft-delete one of the current user's assets and unlink it from the profile."""
         asset = FileAsset.objects.get(id=asset_id, user_id=request.user.id)
         asset.is_deleted = True
         asset.deleted_at = timezone.now()
@@ -203,6 +229,7 @@ class WorkspaceFileAssetEndpoint(BaseAPIView):
     """This endpoint is used to upload cover images/logos etc for workspace, projects and users."""
 
     def get_entity_id_field(self, entity_type, entity_id):
+        """Map an entity type to the FileAsset FK field (e.g. ``{"issue_id": ...}``) used on create."""
         # Workspace Logo
         if entity_type == FileAsset.EntityTypeContext.WORKSPACE_LOGO:
             return {"workspace_id": entity_id}
@@ -235,6 +262,7 @@ class WorkspaceFileAssetEndpoint(BaseAPIView):
         return {}
 
     def asset_delete(self, asset_id):
+        """Soft-delete an asset by id; no-op if it does not exist."""
         asset = FileAsset.objects.filter(id=asset_id).first()
         # Check if the asset exists
         if asset is None:
@@ -246,6 +274,11 @@ class WorkspaceFileAssetEndpoint(BaseAPIView):
         return
 
     def entity_asset_save(self, asset_id, entity_type, asset, request):
+        """Link a finished upload to its workspace logo or project cover.
+
+        Replaces (soft-deletes) any previous logo/cover; logo changes also
+        invalidate cached workspace/instance responses. Other entity types need no linking.
+        """
         # Workspace Logo
         if entity_type == FileAsset.EntityTypeContext.WORKSPACE_LOGO:
             workspace = Workspace.objects.filter(id=asset.workspace_id).first()
@@ -285,6 +318,7 @@ class WorkspaceFileAssetEndpoint(BaseAPIView):
             return
 
     def entity_asset_delete(self, entity_type, asset, request):
+        """Unlink a workspace logo / project cover asset from its owner."""
         # Workspace Logo
         if entity_type == FileAsset.EntityTypeContext.WORKSPACE_LOGO:
             workspace = Workspace.objects.get(id=asset.workspace_id)
@@ -314,6 +348,11 @@ class WorkspaceFileAssetEndpoint(BaseAPIView):
 
     @allow_permission([ROLE.ADMIN, ROLE.MEMBER, ROLE.GUEST], level="WORKSPACE")
     def post(self, request, slug):
+        """Create a workspace-scoped asset and return a presigned upload payload.
+
+        Any workspace role may upload, except ``WORKSPACE_LOGO`` which requires
+        workspace admin. Only image MIME types are allowed.
+        """
         name = sanitize_filename(request.data.get("name")) or "unnamed"
         type = request.data.get("type", "image/jpeg")
         size = int(request.data.get("size", settings.FILE_SIZE_LIMIT))
@@ -362,6 +401,7 @@ class WorkspaceFileAssetEndpoint(BaseAPIView):
         workspace = Workspace.objects.get(slug=slug)
 
         # asset key
+        # Keys are prefixed with the workspace id so objects are grouped per workspace in the bucket.
         asset_key = f"{workspace.id}/{uuid.uuid4().hex}-{name}"
 
         # Create a File Asset
@@ -391,6 +431,7 @@ class WorkspaceFileAssetEndpoint(BaseAPIView):
 
     @allow_permission([ROLE.ADMIN, ROLE.MEMBER, ROLE.GUEST], level="WORKSPACE")
     def patch(self, request, slug, asset_id):
+        """Mark a workspace asset as uploaded and link it to its entity (logo/cover)."""
         # get the asset id
         asset = FileAsset.objects.get(id=asset_id, workspace__slug=slug)
         # get the storage metadata
@@ -413,6 +454,7 @@ class WorkspaceFileAssetEndpoint(BaseAPIView):
 
     @allow_permission([ROLE.ADMIN, ROLE.MEMBER, ROLE.GUEST], level="WORKSPACE")
     def delete(self, request, slug, asset_id):
+        """Soft-delete a workspace asset and unlink it from its entity."""
         asset = FileAsset.objects.get(id=asset_id, workspace__slug=slug)
         asset.is_deleted = True
         asset.deleted_at = timezone.now()
@@ -423,6 +465,7 @@ class WorkspaceFileAssetEndpoint(BaseAPIView):
 
     @allow_permission([ROLE.ADMIN, ROLE.MEMBER, ROLE.GUEST], level="WORKSPACE")
     def get(self, request, slug, asset_id):
+        """Redirect to a presigned download URL for an uploaded workspace asset (404 if not uploaded)."""
         # get the asset id
         asset = FileAsset.objects.get(id=asset_id, workspace__slug=slug)
 
@@ -451,6 +494,11 @@ class StaticFileAssetEndpoint(BaseAPIView):
     permission_classes = [AllowAny]
 
     def get(self, request, asset_id):
+        """Redirect to a presigned URL for a public asset.
+
+        Unauthenticated (``AllowAny``), so it is restricted to avatars, covers and
+        workspace logos; any other entity type is rejected.
+        """
         # get the asset id
         asset = FileAsset.objects.get(id=asset_id)
 
@@ -486,6 +534,7 @@ class AssetRestoreEndpoint(BaseAPIView):
 
     @allow_permission([ROLE.ADMIN, ROLE.MEMBER, ROLE.GUEST], level="WORKSPACE")
     def post(self, request, slug, asset_id):
+        """Clear the soft-delete flags on a workspace asset (``all_objects`` includes deleted rows)."""
         asset = FileAsset.all_objects.get(id=asset_id, workspace__slug=slug)
         asset.is_deleted = False
         asset.deleted_at = None
@@ -497,6 +546,7 @@ class ProjectAssetEndpoint(BaseAPIView):
     """This endpoint is used to upload cover images/logos etc for workspace, projects and users."""
 
     def get_entity_id_field(self, entity_type, entity_id):
+        """Map an entity type to the FileAsset FK field used when creating the asset."""
         if entity_type == FileAsset.EntityTypeContext.WORKSPACE_LOGO:
             return {"workspace_id": entity_id}
 
@@ -527,6 +577,7 @@ class ProjectAssetEndpoint(BaseAPIView):
 
     @allow_permission([ROLE.ADMIN, ROLE.MEMBER, ROLE.GUEST])
     def post(self, request, slug, project_id):
+        """Create a project-scoped asset and return a presigned upload payload."""
         name = sanitize_filename(request.data.get("name")) or "unnamed"
         type = request.data.get("type", "image/jpeg")
         size = int(request.data.get("size", settings.FILE_SIZE_LIMIT))
@@ -594,6 +645,7 @@ class ProjectAssetEndpoint(BaseAPIView):
 
     @allow_permission([ROLE.ADMIN, ROLE.MEMBER, ROLE.GUEST])
     def patch(self, request, slug, project_id, pk):
+        """Mark a project asset as uploaded and update its attributes (no entity linking here)."""
         # get the asset id
         asset = FileAsset.objects.get(id=pk, workspace__slug=slug, project_id=project_id)
         # get the storage metadata
@@ -610,6 +662,7 @@ class ProjectAssetEndpoint(BaseAPIView):
 
     @allow_permission([ROLE.ADMIN, ROLE.MEMBER, ROLE.GUEST])
     def delete(self, request, slug, project_id, pk):
+        """Soft-delete a project asset."""
         # Get the asset
         asset = FileAsset.objects.get(id=pk, workspace__slug=slug, project_id=project_id)
         # Check deleted assets
@@ -621,6 +674,7 @@ class ProjectAssetEndpoint(BaseAPIView):
 
     @allow_permission([ROLE.ADMIN, ROLE.MEMBER, ROLE.GUEST])
     def get(self, request, slug, project_id, pk):
+        """Redirect to a presigned download URL for an uploaded project asset."""
         # get the asset id
         asset = FileAsset.objects.get(workspace__slug=slug, project_id=project_id, pk=pk)
 
@@ -644,13 +698,25 @@ class ProjectAssetEndpoint(BaseAPIView):
 
 
 class ProjectBulkAssetEndpoint(BaseAPIView):
+    """Bulk-attach already uploaded assets to an entity once it exists.
+
+    Used e.g. after an issue/comment/page is saved so that images embedded in
+    its description get linked to it.
+    """
+
     def save_project_cover(self, asset, project_id):
+        """Set the given asset as the project's cover image."""
         project = Project.objects.get(id=project_id)
         project.cover_image_asset_id = asset.id
         project.save()
 
     @allow_permission([ROLE.ADMIN, ROLE.MEMBER, ROLE.GUEST])
     def post(self, request, slug, project_id, entity_id):
+        """Attach ``asset_ids`` to ``entity_id``.
+
+        The entity type of the first asset decides which FK is updated; all assets
+        are assumed to share it. Integrity errors (entity already deleted) are ignored.
+        """
         asset_ids = request.data.get("asset_ids", [])
 
         # Check if the asset ids are provided
@@ -709,14 +775,21 @@ class AssetCheckEndpoint(BaseAPIView):
 
     @allow_permission([ROLE.ADMIN, ROLE.MEMBER, ROLE.GUEST], level="WORKSPACE")
     def get(self, request, slug, asset_id):
+        """Return ``{"exists": bool}`` for a non-deleted asset in the workspace."""
         asset = FileAsset.all_objects.filter(id=asset_id, workspace__slug=slug, deleted_at__isnull=True).exists()
         return Response({"exists": asset}, status=status.HTTP_200_OK)
 
 
 class DuplicateAssetEndpoint(BaseAPIView):
+    """Copy an existing uploaded asset to a new storage object (e.g. when duplicating a page).
+
+    Rate limited by ``AssetRateThrottle``.
+    """
+
     throttle_classes = [AssetRateThrottle]
 
     def get_entity_id_field(self, entity_type, entity_id):
+        """Map an entity type to the FileAsset FK field used when creating the copy."""
         # Workspace Logo
         if entity_type == FileAsset.EntityTypeContext.WORKSPACE_LOGO:
             return {"workspace_id": entity_id}
@@ -751,6 +824,11 @@ class DuplicateAssetEndpoint(BaseAPIView):
 
     @allow_permission([ROLE.ADMIN, ROLE.MEMBER, ROLE.GUEST], level="WORKSPACE")
     def post(self, request, slug, asset_id):
+        """Duplicate asset ``asset_id`` within the same workspace and return the new asset id.
+
+        Body: ``entity_type`` (required), optional ``entity_id`` and ``project_id``.
+        Copies the object in storage and marks the new row as uploaded.
+        """
         project_id = request.data.get("project_id", None)
         entity_id = request.data.get("entity_id", None)
         entity_type = request.data.get("entity_type", None)
@@ -807,6 +885,7 @@ class WorkspaceAssetDownloadEndpoint(BaseAPIView):
 
     @allow_permission([ROLE.ADMIN, ROLE.MEMBER, ROLE.GUEST], level="WORKSPACE")
     def get(self, request, slug, asset_id):
+        """Redirect to a presigned attachment download URL for a workspace asset."""
         try:
             asset = FileAsset.objects.get(
                 id=asset_id,
@@ -834,6 +913,7 @@ class ProjectAssetDownloadEndpoint(BaseAPIView):
 
     @allow_permission([ROLE.ADMIN, ROLE.MEMBER, ROLE.GUEST], level="PROJECT")
     def get(self, request, slug, project_id, asset_id):
+        """Redirect to a presigned attachment download URL for a project asset."""
         try:
             asset = FileAsset.objects.get(
                 id=asset_id,

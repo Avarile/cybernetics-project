@@ -30,11 +30,14 @@ MAX_ERROR_DETAIL_LENGTH = 2000
 
 
 class PlaneAPIClient:
+    """Async httpx client that sends requests straight into Django's ASGI app (no network hop)."""
+
     def __init__(self, django_asgi_app):
         # httpx does not enforce timeouts for in-process ASGI transports, see request()
         self._client = httpx.AsyncClient(transport=httpx.ASGITransport(app=django_asgi_app), timeout=None)
 
     async def aclose(self) -> None:
+        """Close the underlying httpx client."""
         await self._client.aclose()
 
     async def request(
@@ -45,6 +48,12 @@ class PlaneAPIClient:
         params: Optional[dict] = None,
         json_body: Optional[Any] = None,
     ) -> Any:
+        """Call ``/api/v1/<path>`` as the current MCP caller and return the parsed JSON.
+
+        Forwards the caller's API token, scheme, client IP and user agent so auth, rate limits
+        and logging see the real client. ``None`` query params are dropped. Raises ToolError on
+        timeout (``MCP_LOOPBACK_TIMEOUT``), transport failure or an error status.
+        """
         caller = get_caller()
         headers = {
             "X-Api-Key": caller.token,
@@ -59,6 +68,7 @@ class PlaneAPIClient:
         query = {key: value for key, value in (params or {}).items() if value is not None}
 
         try:
+            # Enforce the timeout ourselves since httpx ignores it for ASGI transports.
             with anyio.fail_after(settings.MCP_LOOPBACK_TIMEOUT):
                 response = await self._client.request(method, url, params=query, json=json_body, headers=headers)
         except TimeoutError as e:
@@ -82,6 +92,10 @@ class PlaneAPIClient:
 
 
 def parse_response(response: httpx.Response) -> Any:
+    """Convert a response into a tool result dict, or raise ToolError for status >= 400.
+
+    Empty bodies become ``{"success": True}``; non-JSON bodies are truncated into ``detail``.
+    """
     data = None
     if response.content:
         try:
@@ -99,6 +113,7 @@ def parse_response(response: httpx.Response) -> Any:
 
 
 def error_message(response: httpx.Response, data: Any) -> str:
+    """Build a concise, user-facing error message for a failed API response."""
     status = response.status_code
     if status == 401:
         return "The Plane API token is no longer valid"
@@ -120,12 +135,14 @@ _client: Optional[PlaneAPIClient] = None
 
 
 def configure_client(django_asgi_app) -> PlaneAPIClient:
+    """Create the process-wide loopback client bound to ``django_asgi_app`` and return it."""
     global _client
     _client = PlaneAPIClient(django_asgi_app)
     return _client
 
 
 def api() -> PlaneAPIClient:
+    """Return the configured loopback client; raise if ``configure_client`` has not run."""
     if _client is None:
         raise RuntimeError("The MCP loopback client is not configured")
     return _client

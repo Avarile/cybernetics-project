@@ -2,6 +2,13 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 # See the LICENSE file for details.
 
+"""Relations between work items (blocking, duplicate, relates to, start/finish before).
+
+Relations are stored directionally in ``IssueRelation``; inverse types
+(blocking, start_after, finish_after) are stored by swapping the two work
+items and saving the canonical type returned by ``get_actual_relation``.
+"""
+
 # Python imports
 import json
 
@@ -35,11 +42,19 @@ from plane.utils.host import base_host
 
 
 class IssueRelationViewSet(BaseViewSet):
+    """List, create and remove relations of a work item."""
+
     serializer_class = IssueRelationSerializer
     model = IssueRelation
     permission_classes = [ProjectEntityPermission]
 
     def list(self, request, slug, project_id, issue_id):
+        """Return the work item's related items grouped by relation type.
+
+        Both directions of each stored relation are resolved, e.g. a stored
+        ``blocked_by`` row shows up as "blocked_by" on one side and "blocking" on the
+        other. Relations may span projects within the workspace.
+        """
         issue_relations = (
             IssueRelation.objects.filter(Q(issue_id=issue_id) | Q(related_issue=issue_id))
             .filter(workspace__slug=self.kwargs.get("slug"))
@@ -207,6 +222,11 @@ class IssueRelationViewSet(BaseViewSet):
         return Response(response_data, status=status.HTTP_200_OK)
 
     def create(self, request, slug, project_id, issue_id):
+        """Create relations of ``relation_type`` from this work item to each id in ``issues``.
+
+        Inverse relation types are stored with the work items swapped. Existing
+        relations are ignored (``ignore_conflicts``). Logs an activity.
+        """
         relation_type = request.data.get("relation_type", None)
         if relation_type is None:
             return Response(
@@ -269,6 +289,7 @@ class IssueRelationViewSet(BaseViewSet):
             )
 
     def remove_relation(self, request, slug, project_id, issue_id):
+        """Delete the relation between this work item and ``related_issue`` (either direction)."""
         related_issue = request.data.get("related_issue", None)
 
         issue_relations = IssueRelation.objects.filter(

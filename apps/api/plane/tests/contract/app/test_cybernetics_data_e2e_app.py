@@ -16,26 +16,31 @@ from plane.tests.unit.cybernetics_data.fakes import FakeTeable
 pytest_plugins = ["plane.tests.contract.app.conftest_cybernetics"]
 pytestmark = [pytest.mark.contract, pytest.mark.django_db]
 
+# Short alias for the fake's well-known IDs (T.BASE_ID, T.TABLE_ID, ...).
 T = FakeTeable
 
 
 @pytest.fixture(autouse=True)
 def _isolate(isolate):
+    """Opt every test in this module into the shared ``isolate`` fixture."""
     return isolate
 
 
 @pytest.fixture
 def teable(mocker):
+    """Route every upstream HTTP call through an in-memory ``FakeTeable`` that records calls."""
     fake = FakeTeable()
     mocker.patch("plane.utils.cybernetics_data.client.pinned_fetch", side_effect=fake)
     return fake
 
 
 def _query(call):
+    """Return a recorded call's query as a list of ``(key, value)`` pairs."""
     return call["query"]
 
 
 def test_full_flow(session_client, workspace, project, issue, teable, isolate):
+    """Configure, browse, attach, list, refresh, remove and disconnect in one pass."""
     # 1. configure
     response = session_client.put(
         config_url(workspace, project), {"base_url": "https://data.example.com/api/", "api_token": TOKEN}, format="json"
@@ -43,6 +48,7 @@ def test_full_flow(session_client, workspace, project, issue, teable, isolate):
     assert response.status_code == status.HTTP_200_OK, response.data
     assert response.data["last_verified_status"] == "ok"
     assert TOKEN not in json.dumps(response.data, default=str)
+    # Verification probes bases, then tables, then a single record (take=1).
     assert teable.paths() == ["/base/access/all", f"/base/{T.BASE_ID}/table", f"/table/{T.TABLE_ID}/record"]
     assert ("take", "1") in teable.calls[-1]["query"]
 
@@ -80,6 +86,7 @@ def test_full_flow(session_client, workspace, project, issue, teable, isolate):
     records_call = teable.calls_to(f"/table/{T.TABLE_ID}/record")[-1]
     query = _query(records_call)
     assert ("fieldKeyType", "id") in query
+    # Upstream search is a repeated ``search[]`` param: value, field, and a trailing flag.
     assert [v for k, v in query if k == "search[]"] == ["acme", T.PRIMARY_FIELD, "true"]
     assert dict(query)["filter"] == json.dumps(flt, separators=(",", ":"))
     assert dict(query)["orderBy"] == json.dumps([{"fieldId": T.EMAIL_FIELD, "order": "desc"}], separators=(",", ":"))
@@ -107,6 +114,7 @@ def test_full_flow(session_client, workspace, project, issue, teable, isolate):
     snapshot_query = _query(teable.calls_to(f"/table/{T.TABLE_ID}/record/{T.RECORD_A}")[-1])
     assert ("cellFormat", "text") in snapshot_query
     assert [v for k, v in snapshot_query if k == "projection[]"] == [T.PRIMARY_FIELD, T.EMAIL_FIELD]
+    # ``isolate`` is the issue_activity.delay mock: one activity per attached record.
     assert isolate.call_count == 2
 
     # 4. list
@@ -133,6 +141,7 @@ def test_full_flow(session_client, workspace, project, issue, teable, isolate):
     assert (row.api_token_encrypted, row.token_hint, row.token_fingerprint) == ("", "", "")
     response = session_client.get(config_url(workspace, project, "databases/"))
     assert response.status_code == status.HTTP_404_NOT_FOUND
+    # Disconnecting keeps existing attachments on the issue.
     assert IssueCyberneticsRecord.objects.filter(issue=issue).count() == 1
 
     # The Bearer token only ever went to the configured host, always over the pinned, streamed transport.
@@ -145,6 +154,7 @@ def test_full_flow(session_client, workspace, project, issue, teable, isolate):
 
 
 def test_url_change_sends_new_token_only_to_new_host(session_client, workspace, project, integration, teable):
+    """Re-verification after a URL change talks only to the new host with the new token."""
     new_token = "cybernetics_new_token_for_other_host"
     response = session_client.put(
         config_url(workspace, project), {"base_url": "https://other.example.com", "api_token": new_token}, format="json"
@@ -157,6 +167,7 @@ def test_url_change_sends_new_token_only_to_new_host(session_client, workspace, 
 
 
 def test_upstream_401_during_browse(session_client, workspace, project, integration, teable):
+    """A real upstream 401 surfaces as 424 CYBERNETICS_UNAUTHORIZED through the full stack."""
     teable.errors["/base/access/all"] = 401
     response = session_client.get(config_url(workspace, project, "databases/"))
     assert response.status_code == status.HTTP_424_FAILED_DEPENDENCY

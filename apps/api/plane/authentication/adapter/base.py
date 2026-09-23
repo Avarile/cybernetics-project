@@ -2,6 +2,16 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 # See the LICENSE file for details.
 
+"""
+Base authentication adapter shared by credential and OAuth sign-in flows.
+
+``Adapter.complete_login_or_signup`` is the common tail of every login: it
+validates the email, blocks deactivated accounts, enforces the ENABLE_SIGNUP
+instance setting, creates the ``User``/``Profile`` on first login, optionally
+syncs profile data from the IdP, stores the avatar in S3 and updates login
+metadata.
+"""
+
 # Python imports
 import logging
 import os
@@ -44,9 +54,11 @@ class Adapter:
         self.logger = logging.getLogger("plane.authentication")
 
     def get_user_token(self, data, headers=None):
+        """Exchange an authorization code/credentials for a token payload (provider-specific)."""
         raise NotImplementedError
 
     def get_user_response(self):
+        """Fetch the raw user profile from the provider (provider-specific)."""
         raise NotImplementedError
 
     def set_token_data(self, data):
@@ -56,12 +68,15 @@ class Adapter:
         self.user_data = data
 
     def create_update_account(self, user):
+        """Create or update the linked provider ``Account`` for ``user`` (provider-specific)."""
         raise NotImplementedError
 
     def authenticate(self):
+        """Run the full auth flow and return the authenticated ``User`` (provider-specific)."""
         raise NotImplementedError
 
     def sanitize_email(self, email):
+        """Lower-case, strip and validate ``email``; raise INVALID_EMAIL on failure and return the clean email."""
         # Check if email is present
         if not email:
             self.logger.error("Email is not present")
@@ -89,6 +104,8 @@ class Adapter:
 
     def validate_password(self, email):
         """Validate password strength"""
+        # ``self.code`` holds the submitted password for credential providers; zxcvbn scores 0-4 and
+        # anything below 3 is rejected as too weak.
         results = zxcvbn(self.code)
         if results["score"] < 3:
             self.logger.warning("Password is not strong enough")
@@ -108,6 +125,7 @@ class Adapter:
         ])
 
         # Check if sign up is disabled and invite is present or not
+        # Invited users may still sign up even when public sign-up is disabled.
         if ENABLE_SIGNUP == "0" and not WorkspaceMemberInvite.objects.filter(email=email).exists():
             self.logger.warning("Sign up is disabled and invite is not present")
             # Raise exception
@@ -120,10 +138,12 @@ class Adapter:
         return True
 
     def get_avatar_download_headers(self):
+        """Extra headers needed to download the provider avatar (e.g. auth for GitLab); none by default."""
         return {}
 
     def check_sync_enabled(self):
         """Check if sync is enabled for the provider"""
+        # Instance-level toggle per provider that controls re-syncing profile data on each login.
         provider_config_map = {
             "google": "ENABLE_GOOGLE_SYNC",
             "github": "ENABLE_GITHUB_SYNC",
@@ -232,6 +252,10 @@ class Adapter:
             return None
 
     def save_user_data(self, user):
+        """Update login metadata (medium, time, IP, user agent), activate the user and save.
+
+        Sends the activation email in the background if the account was previously inactive.
+        """
         # Update user details
         user.last_login_medium = self.provider
         user.last_active = timezone.now()
@@ -274,6 +298,7 @@ class Adapter:
             return
 
     def sync_user_data(self, user):
+        """Overwrite name, display name and avatar from the IdP payload for a returning user and save."""
         # Update user details
         first_name = self.user_data.get("user", {}).get("first_name", "")
         last_name = self.user_data.get("user", {}).get("last_name", "")
@@ -307,6 +332,13 @@ class Adapter:
         return user
 
     def complete_login_or_signup(self):
+        """Log in an existing user or sign up a new one from ``self.user_data``.
+
+        Raises ``AuthenticationException`` for invalid email, deactivated accounts,
+        disabled sign-up or weak passwords. Side effects: creates ``User``/``Profile``
+        on signup, updates login metadata, runs ``self.callback`` and upserts the
+        provider ``Account`` when token data is present. Returns the ``User``.
+        """
         # Get email
         email = self.user_data.get("email")
 
@@ -341,6 +373,8 @@ class Adapter:
             user = User(email=email, username=uuid.uuid4().hex)
 
             # Check if password is autoset
+            # OAuth and magic-code sign-ups have no user-chosen password, so a random unusable one is set
+            # and the email is treated as verified by the provider.
             if self.user_data.get("user").get("is_password_autoset"):
                 user.set_password(uuid.uuid4().hex)
                 user.is_password_autoset = True

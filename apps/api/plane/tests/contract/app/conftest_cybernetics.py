@@ -26,17 +26,21 @@ from plane.tests.unit.cybernetics_data.fakes import DictCache
 from plane.throttles.cybernetics_data import CyberneticsDataProxyThrottle
 from plane.utils.cybernetics_data import service
 
+# Dummy integration credentials; the token mimics the ``cybernetics_<id>_<secret>`` shape.
 TOKEN = "cybernetics_tok123_c2VjcmV0c2lnbmF0dXJl"
 BASE_URL = "https://data.example.com"
 
+# Plane role values used for ProjectMember / WorkspaceMember.role.
 ADMIN, MEMBER, GUEST = 20, 15, 5
 
 
 def config_url(workspace, project, suffix=""):
+    """Build a project-level Cybernetics-Data config/browse URL, optionally with a sub-path ``suffix``."""
     return f"/api/workspaces/{workspace.slug}/projects/{project.id}/cybernetics-data/{suffix}"
 
 
 def records_url(workspace, project, issue, suffix=""):
+    """Build the URL for the records linked to ``issue``, optionally with a sub-path ``suffix``."""
     return f"/api/workspaces/{workspace.slug}/projects/{project.id}/issues/{issue.id}/cybernetics-records/{suffix}"
 
 
@@ -56,14 +60,18 @@ def isolate(monkeypatch, mocker, settings):
     settings.CYBERNETICS_DATA_ENABLED = True
     settings.CYBERNETICS_DATA_ALLOWED_HOSTS = ["data.example.com", "other.example.com"]
     settings.CYBERNETICS_DATA_ALLOWED_IPS = []
+    # Swap the shared Django caches for in-memory dicts so cached lookups and throttle
+    # counters never leak between tests.
     monkeypatch.setattr(service, "cache", DictCache())
     monkeypatch.setattr(CyberneticsDataProxyThrottle, "cache", DictCache())
+    # Soft-deletes normally fan out to a Celery task; stub it so no broker is needed.
     mocker.patch("plane.db.mixins.soft_delete_related_objects.delay")
     return mocker.patch("plane.app.views.cybernetics_data.records.issue_activity.delay")
 
 
 @pytest.fixture
 def project(workspace, create_user):
+    """The primary project ("WEB"), with ``create_user`` as an admin member."""
     project = ProjectFactory(name="Web", identifier="WEB", workspace=workspace)
     ProjectMember.objects.create(project=project, member=create_user, role=ADMIN, is_active=True)
     return project
@@ -71,6 +79,7 @@ def project(workspace, create_user):
 
 @pytest.fixture
 def other_project(workspace, create_user):
+    """A second project ("OPS") in the same workspace, used for cross-project isolation checks."""
     project = ProjectFactory(name="Ops", identifier="OPS", workspace=workspace)
     ProjectMember.objects.create(project=project, member=create_user, role=ADMIN, is_active=True)
     return project
@@ -78,21 +87,25 @@ def other_project(workspace, create_user):
 
 @pytest.fixture
 def state(project):
+    """A "Todo" workflow state in ``project``."""
     return StateFactory(project=project, name="Todo")
 
 
 @pytest.fixture
 def issue(project, state):
+    """An active work item in ``project`` that records can be linked to."""
     return IssueFactory(project=project, state=state, name="Fix it")
 
 
 @pytest.fixture
 def archived_issue(project, state):
+    """An archived work item, for asserting that archived issues are handled differently."""
     return IssueFactory(project=project, state=state, name="Old", archived_at=timezone.now().date())
 
 
 @pytest.fixture
 def integration(project):
+    """A saved Cybernetics-Data integration for ``project`` pointing at ``BASE_URL``."""
     return ProjectCyberneticsDataIntegrationFactory(project=project, base_url=BASE_URL, token=TOKEN)
 
 
@@ -105,11 +118,13 @@ def make_member(workspace, project, api_client):
 
     def _make(role, target_project=None):
         user = User.objects.create(email=f"{uuid4().hex[:8]}@example.com", username=uuid4().hex[:12])
+        # Workspace role mirrors the project role: member-or-above gets MEMBER, otherwise GUEST.
         WorkspaceMember.objects.create(
             workspace=workspace, member=user, role=MEMBER if (role or 0) >= MEMBER else GUEST
         )
         if role is not None:
             ProjectMember.objects.create(project=target_project or project, member=user, role=role, is_active=True)
+        # Note: this re-authenticates the shared ``api_client``, so the last call wins.
         api_client.force_authenticate(user=user)
         api_client.user = user
         return api_client

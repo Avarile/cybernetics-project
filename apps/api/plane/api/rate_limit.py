@@ -2,6 +2,12 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 # See the LICENSE file for details.
 
+"""Per-API-key request throttling for the public REST API.
+
+Rate comes from ``settings.API_KEY_RATE_LIMIT``; requests without an API key
+are not throttled by this class.
+"""
+
 # Django imports
 from django.conf import settings
 
@@ -10,10 +16,12 @@ from rest_framework.throttling import SimpleRateThrottle
 
 
 class ApiKeyRateThrottle(SimpleRateThrottle):
+    """Throttle keyed on the X-Api-Key header, exposing remaining quota/reset info."""
     scope = "api_key"
     rate = settings.API_KEY_RATE_LIMIT
 
     def get_cache_key(self, request, view):
+        """Return the cache key for this API key, or None to skip throttling."""
         # Retrieve the API key from the request header
         api_key = request.headers.get("X-Api-Key")
         if not api_key:
@@ -23,6 +31,11 @@ class ApiKeyRateThrottle(SimpleRateThrottle):
         return f"{self.scope}:{api_key}"
 
     def allow_request(self, request, view):
+        """Apply the throttle and stash rate-limit info in ``request.META``.
+
+        Sets ``X-RateLimit-Remaining`` and ``X-RateLimit-Reset`` so later code can
+        surface them as response headers.
+        """
         allowed = super().allow_request(request, view)
 
         if allowed:
@@ -31,6 +44,7 @@ class ApiKeyRateThrottle(SimpleRateThrottle):
             history = self.cache.get(self.key, [])
 
             # Remove old histories
+            # History is newest-first, so expired timestamps are at the tail.
             while history and history[-1] <= now - self.duration:
                 history.pop()
 

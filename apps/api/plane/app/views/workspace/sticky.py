@@ -2,6 +2,11 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 # See the LICENSE file for details.
 
+"""Personal sticky notes within a workspace.
+
+Stickies are private to their owner; the queryset is always restricted to request.user.
+"""
+
 # Third party imports
 from rest_framework.response import Response
 from rest_framework import status
@@ -14,11 +19,14 @@ from plane.app.serializers import StickySerializer
 
 
 class WorkspaceStickyViewSet(BaseViewSet):
+    """CRUD for the current user's stickies in a workspace."""
+
     serializer_class = StickySerializer
     model = Sticky
     use_read_replica = True
 
     def get_queryset(self):
+        """Stickies in this workspace owned by the requesting user."""
         return self.filter_queryset(
             super()
             .get_queryset()
@@ -30,6 +38,7 @@ class WorkspaceStickyViewSet(BaseViewSet):
 
     @allow_permission(allowed_roles=[ROLE.ADMIN, ROLE.MEMBER, ROLE.GUEST], level="WORKSPACE")
     def create(self, request, slug):
+        """Create a sticky owned by the requesting user."""
         workspace = Workspace.objects.get(slug=slug)
         serializer = StickySerializer(data=request.data)
         if serializer.is_valid():
@@ -39,6 +48,7 @@ class WorkspaceStickyViewSet(BaseViewSet):
 
     @allow_permission(allowed_roles=[ROLE.ADMIN, ROLE.MEMBER, ROLE.GUEST], level="WORKSPACE")
     def list(self, request, slug):
+        """Paginated stickies ordered by sort_order desc; `query` does a text search on the description."""
         query = request.query_params.get("query", False)
         stickies = self.get_queryset().order_by("-sort_order")
         if query:
@@ -53,8 +63,10 @@ class WorkspaceStickyViewSet(BaseViewSet):
 
     @allow_permission(allowed_roles=[], creator=True, model=Sticky, level="WORKSPACE")
     def partial_update(self, request, *args, **kwargs):
+        """Update a sticky; only its creator is allowed."""
         return super().partial_update(request, *args, **kwargs)
 
     @allow_permission(allowed_roles=[], creator=True, model=Sticky, level="WORKSPACE")
     def destroy(self, request, *args, **kwargs):
+        """Delete a sticky; only its creator is allowed."""
         return super().destroy(request, *args, **kwargs)

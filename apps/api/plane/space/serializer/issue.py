@@ -2,6 +2,12 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 # See the LICENSE file for details.
 
+"""Issue-related serializers for the public (space) API.
+
+Used by published project boards to show issues, their relations, comments, reactions and
+votes, and to create issues/comments from the public board.
+"""
+
 # Django imports
 from django.utils import timezone
 
@@ -39,6 +45,8 @@ from plane.utils.content_validator import (
 
 
 class IssueStateFlatSerializer(BaseSerializer):
+    """Issue id/sequence/name with lite state and project details (e.g. for a parent issue)."""
+
     state_detail = StateLiteSerializer(read_only=True, source="state")
     project_detail = ProjectLiteSerializer(read_only=True, source="project")
 
@@ -48,6 +56,8 @@ class IssueStateFlatSerializer(BaseSerializer):
 
 
 class LabelSerializer(BaseSerializer):
+    """Full label with nested workspace and project details."""
+
     workspace_detail = WorkspaceLiteSerializer(source="workspace", read_only=True)
     project_detail = ProjectLiteSerializer(source="project", read_only=True)
 
@@ -58,6 +68,8 @@ class LabelSerializer(BaseSerializer):
 
 
 class IssueProjectLiteSerializer(BaseSerializer):
+    """Read-only issue id/name/sequence with its project details."""
+
     project_detail = ProjectLiteSerializer(source="project", read_only=True)
 
     class Meta:
@@ -67,6 +79,8 @@ class IssueProjectLiteSerializer(BaseSerializer):
 
 
 class IssueRelationSerializer(BaseSerializer):
+    """Relation seen from the source issue: ``issue_detail`` describes the related issue."""
+
     issue_detail = IssueProjectLiteSerializer(read_only=True, source="related_issue")
 
     class Meta:
@@ -76,6 +90,8 @@ class IssueRelationSerializer(BaseSerializer):
 
 
 class RelatedIssueSerializer(BaseSerializer):
+    """Reverse relation: ``issue_detail`` describes the issue that points at this one."""
+
     issue_detail = IssueProjectLiteSerializer(read_only=True, source="issue")
 
     class Meta:
@@ -85,6 +101,8 @@ class RelatedIssueSerializer(BaseSerializer):
 
 
 class IssueCycleDetailSerializer(BaseSerializer):
+    """CycleIssue link with nested cycle details."""
+
     cycle_detail = CycleBaseSerializer(read_only=True, source="cycle")
 
     class Meta:
@@ -101,6 +119,8 @@ class IssueCycleDetailSerializer(BaseSerializer):
 
 
 class IssueModuleDetailSerializer(BaseSerializer):
+    """ModuleIssue link with nested module details."""
+
     module_detail = ModuleBaseSerializer(read_only=True, source="module")
 
     class Meta:
@@ -117,6 +137,8 @@ class IssueModuleDetailSerializer(BaseSerializer):
 
 
 class IssueLinkSerializer(BaseSerializer):
+    """External link attached to an issue, with creator details."""
+
     created_by_detail = UserLiteSerializer(read_only=True, source="created_by")
 
     class Meta:
@@ -134,12 +156,15 @@ class IssueLinkSerializer(BaseSerializer):
 
     # Validation if url already exists
     def create(self, validated_data):
+        """Create the link, rejecting a URL already linked to the same issue."""
         if IssueLink.objects.filter(url=validated_data.get("url"), issue_id=validated_data.get("issue_id")).exists():
             raise serializers.ValidationError({"error": "URL already exists for this Issue"})
         return IssueLink.objects.create(**validated_data)
 
 
 class IssueAttachmentSerializer(BaseSerializer):
+    """File asset attached to an issue."""
+
     class Meta:
         model = FileAsset
         fields = "__all__"
@@ -155,6 +180,8 @@ class IssueAttachmentSerializer(BaseSerializer):
 
 
 class IssueReactionSerializer(BaseSerializer):
+    """Emoji reaction on an issue (actor and issue are set by the view)."""
+
     class Meta:
         model = IssueReaction
         fields = ["issue", "reaction", "workspace", "project", "actor"]
@@ -162,6 +189,8 @@ class IssueReactionSerializer(BaseSerializer):
 
 
 class IssueSerializer(BaseSerializer):
+    """Detailed issue with nested state, labels, assignees, relations, cycle/module, links, attachments and reactions."""
+
     project_detail = ProjectLiteSerializer(read_only=True, source="project")
     state_detail = StateSerializer(read_only=True, source="state")
     parent_detail = IssueStateFlatSerializer(read_only=True, source="parent")
@@ -190,6 +219,8 @@ class IssueSerializer(BaseSerializer):
 
 
 class IssueFlatSerializer(BaseSerializer):
+    """Issue scalar fields only (no nested relations)."""
+
     ## Contain only flat fields
 
     class Meta:
@@ -209,6 +240,8 @@ class IssueFlatSerializer(BaseSerializer):
 
 
 class CommentReactionLiteSerializer(BaseSerializer):
+    """Reaction on a comment with actor details."""
+
     actor_detail = UserLiteSerializer(read_only=True, source="actor")
 
     class Meta:
@@ -217,6 +250,11 @@ class CommentReactionLiteSerializer(BaseSerializer):
 
 
 class IssueCommentSerializer(BaseSerializer):
+    """Issue comment with actor, issue, project, workspace details and reactions.
+
+    ``is_member`` is expected as a queryset annotation.
+    """
+
     actor_detail = UserLiteSerializer(read_only=True, source="actor")
     issue_detail = IssueFlatSerializer(read_only=True, source="issue")
     project_detail = ProjectLiteSerializer(read_only=True, source="project")
@@ -241,6 +279,11 @@ class IssueCommentSerializer(BaseSerializer):
 ##TODO: Find a better way to write this serializer
 ## Find a better approach to save manytomany?
 class IssueCreateSerializer(BaseSerializer):
+    """Create/update an issue together with its assignees and labels (write-only id lists).
+
+    ``create`` needs ``project_id``, ``workspace_id`` and ``default_assignee_id`` in the serializer context.
+    """
+
     state_detail = StateSerializer(read_only=True, source="state")
     created_by_detail = UserLiteSerializer(read_only=True, source="created_by")
     project_detail = ProjectLiteSerializer(read_only=True, source="project")
@@ -271,12 +314,18 @@ class IssueCreateSerializer(BaseSerializer):
         ]
 
     def to_representation(self, instance):
+        """Add ``assignees`` and ``labels`` to the output as lists of id strings."""
         data = super().to_representation(instance)
         data["assignees"] = [str(assignee.id) for assignee in instance.assignees.all()]
         data["labels"] = [str(label.id) for label in instance.labels.all()]
         return data
 
     def validate(self, data):
+        """Ensure start_date <= target_date and validate rich-text content.
+
+        ``description_html`` is sanitized (replaced by the cleaned HTML); invalid HTML or
+        ``description_binary`` raises a ValidationError.
+        """
         if (
             data.get("start_date", None) is not None
             and data.get("target_date", None) is not None
@@ -301,6 +350,10 @@ class IssueCreateSerializer(BaseSerializer):
         return data
 
     def create(self, validated_data):
+        """Create the issue in the context project, then attach assignees and labels.
+
+        If no assignees are given, the project's default assignee (if any) is assigned.
+        """
         assignees = validated_data.pop("assignees", None)
         labels = validated_data.pop("labels", None)
 
@@ -360,6 +413,9 @@ class IssueCreateSerializer(BaseSerializer):
         return issue
 
     def update(self, instance, validated_data):
+        """Update the issue; when ``assignees``/``labels`` are provided they replace the existing
+        sets (old rows deleted, new ones bulk-created). Always bumps ``updated_at``.
+        """
         assignees = validated_data.pop("assignees", None)
         labels = validated_data.pop("labels", None)
 
@@ -409,6 +465,8 @@ class IssueCreateSerializer(BaseSerializer):
 
 
 class CommentReactionSerializer(BaseSerializer):
+    """Full CommentReaction; comment and actor are set by the view."""
+
     class Meta:
         model = CommentReaction
         fields = "__all__"
@@ -416,6 +474,8 @@ class CommentReactionSerializer(BaseSerializer):
 
 
 class IssueVoteSerializer(BaseSerializer):
+    """Read-only vote on an issue."""
+
     class Meta:
         model = IssueVote
         fields = ["issue", "vote", "workspace", "project", "actor"]
@@ -423,6 +483,11 @@ class IssueVoteSerializer(BaseSerializer):
 
 
 class IssuePublicSerializer(BaseSerializer):
+    """Compact read-only issue for published board listings, with reactions and votes.
+
+    ``module_ids``, ``label_ids`` and ``assignee_ids`` are expected as queryset annotations.
+    """
+
     reactions = IssueReactionSerializer(read_only=True, many=True, source="issue_reactions")
     votes = IssueVoteSerializer(read_only=True, many=True)
     module_ids = serializers.ListField(child=serializers.UUIDField(), required=False)
@@ -451,6 +516,8 @@ class IssuePublicSerializer(BaseSerializer):
 
 
 class LabelLiteSerializer(BaseSerializer):
+    """Minimal label info (id, name, color)."""
+
     class Meta:
         model = Label
         fields = ["id", "name", "color"]

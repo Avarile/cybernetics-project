@@ -65,6 +65,7 @@ class PinnedIPAdapter(HTTPAdapter):
         super().__init__(*args, **kwargs)
 
     def get_connection_with_tls_context(self, request, verify, proxies=None, cert=None):
+        """Return a urllib3 connection pool whose TLS uses the original hostname for SNI/verification."""
         # requests >= 2.32 calls this (it replaced get_connection() as part of
         # the CVE-2024-35195 fix). requests is pinned to 2.33 in base.txt.
         host_params, pool_kwargs = self.build_connection_pool_key_attributes(

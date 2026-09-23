@@ -2,6 +2,14 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 # See the LICENSE file for details.
 
+"""Asset endpoints for published boards (``/api/public/assets/v2/anchor/<anchor>/...``).
+
+Used by the space frontend to view images embedded in public issue/comment descriptions
+and to upload images into comments posted from a published board. Uploads go straight
+to S3/MinIO via presigned POST; the API only records FileAsset rows. All lookups are
+scoped to the workspace and project of the DeployBoard ``anchor``.
+"""
+
 # Python imports
 import uuid
 
@@ -25,7 +33,10 @@ from .base import BaseAPIView
 
 
 class EntityAssetEndpoint(BaseAPIView):
+    """View (public) and upload/confirm/delete (authenticated) assets of a published project."""
+
     def get_permissions(self):
+        """GET is public; all other methods require an authenticated user."""
         if self.request.method == "GET":
             permission_classes = [AllowAny]
         else:
@@ -33,6 +44,7 @@ class EntityAssetEndpoint(BaseAPIView):
         return [permission() for permission in permission_classes]
 
     def get(self, request, anchor, pk):
+        """Redirect to a presigned download URL for an uploaded issue/comment description asset of the published project."""
         # Get the deploy board
         deploy_board = DeployBoard.objects.filter(anchor=anchor).first()
         # Check if the project is published
@@ -68,6 +80,10 @@ class EntityAssetEndpoint(BaseAPIView):
         return HttpResponseRedirect(signed_url)
 
     def post(self, request, anchor):
+        """Create a FileAsset for an image upload and return presigned POST data for the browser.
+
+        Only image MIME types are accepted; ``entity_identifier`` is stored as the comment id.
+        """
         # Get the deploy board
         deploy_board = DeployBoard.objects.filter(anchor=anchor).first()
         # Check if the project is published
@@ -135,6 +151,7 @@ class EntityAssetEndpoint(BaseAPIView):
         )
 
     def patch(self, request, anchor, pk):
+        """Mark the asset as uploaded, update its attributes and queue metadata fetching if missing."""
         # Get the deploy board
         deploy_board = DeployBoard.objects.filter(anchor=anchor).first()
         # Check if the project is published
@@ -156,6 +173,7 @@ class EntityAssetEndpoint(BaseAPIView):
         return Response(status=status.HTTP_204_NO_CONTENT)
 
     def delete(self, request, anchor, pk):
+        """Soft-delete the asset (``is_deleted``/``deleted_at``)."""
         # Get the deploy board
         deploy_board = DeployBoard.objects.filter(anchor=anchor, entity_name="project").first()
         # Check if the project is published
@@ -175,6 +193,7 @@ class AssetRestoreEndpoint(BaseAPIView):
     """Endpoint to restore a deleted assets."""
 
     def post(self, request, anchor, pk):
+        """Undo a soft delete of an asset in the published project."""
         # Get the deploy board
         deploy_board = DeployBoard.objects.filter(anchor=anchor, entity_name="project").first()
         # Check if the project is published
@@ -193,6 +212,10 @@ class EntityBulkAssetEndpoint(BaseAPIView):
     """Endpoint to bulk update assets."""
 
     def post(self, request, anchor, entity_id):
+        """Link the given assets to comment ``entity_id``.
+
+        Only applied when the first matching asset is a comment-description asset.
+        """
         # Get the deploy board
         deploy_board = DeployBoard.objects.filter(anchor=anchor, entity_name="project").first()
         # Check if the project is published

@@ -2,6 +2,13 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 # See the LICENSE file for details.
 
+"""Smoke tests hitting a live Plane server (``plane_server`` fixture) over HTTP.
+
+Checks the sign-in endpoint accepts/rejects credentials without server errors and
+that the root health check returns 200. Assertions are deliberately tolerant of
+redirect vs JSON response styles.
+"""
+
 import pytest
 import requests
 from django.urls import reverse

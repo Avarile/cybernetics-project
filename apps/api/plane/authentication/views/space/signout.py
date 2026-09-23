@@ -2,6 +2,8 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 # See the LICENSE file for details.
 
+"""Sign-out view for the space frontend (``POST /auth/spaces/sign-out/``)."""
+
 # Django imports
 from django.views import View
 from django.contrib.auth import logout
@@ -15,7 +17,10 @@ from plane.utils.path_validator import get_safe_redirect_url
 
 
 class SignOutAuthSpaceEndpoint(View):
+    """Log the current user out of the space frontend."""
+
     def post(self, request):
+        """Record logout IP/time, clear the session and redirect to the space ``next_path``; always redirects."""
         next_path = request.POST.get("next_path")
 
         # Get user

@@ -2,6 +2,12 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 # See the LICENSE file for details.
 
+"""Celery task that emails a workspace invitation to an email address.
+
+Enqueued when WorkspaceMemberInvite rows are created; SMTP settings come from
+the instance configuration.
+"""
+
 # Python imports
 import logging
 
@@ -21,6 +27,11 @@ from plane.utils.exception_logger import log_exception
 
 @shared_task
 def workspace_invitation(email, workspace_id, token, current_site, inviter):
+    """Render and send the workspace invitation email.
+
+    ``inviter`` is the inviting user's email. Side effect: stores the rendered
+    plain-text body on ``WorkspaceMemberInvite.message``. Missing workspace/invite is ignored.
+    """
     try:
         user = User.objects.get(email=inviter)
 

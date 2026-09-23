@@ -2,6 +2,9 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 # See the LICENSE file for details.
 
+"""URL routes for project pages: CRUD, summary, favorites, archive, lock, access (public/private),
+description (binary document) sync, version history and duplication."""
+
 from django.urls import path
 
 

@@ -2,6 +2,14 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 # See the LICENSE file for details.
 
+"""
+Magic-code (passwordless) auth views for the space (public project) frontend.
+
+Routes: ``POST /auth/spaces/magic-generate/`` (JSON API, issues and emails a
+code), ``POST /auth/spaces/magic-sign-in/`` and ``POST /auth/spaces/magic-sign-up/``
+(form POSTs that verify the code, log in and redirect to the space ``next_path``).
+"""
+
 # Django imports
 from django.core.validators import validate_email
 from django.http import HttpResponseRedirect
@@ -33,11 +41,14 @@ from plane.utils.path_validator import get_safe_redirect_url, validate_next_path
 
 
 class MagicGenerateSpaceEndpoint(APIView):
+    """Generate a magic code for an email and send it in the background."""
+
     permission_classes = [AllowAny]
 
     throttle_classes = [AuthenticationThrottle]
 
     def post(self, request):
+        """Issue a code via ``MagicCodeProvider.initiate``, queue the ``magic_link`` email and return the Redis key."""
         # Check if instance is configured
         instance = Instance.objects.first()
         if instance is None or not instance.is_setup_done:
@@ -60,7 +71,10 @@ class MagicGenerateSpaceEndpoint(APIView):
 
 
 class MagicSignInSpaceEndpoint(View):
+    """Sign in an existing user with an emailed magic code from the space frontend."""
+
     def post(self, request):
+        """Verify the code, log the user in and redirect to the space; the auth throttle is applied manually."""
         # set the referer as session to redirect after login
         code = request.POST.get("code", "").strip()
         email = request.POST.get("email", "").strip().lower()
@@ -115,6 +129,7 @@ class MagicSignInSpaceEndpoint(View):
             # redirect to referer path
             next_path = validate_next_path(next_path=next_path)
             url = f"{base_host(request=request, is_space=True).rstrip('/')}{next_path}"
+            # Guard against open redirects: only follow next_path if the final URL is on an allowed host.
             if url_has_allowed_host_and_scheme(url, allowed_hosts=get_allowed_hosts()):
                 return HttpResponseRedirect(url)
             else:
@@ -131,7 +146,10 @@ class MagicSignInSpaceEndpoint(View):
 
 
 class MagicSignUpSpaceEndpoint(View):
+    """Create a new account using an emailed magic code from the space frontend."""
+
     def post(self, request):
+        """Verify the code, create the user, log in and redirect to the space; the auth throttle is applied manually."""
         # set the referer as session to redirect after login
         code = request.POST.get("code", "").strip()
         email = request.POST.get("email", "").strip().lower()
@@ -185,6 +203,7 @@ class MagicSignUpSpaceEndpoint(View):
             # redirect to referer path
             next_path = validate_next_path(next_path=next_path)
             url = f"{base_host(request=request, is_space=True).rstrip('/')}{next_path}"
+            # Guard against open redirects: only follow next_path if the final URL is on an allowed host.
             if url_has_allowed_host_and_scheme(url, allowed_hosts=get_allowed_hosts()):
                 return HttpResponseRedirect(url)
             else:

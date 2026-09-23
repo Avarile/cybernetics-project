@@ -2,6 +2,8 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 # See the LICENSE file for details.
 
+"""URL routes for project workflow states, including the intake (triage) state and marking a default state."""
+
 from django.urls import path
 
 

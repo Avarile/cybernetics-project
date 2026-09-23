@@ -2,6 +2,10 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 # See the LICENSE file for details.
 
+"""Shared constants."""
+
+# Slugs that cannot be used as workspace slugs because they clash with frontend routes,
+# product names or reserved paths.
 RESTRICTED_WORKSPACE_SLUGS = [
     "404",
     "accounts",

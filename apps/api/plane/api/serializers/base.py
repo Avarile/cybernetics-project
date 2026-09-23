@@ -2,6 +2,12 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 # See the LICENSE file for details.
 
+"""Base serializer shared by all public API serializers.
+
+Adds ``fields=`` (sparse fieldsets) and ``expand=`` (inline nested objects)
+kwargs on top of DRF's ModelSerializer.
+"""
+
 # Third party imports
 from rest_framework import serializers
 
@@ -17,6 +23,7 @@ class BaseSerializer(serializers.ModelSerializer):
     id = serializers.PrimaryKeyRelatedField(read_only=True)
 
     def __init__(self, *args, **kwargs):
+        """Accept optional ``fields`` (whitelist) and ``expand`` (relations to inline) kwargs."""
         # If 'fields' is provided in the arguments, remove it and store it separately.
         # This is done so as not to pass this custom argument up to the superclass.
         fields = kwargs.pop("fields", [])
@@ -70,6 +77,11 @@ class BaseSerializer(serializers.ModelSerializer):
         return self.fields
 
     def to_representation(self, instance):
+        """Serialize the instance, replacing ids with nested objects for requested expansions.
+
+        Only fields present on the serializer and listed in the ``expansion`` map are
+        expanded; other requested names fall back to their ``<name>_id`` value.
+        """
         response = super().to_representation(instance)
 
         # Ensure 'expand' is iterable before processing
@@ -77,6 +89,7 @@ class BaseSerializer(serializers.ModelSerializer):
             for expand in self.expand:
                 if expand in self.fields:
                     # Import all the expandable serializers
+                    # Imported lazily to avoid circular imports with the serializer package.
                     from . import (
                         IssueSerializer,
                         IssueLiteSerializer,

@@ -2,6 +2,15 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 # See the LICENSE file for details.
 
+"""
+Periodic Celery tasks that prune log/version tables.
+
+Hard-deletes, in batches of ``BATCH_SIZE``, API activity logs, email notification
+logs and webhook logs older than their configured retention (``*_RETENTION_DAYS``
+settings), and keeps only the 20 newest page versions per page and description
+versions per issue. Scheduled via Celery beat.
+"""
+
 # Python imports
 from datetime import timedelta
 import logging
@@ -51,6 +60,7 @@ def process_cleanup_task(
     batch: list = []
 
     def flush(ids: list) -> None:
+        """Hard-delete one batch of ids and update the running counters."""
         nonlocal total_deleted, total_batches
         if not ids:
             return
@@ -59,6 +69,7 @@ def process_cleanup_task(
             # `all_objects` is a plain manager, so this is a hard delete — rows
             # are removed from PostgreSQL immediately rather than soft-deleted.
             delete_result = model.all_objects.filter(id__in=ids).delete()
+            # QuerySet.delete() returns (total_deleted, per_model_counts).
             deleted = delete_result[0] if isinstance(delete_result, tuple) else 0
             total_deleted += deleted
         except Exception as e:
@@ -108,6 +119,7 @@ def get_page_versions_queryset():
     """Get page versions beyond the maximum allowed (20 per page)."""
     subq = (
         PageVersion.all_objects.annotate(
+            # Rank versions per page newest-first; anything past rank 20 is excess.
             row_num=Window(
                 expression=RowNumber(),
                 partition_by=[F("page_id")],

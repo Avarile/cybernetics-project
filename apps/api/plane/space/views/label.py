@@ -2,6 +2,8 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 # See the LICENSE file for details.
 
+"""Public endpoint listing a published project's labels (``/api/public/anchor/<anchor>/labels/``)."""
+
 # Third Party imports
 from rest_framework.response import Response
 from rest_framework import status
@@ -13,6 +15,8 @@ from plane.db.models import DeployBoard, Label
 
 
 class ProjectLabelsEndpoint(BaseAPIView):
+    """List the labels of the project published under ``anchor`` (id, name, color, parent); no auth required."""
+
     permission_classes = [AllowAny]
 
     def get(self, request, anchor):

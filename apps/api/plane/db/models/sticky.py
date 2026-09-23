@@ -2,6 +2,8 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 # See the LICENSE file for details.
 
+"""Sticky notes: personal, workspace-scoped rich-text notes owned by a user."""
+
 # Django imports
 from django.conf import settings
 from django.db import models
@@ -14,6 +16,8 @@ from plane.utils.html_processor import strip_tags
 
 
 class Sticky(BaseModel):
+    """A user's sticky note in a workspace, with rich-text content and display colours."""
+
     name = models.TextField(null=True, blank=True)
 
     description = models.JSONField(blank=True, default=dict)
@@ -36,6 +40,7 @@ class Sticky(BaseModel):
         ordering = ("-created_at",)
 
     def save(self, *args, **kwargs):
+        """Derive ``description_stripped`` and, on create, place the sticky after the workspace's highest ``sort_order``."""
         # Strip the html tags using html parser
         self.description_stripped = (
             None

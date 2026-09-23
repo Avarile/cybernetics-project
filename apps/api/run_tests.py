@@ -3,12 +3,21 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 # See the LICENSE file for details.
 
+"""
+CLI wrapper around pytest for the API test suite.
+
+Builds a pytest command from flags (marker selection for unit/contract/smoke,
+coverage, parallel via pytest-xdist, verbosity) and exits with pytest's status.
+When coverage is requested, also fails if total coverage is below 90%.
+"""
+
 import argparse
 import subprocess
 import sys
 
 
 def main():
+    """Parse CLI flags, run pytest, and exit with its return code."""
     parser = argparse.ArgumentParser(description="Run Plane tests")
     parser.add_argument("-u", "--unit", action="store_true", help="Run unit tests only")
     parser.add_argument("-c", "--contract", action="store_true", help="Run contract tests only")
@@ -46,7 +55,8 @@ def main():
     if args.verbose:
         cmd.append("-v")
 
-    # Add common flags
+    # Add common flags: keep the test DB between runs and build the schema
+    # directly from models instead of running migrations (faster)
     cmd.extend(["--reuse-db", "--nomigrations"])
 
     # Print command

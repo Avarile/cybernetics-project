@@ -2,6 +2,14 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 # See the LICENSE file for details.
 
+"""Project-level "advanced analytics" endpoints.
+
+Serves the project analytics page: headline work item counts, per-assignee
+state breakdowns and chart data (custom x-axis/group-by charts and
+created-vs-completed trends), optionally narrowed to a cycle or module.
+Filters (date range, project ids) are derived by ``get_analytics_filters``.
+"""
+
 from rest_framework.response import Response
 from rest_framework import status
 from typing import Dict, Any
@@ -30,7 +38,14 @@ from plane.utils.date_utils import (
 
 
 class ProjectAdvanceAnalyticsBaseView(BaseAPIView):
+    """Shared setup for the project analytics endpoints."""
+
     def initialize_workspace(self, slug: str, type: str) -> None:
+        """Store the workspace slug and compute ``self.filters`` from the request.
+
+        ``type`` ("analytics" or "chart") controls which date ranges are produced
+        (``analytics_date_range`` vs ``chart_period_range``).
+        """
         self._workspace_slug = slug
         self.filters = get_analytics_filters(
             slug=slug,
@@ -42,7 +57,10 @@ class ProjectAdvanceAnalyticsBaseView(BaseAPIView):
 
 
 class ProjectAdvanceAnalyticsEndpoint(ProjectAdvanceAnalyticsBaseView):
+    """Headline work item counts per state group for a project, cycle or module."""
+
     def get_filtered_counts(self, queryset: QuerySet) -> Dict[str, int]:
+        """Return ``{"count": n}`` for the queryset, limited to the current date range if one is set."""
         def get_filtered_count() -> int:
             if self.filters["analytics_date_range"]:
                 return queryset.filter(
@@ -83,6 +101,7 @@ class ProjectAdvanceAnalyticsEndpoint(ProjectAdvanceAnalyticsBaseView):
 
     @allow_permission([ROLE.ADMIN, ROLE.MEMBER])
     def get(self, request: HttpRequest, slug: str, project_id: str) -> Response:
+        """Return work item stats; ``cycle_id`` / ``module_id`` query params narrow the scope."""
         self.initialize_workspace(slug, type="analytics")
 
         # Optionally accept cycle_id or module_id as query params
@@ -95,7 +114,13 @@ class ProjectAdvanceAnalyticsEndpoint(ProjectAdvanceAnalyticsBaseView):
 
 
 class ProjectAdvanceAnalyticsStatsEndpoint(ProjectAdvanceAnalyticsBaseView):
+    """Per-assignee work item breakdowns for a project."""
+
     def get_project_issues_stats(self) -> QuerySet:
+        """Return per-project work item counts by state group (within the chart period, if any).
+
+        Not used by ``get`` in this view.
+        """
         # Get the base queryset with workspace and project filters
         base_queryset = Issue.issue_objects.filter(**self.filters["base_filters"])
 
@@ -117,6 +142,7 @@ class ProjectAdvanceAnalyticsStatsEndpoint(ProjectAdvanceAnalyticsBaseView):
         )
 
     def get_work_items_stats(self, project_id, cycle_id=None, module_id=None) -> Dict[str, Dict[str, int]]:
+        """Return per-assignee counts by state group, scoped to a project, cycle or module."""
         base_queryset = None
         if cycle_id is not None:
             cycle_issues = CycleIssue.objects.filter(**self.filters["base_filters"], cycle_id=cycle_id).values_list(
@@ -131,6 +157,8 @@ class ProjectAdvanceAnalyticsStatsEndpoint(ProjectAdvanceAnalyticsBaseView):
         else:
             base_queryset = Issue.issue_objects.filter(**self.filters["base_filters"], project_id=project_id)
         return (
+            # One row per assignee (unassigned items group under a null assignee); distinct
+            # counts avoid double counting caused by the assignee join.
             base_queryset.annotate(display_name=F("assignees__display_name"))
             .annotate(assignee_id=F("assignees__id"))
             .annotate(avatar=F("assignees__avatar"))
@@ -164,6 +192,7 @@ class ProjectAdvanceAnalyticsStatsEndpoint(ProjectAdvanceAnalyticsBaseView):
 
     @allow_permission([ROLE.ADMIN, ROLE.MEMBER])
     def get(self, request: HttpRequest, slug: str, project_id: str) -> Response:
+        """Return assignee stats for ``type=work-items``; other types are rejected with 400."""
         self.initialize_workspace(slug, type="chart")
         type = request.GET.get("type", "work-items")
 
@@ -180,7 +209,15 @@ class ProjectAdvanceAnalyticsStatsEndpoint(ProjectAdvanceAnalyticsBaseView):
 
 
 class ProjectAdvanceAnalyticsChartEndpoint(ProjectAdvanceAnalyticsBaseView):
+    """Chart data for the project analytics page."""
+
     def work_item_completion_chart(self, project_id, cycle_id=None, module_id=None) -> Dict[str, Any]:
+        """Build the created-vs-completed trend chart.
+
+        For a cycle/module: one point per day between its start and end dates.
+        For the whole project: one point per month from the project's creation month
+        to the current month. Returns ``{"data": [...], "schema": {...}}``.
+        """
         # Get the base queryset
         queryset = (
             Issue.issue_objects.filter(**self.filters["base_filters"])
@@ -199,6 +236,8 @@ class ProjectAdvanceAnalyticsChartEndpoint(ProjectAdvanceAnalyticsBaseView):
                 end_date = cycle.end_date.date()
             else:
                 return {"data": [], "schema": {}}
+            # Note: queryset now holds CycleIssue rows (issue ids), so the daily stats below
+            # are keyed on when the issue was added to the cycle.
             queryset = cycle_issues
 
         elif module_id is not None:
@@ -211,6 +250,7 @@ class ProjectAdvanceAnalyticsChartEndpoint(ProjectAdvanceAnalyticsBaseView):
                 end_date = module.target_date
             else:
                 return {"data": [], "schema": {}}
+            # Same as above, but with ModuleIssue rows.
             queryset = module_issues
 
         else:
@@ -316,6 +356,12 @@ class ProjectAdvanceAnalyticsChartEndpoint(ProjectAdvanceAnalyticsBaseView):
 
     @allow_permission([ROLE.ADMIN, ROLE.MEMBER, ROLE.GUEST])
     def get(self, request: HttpRequest, slug: str, project_id: str) -> Response:
+        """Return chart data.
+
+        ``type=custom-work-items`` builds a generic chart via ``build_analytics_chart``
+        using ``x_axis`` / ``group_by``; ``type=work-items`` returns the completion
+        trend chart. Other types get a 400.
+        """
         self.initialize_workspace(slug, type="chart")
         type = request.GET.get("type", "projects")
         group_by = request.GET.get("group_by", None)

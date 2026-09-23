@@ -7,6 +7,11 @@ Common OpenAPI examples for drf-spectacular.
 
 This module provides reusable example data for API responses and requests
 to make the generated documentation more helpful and realistic.
+
+The ``*_EXAMPLE`` objects are attached to public API v1 views (``plane.api``)
+via ``extend_schema(examples=...)``; the ``SAMPLE_*`` dicts feed
+``get_sample_for_schema``, which ``responses.py`` uses to build paginated
+response examples. All IDs/values are illustrative only.
 """
 
 from drf_spectacular.utils import OpenApiExample
@@ -750,6 +755,7 @@ ESTIMATE_POINT_UPDATE_EXAMPLE = OpenApiExample(
 
 
 # Sample data for different entity types
+# (plain dicts, embedded in generated paginated response examples)
 SAMPLE_ISSUE = {
     "id": "550e8400-e29b-41d4-a716-446655440000",
     "name": "Fix authentication bug in user login",
@@ -882,7 +888,7 @@ SAMPLE_ESTIMATE_POINT = {
     "created_at": "2024-01-01T10:30:00Z",
 }
 
-# Mapping of schema types to sample data
+# Mapping of schema types to sample data; unknown names fall back to SAMPLE_GENERIC
 SCHEMA_EXAMPLES = {
     "Issue": SAMPLE_ISSUE,
     "WorkItem": SAMPLE_ISSUE,

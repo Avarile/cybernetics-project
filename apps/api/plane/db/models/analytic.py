@@ -2,6 +2,12 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 # See the LICENSE file for details.
 
+"""Saved analytics views.
+
+An ``AnalyticView`` stores a named analytics query for a workspace so that the
+analytics screens can re-run it later.
+"""
+
 # Django models
 from django.db import models
 
@@ -9,6 +15,8 @@ from .base import BaseModel
 
 
 class AnalyticView(BaseModel):
+    """A named, workspace-scoped analytics query (``query``/``query_dict`` hold the filter params)."""
+
     workspace = models.ForeignKey("db.Workspace", related_name="analytics", on_delete=models.CASCADE)
     name = models.CharField(max_length=255)
     description = models.TextField(blank=True)

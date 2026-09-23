@@ -2,6 +2,12 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 # See the LICENSE file for details.
 
+"""Public API (``plane.api``) endpoints for workspace and project membership.
+
+Provides listing of workspace members (with roles) and list/create/retrieve/
+update/deactivate operations for project members.
+"""
+
 # Third Party imports
 from rest_framework.response import Response
 from rest_framework import status
@@ -29,6 +35,8 @@ from plane.utils.openapi import (
 
 
 class WorkspaceMemberAPIEndpoint(BaseAPIView):
+    """List all members of a workspace with their workspace role (admin/member only)."""
+
     permission_classes = [WorkSpaceAdminPermission]
     use_read_replica = True
 
@@ -92,10 +100,13 @@ class WorkspaceMemberAPIEndpoint(BaseAPIView):
 
 
 class ProjectMemberListCreateAPIEndpoint(BaseAPIView):
+    """List members of a project (any project member) or add a member (project admins only)."""
+
     permission_classes = [ProjectMemberPermission]
     use_read_replica = True
 
     def get_permissions(self):
+        """Use ProjectMemberPermission for reads and ProjectAdminPermission for writes."""
         if self.request.method == "GET":
             return [ProjectMemberPermission()]
         return [ProjectAdminPermission()]
@@ -150,6 +161,7 @@ class ProjectMemberListCreateAPIEndpoint(BaseAPIView):
         request=OpenApiRequest(request=ProjectMemberSerializer),
     )
     def post(self, request, slug, project_id):
+        """Add a user to the project; the serializer validates workspace membership via ``slug``."""
         serializer = ProjectMemberSerializer(data=request.data, context={"slug": slug})
         serializer.is_valid(raise_exception=True)
         serializer.save(project_id=project_id)
@@ -158,6 +170,8 @@ class ProjectMemberListCreateAPIEndpoint(BaseAPIView):
 
 # API endpoint to get and update a project member
 class ProjectMemberDetailAPIEndpoint(ProjectMemberListCreateAPIEndpoint):
+    """Retrieve, update or remove a single project member; inherits permission rules from the list endpoint."""
+
     @extend_schema(
         operation_id="get_project_member",
         summary="Get project member",
@@ -186,6 +200,7 @@ class ProjectMemberDetailAPIEndpoint(ProjectMemberListCreateAPIEndpoint):
             )
 
         # Get the workspace members that are present inside the workspace
+        # Raises ProjectMember.DoesNotExist if the membership is not found in this project
         project_members = ProjectMember.objects.get(project_id=project_id, workspace__slug=slug, pk=pk)
         user = User.objects.get(id=project_members.member_id)
         user = UserLiteSerializer(user).data
@@ -201,6 +216,7 @@ class ProjectMemberDetailAPIEndpoint(ProjectMemberListCreateAPIEndpoint):
         request=OpenApiRequest(request=ProjectMemberSerializer),
     )
     def patch(self, request, slug, project_id, pk):
+        """Partially update a project membership (e.g. change role)."""
         project_member = ProjectMember.objects.get(project_id=project_id, workspace__slug=slug, pk=pk)
         serializer = ProjectMemberSerializer(project_member, data=request.data, partial=True, context={"slug": slug})
         serializer.is_valid(raise_exception=True)
@@ -216,6 +232,7 @@ class ProjectMemberDetailAPIEndpoint(ProjectMemberListCreateAPIEndpoint):
         responses={204: OpenApiResponse(description="Project member deleted")},
     )
     def delete(self, request, slug, project_id, pk):
+        """Soft-remove a member from the project by marking the membership inactive (no hard delete)."""
         project_member = ProjectMember.objects.get(project_id=project_id, workspace__slug=slug, pk=pk)
         project_member.is_active = False
         project_member.save()

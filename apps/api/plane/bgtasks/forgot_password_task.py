@@ -2,6 +2,8 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 # See the LICENSE file for details.
 
+"""Celery task that emails a password reset link (used by the app and space forgot-password views)."""
+
 # Python imports
 import logging
 
@@ -21,6 +23,10 @@ from plane.utils.exception_logger import log_exception
 
 @shared_task
 def forgot_password(first_name, email, uidb64, token, current_site):
+    """Send the reset-password email linking to ``current_site``/accounts/reset-password with the uid/token.
+
+    Errors are logged and swallowed.
+    """
     try:
         relative_link = f"/accounts/reset-password/?uidb64={uidb64}&token={token}&email={email}"
         abs_url = str(current_site) + relative_link

@@ -2,6 +2,13 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 # See the LICENSE file for details.
 
+"""Workflow state models for work items.
+
+Defines ``StateGroup`` (the fixed lifecycle buckets every state belongs to),
+the ``DEFAULT_STATES`` seeded into new projects, and the ``State`` model with
+managers that hide or isolate intake/triage states.
+"""
+
 # Django imports
 from django.db import models
 from django.template.defaultfilters import slugify
@@ -12,6 +19,8 @@ from .project import ProjectBaseModel
 from plane.db.mixins import SoftDeletionManager
 
 class StateGroup(models.TextChoices):
+    """Lifecycle group a state belongs to; drives progress/analytics grouping."""
+
     BACKLOG = "backlog", "Backlog"
     UNSTARTED = "unstarted", "Unstarted"
     STARTED = "started", "Started"
@@ -21,6 +30,8 @@ class StateGroup(models.TextChoices):
 
 
 # Default states
+# Seeded when a project is created. Sequences are spaced 10000 apart so new
+# states can be inserted between them without renumbering.
 DEFAULT_STATES = [
     {
         "name": "Backlog",
@@ -77,7 +88,13 @@ class TriageStateManager(SoftDeletionManager):
 
 
 class State(ProjectBaseModel):
-    name = models.CharField(max_length=255, verbose_name="State Name")
+    """A project-scoped workflow state (e.g. "Todo", "Done") for work items.
+
+    ``objects`` excludes triage states; use ``all_state_objects`` to include
+    them or ``triage_objects`` to fetch only triage states.
+    """
+
+    name =models.CharField(max_length=255, verbose_name="State Name")
     description = models.TextField(verbose_name="State Description", blank=True)
     color = models.CharField(max_length=255, verbose_name="State Color")
     slug = models.SlugField(max_length=100, blank=True)
@@ -115,9 +132,11 @@ class State(ProjectBaseModel):
         ordering = ("sequence",)
 
     def save(self, *args, **kwargs):
+        """Refresh the slug and, on create, append the state after the last one."""
         self.slug = slugify(self.name)
         if self._state.adding:
             # Get the maximum sequence value from the database
+            # (note: `objects` excludes triage states from this max)
             last_id = State.objects.filter(project=self.project).aggregate(largest=models.Max("sequence"))["largest"]
             # if last_id is not None
             if last_id is not None:

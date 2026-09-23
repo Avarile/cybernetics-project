@@ -2,6 +2,8 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 # See the LICENSE file for details.
 
+"""Third-party integration models (generic, GitHub and Slack), re-exported for ``plane.db.models``."""
+
 from .base import Integration, WorkspaceIntegration
 from .github import (
     GithubRepository,

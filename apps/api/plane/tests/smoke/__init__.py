@@ -2,3 +2,4 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 # See the LICENSE file for details.
 
+"""Smoke tests: quick checks against a running server or live network stack (marked ``smoke``)."""

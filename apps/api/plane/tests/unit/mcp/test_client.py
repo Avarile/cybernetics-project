@@ -2,6 +2,12 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 # See the LICENSE file for details.
 
+"""Unit tests for ``plane.mcp.client``: the in-process loopback client MCP tools use to call the Plane REST API.
+
+``PlaneAPIClient`` sends requests straight into the Django ASGI app (no network) on behalf of the
+current MCP caller; ``parse_response`` turns API responses into tool results or ``ToolError``.
+"""
+
 import json
 
 import httpx
@@ -13,12 +19,15 @@ from plane.mcp.client import PlaneAPIClient, parse_response
 
 
 def response(status, body=None, headers=None):
+    """Build an ``httpx.Response`` with an optional JSON body."""
     content = json.dumps(body).encode() if body is not None else b""
     return httpx.Response(status, content=content, headers=headers or {})
 
 
 @pytest.mark.unit
 class TestParseResponse:
+    """Mapping of REST API responses to MCP tool results and user-facing errors."""
+
     def test_success_returns_json(self):
         assert parse_response(response(200, {"id": "1"})) == {"id": "1"}
 
@@ -26,6 +35,7 @@ class TestParseResponse:
         assert parse_response(response(204)) == {"success": True}
 
     def test_list_is_wrapped_in_an_object(self):
+        """Top-level JSON arrays are wrapped under a ``results`` key."""
         assert parse_response(response(200, [{"id": "1"}])) == {"results": [{"id": "1"}]}
 
     @pytest.mark.parametrize(
@@ -46,6 +56,7 @@ class TestParseResponse:
         assert expected in str(exc.value)
 
     def test_server_error_does_not_leak_body(self):
+        """5xx bodies (which may contain internals) are not echoed back to the model."""
         with pytest.raises(ToolError) as exc:
             parse_response(response(500, {"error": "secret stack trace"}))
         assert "secret" not in str(exc.value)
@@ -53,8 +64,11 @@ class TestParseResponse:
 
 @pytest.mark.unit
 class TestLoopbackRequest:
+    """Requests are replayed into the ASGI app with the caller's identity."""
+
     @pytest.mark.anyio
     async def test_replays_caller_identity(self):
+        """Host, API key, forwarded headers and body are forwarded under ``/api/v1/``."""
         captured = {}
 
         async def fake_django(scope, receive, send):
@@ -74,6 +88,7 @@ class TestLoopbackRequest:
             user_agent="claude-code/2.0",
         )
         client = PlaneAPIClient(fake_django)
+        # Simulate what MCPAuthMiddleware does for a real request.
         reset = _current_caller.set(caller)
         try:
             result = await client.post("workspaces/acme/projects/p1/work-items/", {"name": "Bug"})
@@ -95,6 +110,7 @@ class TestLoopbackRequest:
 
     @pytest.mark.anyio
     async def test_drops_unset_query_params(self):
+        """Query params whose value is ``None`` are omitted from the query string."""
         captured = {}
 
         async def fake_django(scope, receive, send):

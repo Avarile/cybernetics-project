@@ -2,6 +2,8 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 # See the LICENSE file for details.
 
+"""Public endpoint listing a published project's workflow states (``/api/public/anchor/<anchor>/states/``)."""
+
 # Django imports
 from django.db.models import Q
 
@@ -16,6 +18,8 @@ from plane.db.models import DeployBoard, State
 
 
 class ProjectStatesEndpoint(BaseAPIView):
+    """List the states of the project published under ``anchor``, excluding the "Triage" state; no auth required."""
+
     permission_classes = [AllowAny]
 
     def get(self, request, anchor):

@@ -45,11 +45,13 @@ from plane.authentication.adapter.base import Adapter
 
 
 def _addr(ip):
+    """Build a single getaddrinfo-style result tuple for an IP string."""
     family = 6 if ":" in ip else 2
     return (family, None, None, None, (ip, 0))
 
 
 def _resp(status_code=200, headers=None, content=b"OK"):
+    """Build a mock requests.Response with the given status, headers and body."""
     resp = MagicMock(spec=requests.Response)
     resp.status_code = status_code
     resp.headers = headers or {}
@@ -57,6 +59,7 @@ def _resp(status_code=200, headers=None, content=b"OK"):
     return resp
 
 
+# Error message raised by the IP validators when a target is internal.
 _BLOCKED = "Access to private/internal networks is not allowed"
 
 
@@ -66,6 +69,8 @@ _BLOCKED = "Access to private/internal networks is not allowed"
 # ---------------------------------------------------------------------------
 @pytest.mark.unit
 class TestWebhookUrlValidation:
+    """validate_url rejects webhook hosts resolving to internal ranges and accepts public ones."""
+
     @pytest.mark.parametrize(
         "ip",
         [
@@ -105,7 +110,10 @@ class TestWebhookUrlValidation:
 # ---------------------------------------------------------------------------
 @pytest.mark.unit
 class TestWebhookPatchContextGuard:
+    """WebhookSerializer's request-host guard runs when ``request`` is in the context."""
+
     def _serializer_with_request(self, host):
+        """WebhookSerializer whose context request reports ``host`` as the instance host."""
         from plane.app.serializers import WebhookSerializer
 
         request = MagicMock()
@@ -134,6 +142,8 @@ class TestWebhookPatchContextGuard:
 # ---------------------------------------------------------------------------
 @pytest.mark.unit
 class TestWebhookRebinding:
+    """pinned_fetch connects to the validated IP literal, defeating DNS rebinding."""
+
     @patch("plane.utils.url_security.requests.Session")
     @patch("plane.utils.url_security.resolve_and_validate")
     def test_connection_pinned_to_validated_ip(self, mock_resolve, mock_session_cls):
@@ -165,6 +175,8 @@ class TestWebhookRebinding:
 # ---------------------------------------------------------------------------
 @pytest.mark.unit
 class TestWebhookRedirect:
+    """Webhook delivery returns 3xx responses as-is instead of following them."""
+
     @patch("plane.utils.url_security.requests.Session")
     @patch("plane.utils.url_security.resolve_and_validate")
     def test_webhook_does_not_follow_redirects(self, mock_resolve, mock_session_cls):
@@ -192,6 +204,8 @@ class TestWebhookRedirect:
 # ---------------------------------------------------------------------------
 @pytest.mark.unit
 class TestFaviconRedirect:
+    """Favicon fetch falls back to the default icon when a redirect hop is internal."""
+
     @patch("plane.utils.url_security.requests.Session")
     @patch("plane.utils.url_security.resolve_and_validate")
     @patch("plane.bgtasks.work_item_link_task.socket.getaddrinfo")
@@ -224,6 +238,8 @@ class TestFaviconRedirect:
 # ---------------------------------------------------------------------------
 @pytest.mark.unit
 class TestFaviconRebinding:
+    """Favicon fetch falls back to the default icon when the host rebinds to an internal IP."""
+
     @patch("plane.utils.url_security.requests.Session")
     @patch("plane.utils.url_security.resolve_and_validate")
     @patch("plane.bgtasks.work_item_link_task.socket.getaddrinfo")
@@ -250,7 +266,10 @@ class TestFaviconRebinding:
 # ---------------------------------------------------------------------------
 @pytest.mark.unit
 class TestOAuthAvatarSSRF:
+    """OAuth avatar download refuses internal targets and uses the pinned SSRF-safe client."""
+
     def _adapter(self):
+        """Base authentication Adapter with a mocked request (provider name is arbitrary)."""
         return Adapter(request=MagicMock(), provider="gitea")
 
     @patch("plane.utils.url_security.resolve_and_validate")

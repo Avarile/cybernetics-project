@@ -2,6 +2,12 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 # See the LICENSE file for details.
 
+"""Public endpoints for published projects: DeployBoard settings, anchor lookup and members.
+
+A DeployBoard row (``entity_name="project"``) marks a project as published and gives it the
+public ``anchor`` used in space URLs.
+"""
+
 # Django imports
 from django.db.models import Exists, OuterRef
 
@@ -17,6 +23,8 @@ from plane.db.models import Project, DeployBoard, ProjectMember
 
 
 class ProjectDeployBoardPublicSettingsEndpoint(BaseAPIView):
+    """Return the DeployBoard (publish settings) for ``anchor``; no auth required."""
+
     permission_classes = [AllowAny]
 
     def get(self, request, anchor):
@@ -26,6 +34,12 @@ class ProjectDeployBoardPublicSettingsEndpoint(BaseAPIView):
 
 
 class WorkspaceProjectDeployBoardEndpoint(BaseAPIView):
+    """Intended to list the published projects of a workspace.
+
+    Note: the route passes ``slug`` while ``get`` expects ``anchor``, and ``deploy_board`` is
+    assigned the queryset's ``values_list`` method (never called), so this endpoint does not work as written.
+    """
+
     permission_classes = [AllowAny]
 
     def get(self, request, anchor):
@@ -52,6 +66,8 @@ class WorkspaceProjectDeployBoardEndpoint(BaseAPIView):
 
 
 class WorkspaceProjectAnchorEndpoint(BaseAPIView):
+    """Return the project DeployBoard (including its anchor) for a workspace slug + project id; no auth required."""
+
     permission_classes = [AllowAny]
 
     def get(self, request, slug, project_id):
@@ -63,6 +79,8 @@ class WorkspaceProjectAnchorEndpoint(BaseAPIView):
 
 
 class ProjectMembersEndpoint(BaseAPIView):
+    """List active members (id, display name, avatar) of the project published under ``anchor``; no auth required."""
+
     permission_classes = [AllowAny]
 
     def get(self, request, anchor):

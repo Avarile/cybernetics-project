@@ -2,6 +2,13 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 # See the LICENSE file for details.
 
+"""Instance-admin ("god mode") account endpoints.
+
+Covers managing InstanceAdmin rows, the first-run admin sign-up, admin sign-in/sign-out
+(form posts that answer with redirects to the admin app), and the ``me``/session lookups.
+Routes are defined in ``plane/license/urls.py`` under ``/api/instances/admins/``.
+"""
+
 # Python imports
 from urllib.parse import urlencode, urljoin
 import uuid
@@ -43,11 +50,17 @@ from plane.utils.path_validator import get_safe_redirect_url
 
 
 class InstanceAdminEndpoint(BaseAPIView):
+    """List, add and remove instance admins; restricted to existing instance admins."""
+
     permission_classes = [InstanceAdminPermission]
 
     @invalidate_cache(path="/api/instances/", user=False)
     # Create an instance admin
     def post(self, request):
+        """Make an existing user (looked up by ``email``) an instance admin with ``role`` (default 20).
+
+        Clears the cached ``/api/instances/`` response. Raises ``User.DoesNotExist`` if no user has that email.
+        """
         email = request.data.get("email", False)
         role = request.data.get("role", 20)
 
@@ -70,6 +83,7 @@ class InstanceAdminEndpoint(BaseAPIView):
 
     @cache_response(60 * 60 * 2, user=False)
     def get(self, request):
+        """Return all admins of the instance (response cached for 2 hours)."""
         instance = Instance.objects.first()
         if instance is None:
             return Response(
@@ -82,16 +96,30 @@ class InstanceAdminEndpoint(BaseAPIView):
 
     @invalidate_cache(path="/api/instances/", user=False)
     def delete(self, request, pk):
+        """Remove the InstanceAdmin row ``pk`` from the instance."""
         instance = Instance.objects.first()
         InstanceAdmin.objects.filter(instance=instance, pk=pk).delete()
         return Response(status=status.HTTP_204_NO_CONTENT)
 
 
 class InstanceAdminSignUpEndpoint(View):
+    """First-run setup: create the very first instance admin from a form post.
+
+    This is a plain Django ``View``, so ``permission_classes`` is not enforced by DRF; access
+    control comes from the "no admin yet" guards in ``post``. Errors are reported by
+    redirecting to the admin app with error details in the query string.
+    """
+
     permission_classes = [AllowAny]
 
     @invalidate_cache(path="/api/instances/", user=False)
     def post(self, request):
+        """Validate the form, create the user, Profile and InstanceAdmin, mark setup done and log in.
+
+        Refuses if setup is already done or any admin exists. The final check-and-create runs
+        under a row lock on the Instance to prevent two concurrent sign-ups. Redirects to
+        ``general/`` of the admin app on success.
+        """
         # Check instance first (outside the transaction — no need to lock yet)
         instance = Instance.objects.first()
         if instance is None:
@@ -192,6 +220,7 @@ class InstanceAdminSignUpEndpoint(View):
             )
             return HttpResponseRedirect(url)
         else:
+            # Require a zxcvbn strength score of at least 3 (0-4 scale).
             results = zxcvbn(password)
             if results["score"] < 3:
                 exc = AuthenticationException(
@@ -267,10 +296,20 @@ class InstanceAdminSignUpEndpoint(View):
 
 
 class InstanceAdminSignInEndpoint(View):
+    """Sign in an instance admin with email and password from a form post.
+
+    Plain Django ``View``: the checks in ``post`` (not ``permission_classes``) gate access.
+    """
+
     permission_classes = [AllowAny]
 
     @invalidate_cache(path="/api/instances/", user=False)
     def post(self, request):
+        """Authenticate the user, ensure they are an admin of this instance, then start an admin session.
+
+        Updates last-login tracking fields and redirects to the admin app; failures redirect with
+        an error code in the query string.
+        """
         # Check instance first
         instance = Instance.objects.first()
         if instance is None:
@@ -386,6 +425,8 @@ class InstanceAdminSignInEndpoint(View):
 
 
 class InstanceAdminUserMeEndpoint(BaseAPIView):
+    """Return the profile of the signed-in instance admin."""
+
     permission_classes = [InstanceAdminPermission]
 
     def get(self, request):
@@ -394,9 +435,12 @@ class InstanceAdminUserMeEndpoint(BaseAPIView):
 
 
 class InstanceAdminUserSessionEndpoint(BaseAPIView):
+    """Report whether the caller has an authenticated admin session (open to anyone)."""
+
     permission_classes = [AllowAny]
 
     def get(self, request):
+        """Return ``{"is_authenticated": True, "user": ...}`` for an admin session, else ``{"is_authenticated": False}``."""
         if request.user.is_authenticated and InstanceAdmin.objects.filter(user=request.user).exists():
             serializer = InstanceAdminMeSerializer(request.user)
             data = {"is_authenticated": True}
@@ -407,9 +451,15 @@ class InstanceAdminUserSessionEndpoint(BaseAPIView):
 
 
 class InstanceAdminSignOutEndpoint(View):
+    """Log the admin out and redirect back to the admin app (plain ``View``; ``permission_classes`` is not enforced)."""
+
     permission_classes = [InstanceAdminPermission]
 
     def post(self, request):
+        """Record logout IP/time on the user, end the Django session and redirect.
+
+        Any error (e.g. anonymous request) still results in a redirect to the admin app.
+        """
         # Get user
         try:
             user = User.objects.get(pk=request.user.id)

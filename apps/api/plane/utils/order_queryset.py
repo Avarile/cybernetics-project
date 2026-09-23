@@ -2,6 +2,14 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 # See the LICENSE file for details.
 
+"""
+Safe, semantic ordering for querysets built from user-supplied ``order_by``.
+
+Provides per-endpoint allowlists plus ``sanitize_order_by`` to block ORM
+order_by injection, and ``order_issue_queryset`` which applies issue ordering
+with custom rules for priority, state group and many-to-many fields.
+"""
+
 from django.db.models import Case, CharField, Min, Value, When
 
 # Custom ordering for priority and state
@@ -102,11 +110,20 @@ def sanitize_order_by(value, allowed_fields, default="-created_at"):
 
 
 def order_issue_queryset(issue_queryset, order_by_param="-created_at"):
+    """
+    Order an issue queryset by a (sanitized) user-supplied field.
+
+    Returns ``(queryset, order_by_param)`` where the returned param may name an
+    annotation (``priority_order``, ``state_order``, ``min_values``) instead of
+    the original field, so paginators can order by the same key.
+    """
     # Reject any field that is not in the allowlist before building the queryset.
     # An unrecognised value is silently replaced with the safe default so callers
     # receive consistent output rather than an ORM error or data leak.
     order_by_param = sanitize_order_by(order_by_param, ISSUE_ORDER_BY_ALLOWLIST, default="-created_at")
-    # Priority Ordering
+    # Priority Ordering: map each priority to its index in PRIORITY_ORDER
+    # (urgent=0 ... none=4). Note the returned param flips the sign relative
+    # to the requested one.
     if order_by_param == "priority" or order_by_param == "-priority":
         issue_queryset = issue_queryset.annotate(
             priority_order=Case(
@@ -115,7 +132,8 @@ def order_issue_queryset(issue_queryset, order_by_param="-created_at"):
             )
         ).order_by("priority_order", "-created_at")
         order_by_param = "priority_order" if order_by_param.startswith("-") else "-priority_order"
-    # State Ordering
+    # State Ordering: rank by state group workflow order (backlog -> cancelled);
+    # states with an unknown group sort last via the default value
     elif order_by_param in ["state__group", "-state__group"]:
         state_order = STATE_ORDER if order_by_param in ["state__name", "state__group"] else STATE_ORDER[::-1]
         issue_queryset = issue_queryset.annotate(
@@ -126,7 +144,8 @@ def order_issue_queryset(issue_queryset, order_by_param="-created_at"):
             )
         ).order_by("state_order", "-created_at")
         order_by_param = "-state_order" if order_by_param.startswith("-") else "state_order"
-    # assignee and label ordering
+    # assignee and label ordering: these are multi-valued relations, so order by
+    # the minimum related value per issue to avoid duplicate rows from the join
     elif order_by_param in [
         "labels__name",
         "assignees__first_name",

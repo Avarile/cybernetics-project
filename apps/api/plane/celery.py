@@ -2,6 +2,16 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 # See the LICENSE file for details.
 
+"""
+Celery application for the Plane API.
+
+Creates the ``app`` Celery instance (configured from Django settings keys
+prefixed with ``CELERY_``), defines the periodic ``beat_schedule`` for
+recurring maintenance tasks, wires JSON log formatting for worker/task
+loggers, and autodiscovers tasks from installed Django apps (e.g.
+``plane.bgtasks``). Beat uses the django_celery_beat database scheduler.
+"""
+
 # Python imports
 import os
 import logging
@@ -19,11 +29,13 @@ from plane.settings.redis import redis_instance
 # Set the default Django settings module for the 'celery' program.
 os.environ.setdefault("DJANGO_SETTINGS_MODULE", "plane.settings.production")
 
+# Module-level Redis client created at worker import time.
 ri = redis_instance()
 
 # Configurable metrics push interval (in minutes)
 # Default: 360 (6 hours), set to 5 for development/testing
 def _get_metrics_push_interval_minutes() -> int:
+    """Read METRICS_PUSH_INTERVAL_MINUTES from env, falling back to 360 on invalid/out-of-range values."""
     raw = os.environ.get("METRICS_PUSH_INTERVAL_MINUTES", "360")
     try:
         value = int(raw)
@@ -41,6 +53,8 @@ app = Celery("plane")
 # pickle the object when using Windows.
 app.config_from_object("django.conf:settings", namespace="CELERY")
 
+# Periodic tasks run by celery beat. Daily jobs are staggered (UTC) so they
+# don't all hit the database at the same time.
 app.conf.beat_schedule = {
     # Intra day recurring jobs
     "check-every-five-minutes-to-send-email-notifications": {
@@ -98,6 +112,7 @@ app.conf.beat_schedule = {
 # Setup logging
 @after_setup_logger.connect
 def setup_loggers(logger, *args, **kwargs):
+    """Attach a JSON-formatted stdout handler to the Celery worker logger."""
     formatter = JsonFormatter('"%(levelname)s %(asctime)s %(module)s %(name)s %(message)s')
     handler = logging.StreamHandler()
     handler.setFormatter(fmt=formatter)
@@ -106,6 +121,7 @@ def setup_loggers(logger, *args, **kwargs):
 
 @after_setup_task_logger.connect
 def setup_task_loggers(logger, *args, **kwargs):
+    """Attach a JSON-formatted stdout handler to per-task loggers."""
     formatter = JsonFormatter('"%(levelname)s %(asctime)s %(module)s %(name)s %(message)s')
     handler = logging.StreamHandler()
     handler.setFormatter(fmt=formatter)
@@ -115,4 +131,5 @@ def setup_task_loggers(logger, *args, **kwargs):
 # Load task modules from all registered Django app configs.
 app.autodiscover_tasks()
 
+# Store/read periodic task schedules in the database (django_celery_beat tables).
 app.conf.beat_scheduler = "django_celery_beat.schedulers.DatabaseScheduler"

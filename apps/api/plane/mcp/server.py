@@ -2,6 +2,13 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 # See the LICENSE file for details.
 
+"""Construction of the Plane MCP server.
+
+Defines the server instructions shown to AI clients, the ToolRegistry decorator used by
+``plane.mcp.tools`` to register tools, DNS-rebinding protection settings, and the
+stateless streamable-HTTP ASGI app mounted at ``MCP_PATH``.
+"""
+
 # Python imports
 from typing import Callable, Optional
 from urllib.parse import urlparse
@@ -42,6 +49,10 @@ class ToolRegistry:
         idempotent: bool = False,
         title: Optional[str] = None,
     ) -> Callable:
+        """Return a decorator registering the function as an MCP tool with the given hints.
+
+        When the server runs in read-only mode, non-read-only tools are silently not registered.
+        """
         def decorator(fn):
             if self.read_only_mode and not read_only:
                 return fn
@@ -80,6 +91,7 @@ def transport_security() -> TransportSecuritySettings:
 
 
 def build_server() -> MCPServer:
+    """Create the MCPServer and register every tool from ``plane.mcp.tools``."""
     from plane.mcp.tools import register_all
 
     server = MCPServer(name="plane", title="Plane", instructions=INSTRUCTIONS, version="1.0.0")
@@ -88,6 +100,7 @@ def build_server() -> MCPServer:
 
 
 def build_http_app(server: MCPServer):
+    """Return the stateless, JSON-response streamable-HTTP ASGI app for ``server``."""
     return server.streamable_http_app(
         streamable_http_path=settings.MCP_PATH,
         stateless_http=True,

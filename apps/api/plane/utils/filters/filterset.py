@@ -2,6 +2,12 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 # See the LICENSE file for details.
 
+"""django-filter FilterSets used by ``ComplexFilterBackend`` for rich work item filtering.
+
+FilterSets here produce ``Q`` objects (``build_combined_q``) instead of filtered querysets,
+so the backend can combine leaves with and/or/not before touching the database.
+"""
+
 import copy
 
 from django.db import models
@@ -12,14 +18,20 @@ from plane.db.models import Issue
 
 
 class UUIDInFilter(filters.BaseInFilter, filters.UUIDFilter):
+    """Comma-separated list of UUIDs, for ``__in`` lookups."""
+
     pass
 
 
 class CharInFilter(filters.BaseInFilter, filters.CharFilter):
+    """Comma-separated list of strings, for ``__in`` lookups."""
+
     pass
 
 
 class BaseFilterSet(FilterSet):
+    """FilterSet that builds a single Q object and accepts ``<name>__exact`` aliases."""
+
     @classmethod
     def get_filters(cls):
         """
@@ -52,7 +64,7 @@ class BaseFilterSet(FilterSet):
         Returns:
             Q object representing all filter conditions combined.
         """
-        # Ensure form validation has occurred
+        # Ensure form validation has occurred (accessing .errors triggers form cleaning)
         self.errors
 
         combined_q = Q()
@@ -122,6 +134,12 @@ class BaseFilterSet(FilterSet):
 
 
 class IssueFilterSet(BaseFilterSet):
+    """Allow-listed filters for work items (Issue) used by rich-filter list endpoints.
+
+    Relation filters go through custom methods so rows of soft-deleted relation
+    (through) records are not matched.
+    """
+
     # Custom filter methods to handle soft delete exclusion for relations
 
     assignee_id = filters.UUIDFilter(method="filter_assignee_id")
@@ -157,6 +175,7 @@ class IssueFilterSet(BaseFilterSet):
     subscriber_id = filters.UUIDFilter(method="filter_subscriber_id")
     subscriber_id__in = UUIDInFilter(method="filter_subscriber_id_in", lookup_expr="in")
 
+    # Meta.fields auto-generates filters named "<field>" (exact) and "<field>__<lookup>"
     class Meta:
         model = Issue
         fields = {

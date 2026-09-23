@@ -2,6 +2,8 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 # See the LICENSE file for details.
 
+"""Recently visited entities (issues, pages, projects) for the workspace home page."""
+
 # Third party imports
 from rest_framework import status
 from rest_framework.response import Response
@@ -15,6 +17,8 @@ from plane.app.permissions import allow_permission, ROLE
 
 
 class UserRecentVisitViewSet(BaseViewSet):
+    """Read-only listing of the current user's recent visits in a workspace."""
+
     model = UserRecentVisit
     use_read_replica = True
 
@@ -23,6 +27,7 @@ class UserRecentVisitViewSet(BaseViewSet):
 
     @allow_permission([ROLE.ADMIN, ROLE.MEMBER, ROLE.GUEST], level="WORKSPACE")
     def list(self, request, slug):
+        """Return up to 20 recent visits, optionally filtered by `entity_name` query param."""
         user_recent_visits = UserRecentVisit.objects.filter(workspace__slug=slug, user=request.user)
 
         entity_name = request.query_params.get("entity_name")
@@ -30,6 +35,7 @@ class UserRecentVisitViewSet(BaseViewSet):
         if entity_name:
             user_recent_visits = user_recent_visits.filter(entity_name=entity_name)
 
+        # Only these entity types are surfaced, regardless of the requested filter.
         user_recent_visits = user_recent_visits.filter(entity_name__in=["issue", "page", "project"])
 
         serializer = WorkspaceRecentVisitSerializer(user_recent_visits[:20], many=True)

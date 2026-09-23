@@ -2,6 +2,15 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 # See the LICENSE file for details.
 
+"""MCP tools for listing, searching, reading, creating, updating and deleting work items.
+
+``list_work_items`` reads the DB directly (see ``services.work_item_query``) because the
+public list endpoint does not support filters; the other tools go through the REST loopback.
+
+Note: each tool function's docstring is sent to MCP clients as the tool description,
+so edit those docstrings as user-facing text.
+"""
+
 # Python imports
 from typing import Annotated, Literal, Optional
 from uuid import UUID
@@ -199,6 +208,7 @@ async def delete_work_item(workspace_slug: WorkspaceSlug, project_id: ProjectId,
 
 
 def register(tool) -> None:
+    """Register this module's tools with their read-only/destructive/idempotent hints."""
     tool(read_only=True, title="List work items")(list_work_items)
     tool(read_only=True, title="Search work items")(search_work_items)
     tool(read_only=True, title="Get work item")(get_work_item)

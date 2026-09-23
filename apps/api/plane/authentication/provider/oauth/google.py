@@ -2,6 +2,13 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 # See the LICENSE file for details.
 
+"""
+Google OAuth2 provider.
+
+Reads GOOGLE_CLIENT_ID/GOOGLE_CLIENT_SECRET from instance config or env. Used by
+the ``/auth/google/`` (app) and ``/auth/spaces/google/`` (space) views.
+"""
+
 # Python imports
 import os
 from datetime import datetime
@@ -19,12 +26,18 @@ from plane.authentication.adapter.error import (
 
 
 class GoogleOAuthProvider(OauthAdapter):
+    """OAuth2 adapter for Google accounts."""
+
     token_url = "https://oauth2.googleapis.com/token"
     userinfo_url = "https://www.googleapis.com/oauth2/v2/userinfo"
     scope = "https://www.googleapis.com/auth/userinfo.email https://www.googleapis.com/auth/userinfo.profile"
     provider = "google"
 
     def __init__(self, request, code=None, state=None, callback=None):
+        """Validate Google config and build the authorize URL.
+
+        ``access_type=offline`` + ``prompt=consent`` ask Google to also return a refresh token.
+        """
         (GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET) = get_configuration_value(
             [
                 {
@@ -74,6 +87,7 @@ class GoogleOAuthProvider(OauthAdapter):
         )
 
     def set_token_data(self):
+        """Exchange the authorization code for tokens and store them."""
         data = {
             "code": self.code,
             "client_id": self.client_id,
@@ -101,6 +115,7 @@ class GoogleOAuthProvider(OauthAdapter):
         )
 
     def set_user_data(self):
+        """Load the Google profile (email, name, picture) into ``user_data``."""
         user_info_response = self.get_user_response()
         user_data = {
             "email": user_info_response.get("email"),

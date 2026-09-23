@@ -2,6 +2,12 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 # See the LICENSE file for details.
 
+"""Base DRF view for the instance-admin API.
+
+Provides session authentication, the InstanceAdminPermission default, per-user timezone
+activation, filtering/pagination helpers and uniform JSON error handling.
+"""
+
 # Python imports
 import zoneinfo
 from django.conf import settings
@@ -32,6 +38,7 @@ class TimezoneMixin:
     """
 
     def initial(self, request, *args, **kwargs):
+        """Activate the user's timezone for this request (or reset to default for anonymous users)."""
         super().initial(request, *args, **kwargs)
         if request.user.is_authenticated:
             timezone.activate(zoneinfo.ZoneInfo(request.user.user_timezone))
@@ -40,6 +47,12 @@ class TimezoneMixin:
 
 
 class BaseAPIView(TimezoneMixin, APIView, BasePaginator):
+    """Base class for all ``/api/instances/`` endpoints.
+
+    Defaults to session auth and InstanceAdminPermission; subclasses override
+    ``permission_classes`` for public endpoints.
+    """
+
     permission_classes = [InstanceAdminPermission]
 
     filter_backends = (DjangoFilterBackend, SearchFilter)
@@ -51,6 +64,7 @@ class BaseAPIView(TimezoneMixin, APIView, BasePaginator):
     search_fields = []
 
     def filter_queryset(self, queryset):
+        """Apply every configured filter backend (DjangoFilter, search) to ``queryset``."""
         for backend in list(self.filter_backends):
             queryset = backend().filter_queryset(self.request, queryset, self)
         return queryset
@@ -64,6 +78,7 @@ class BaseAPIView(TimezoneMixin, APIView, BasePaginator):
             response = super().handle_exception(exc)
             return response
         except Exception as e:
+            # Map common Django/DB errors to 4xx responses; anything else is logged and returned as 500.
             if isinstance(e, IntegrityError):
                 return Response(
                     {"error": "The payload is not valid"},
@@ -95,6 +110,7 @@ class BaseAPIView(TimezoneMixin, APIView, BasePaginator):
             )
 
     def dispatch(self, request, *args, **kwargs):
+        """Run the view, converting uncaught exceptions to error responses; logs query count when DEBUG."""
         try:
             response = super().dispatch(request, *args, **kwargs)
 
@@ -110,10 +126,12 @@ class BaseAPIView(TimezoneMixin, APIView, BasePaginator):
 
     @property
     def fields(self):
+        """Comma-separated ``?fields=`` query param as a list, or None when absent."""
         fields = [field for field in self.request.GET.get("fields", "").split(",") if field]
         return fields if fields else None
 
     @property
     def expand(self):
+        """Comma-separated ``?expand=`` query param as a list, or None when absent."""
         expand = [expand for expand in self.request.GET.get("expand", "").split(",") if expand]
         return expand if expand else None

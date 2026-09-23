@@ -2,6 +2,12 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 # See the LICENSE file for details.
 
+"""MCP tools for project cycles (sprints) and their work items, backed by the ``/api/v1`` cycle endpoints.
+
+Note: each tool function's docstring is sent to MCP clients as the tool description,
+so edit those docstrings as user-facing text.
+"""
+
 # Python imports
 from typing import Annotated, Optional
 from uuid import UUID
@@ -21,6 +27,7 @@ CycleDate = Annotated[
 
 
 def cycle_path(workspace_slug: str, project_id: UUID, cycle_id: Optional[UUID] = None) -> str:
+    """Relative API path of a project's cycles, or of one cycle when ``cycle_id`` is given."""
     base = f"{project_path(workspace_slug, project_id)}/cycles"
     return f"{base}/{cycle_id}" if cycle_id else base
 
@@ -89,6 +96,7 @@ async def remove_work_item_from_cycle(
 
 
 def register(tool) -> None:
+    """Register this module's tools with their read-only/destructive/idempotent hints."""
     tool(read_only=True, title="List cycles")(list_cycles)
     tool(read_only=True, title="Get cycle")(get_cycle)
     tool(read_only=False, title="Create cycle")(create_cycle)

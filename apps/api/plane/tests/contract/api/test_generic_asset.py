@@ -75,9 +75,11 @@ class TestGenericAssetCrossWorkspaceIDOR:
     """A PAT holder must not reach assets in a workspace they don't belong to."""
 
     def detail_url(self, slug, asset_id):
+        """Build the public asset detail URL for ``asset_id`` in workspace ``slug``."""
         return f"/api/v1/workspaces/{slug}/assets/{asset_id}/"
 
     def list_url(self, slug):
+        """Build the public asset upload/list URL for workspace ``slug``."""
         return f"/api/v1/workspaces/{slug}/assets/"
 
     @pytest.mark.django_db
@@ -86,6 +88,7 @@ class TestGenericAssetCrossWorkspaceIDOR:
         presigned download URL."""
         url = self.detail_url(victim_workspace.slug, victim_asset.id)
 
+        # Stub S3 so the test never talks to real storage and we can assert no URL is minted.
         with mock.patch("plane.api.views.asset.S3Storage") as mock_storage:
             mock_storage.return_value.generate_presigned_url.return_value = "https://signed.example/download"
             response = api_key_client.get(url)

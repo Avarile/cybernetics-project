@@ -2,6 +2,13 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 # See the LICENSE file for details.
 
+"""Unit tests for formula-injection protection in both XLSX formatters.
+
+Covers the porter XLSXFormatter (issue exports) and the schema-based exporter
+XLSXFormatter: user-controlled strings and headers must be stored as quote-prefixed
+text, never as formula cells, while safe strings and numbers are left intact.
+"""
+
 from io import BytesIO
 
 import pytest
@@ -28,6 +35,7 @@ class TestPorterXLSXFormatterSanitization:
     """XLSX issue exports must not store user-controlled values as formula cells."""
 
     def test_formula_payload_is_stored_as_text(self):
+        """A =HYPERLINK(...) payload is stored as text with a leading quote."""
         content = PorterXLSXFormatter().encode([{"name": HYPERLINK_PAYLOAD}])
         ws = _load_cells(content)
         cell = ws.cell(row=2, column=1)
@@ -36,6 +44,7 @@ class TestPorterXLSXFormatterSanitization:
 
     @pytest.mark.parametrize("trigger", FORMULA_TRIGGERS)
     def test_all_formula_trigger_characters_are_escaped(self, trigger):
+        """Every character in FORMULA_TRIGGERS causes the value to be escaped."""
         payload = trigger + "1+2"
         content = PorterXLSXFormatter().encode([{"name": payload}])
         ws = _load_cells(content)
@@ -56,6 +65,7 @@ class TestPorterXLSXFormatterSanitization:
         assert cell.data_type == "n"
 
     def test_list_value_joining_to_formula_is_escaped(self):
+        """List values are joined with ", " before sanitizing, so the joined string is escaped."""
         content = PorterXLSXFormatter().encode([{"labels": ["=cmd", "bug"]}])
         ws = _load_cells(content)
         cell = ws.cell(row=2, column=1)
@@ -71,11 +81,15 @@ class TestPorterXLSXFormatterSanitization:
 
 
 class _FakeField:
+    """Minimal stand-in for a serializer field; only `label` is read by the formatter."""
+
     def __init__(self, label=None):
         self.label = label
 
 
 class _FakeSchema:
+    """Minimal stand-in for an export schema; the formatter reads headers from _declared_fields."""
+
     _declared_fields = {
         "name": _FakeField("Name"),
         "estimate": _FakeField("=Estimate"),

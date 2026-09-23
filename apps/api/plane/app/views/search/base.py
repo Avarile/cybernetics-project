@@ -2,6 +2,15 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 # See the LICENSE file for details.
 
+"""Workspace search endpoints.
+
+``GlobalSearchEndpoint`` powers the command-palette style search across
+workspaces, projects, issues, cycles, modules, views, pages and intake items.
+``SearchEndpoint`` powers smaller entity lookups such as @-mentions in the
+editor, optionally scoped to one project. All results are restricted to
+projects where the requester is a member.
+"""
+
 # Python imports
 import re
 
@@ -49,6 +58,7 @@ class GlobalSearchEndpoint(BaseAPIView):
     """
 
     def filter_workspaces(self, query, _slug, _project_id, _workspace_search):
+        """Workspaces the user belongs to whose name matches ``query``."""
         fields = ["name"]
         q = Q()
         if query:
@@ -62,6 +72,7 @@ class GlobalSearchEndpoint(BaseAPIView):
         )
 
     def filter_projects(self, query, slug, _project_id, _workspace_search):
+        """Non-archived projects in the workspace the user is an active member of."""
         fields = ["name", "identifier"]
         q = Q()
         if query:
@@ -81,6 +92,7 @@ class GlobalSearchEndpoint(BaseAPIView):
         )
 
     def filter_issues(self, query, slug, project_id, workspace_search):
+        """Issues matching by name, project identifier or numeric sequence id (max 100)."""
         fields = ["name", "sequence_id", "project__identifier"]
         q = Q()
         if query:
@@ -114,6 +126,7 @@ class GlobalSearchEndpoint(BaseAPIView):
         )[:100]
 
     def filter_cycles(self, query, slug, project_id, workspace_search):
+        """Cycles whose name matches ``query``."""
         fields = ["name"]
         q = Q()
         if query:
@@ -138,6 +151,7 @@ class GlobalSearchEndpoint(BaseAPIView):
         )
 
     def filter_modules(self, query, slug, project_id, workspace_search):
+        """Modules whose name matches ``query``."""
         fields = ["name"]
         q = Q()
         if query:
@@ -162,6 +176,8 @@ class GlobalSearchEndpoint(BaseAPIView):
         )
 
     def filter_pages(self, query, slug, project_id, workspace_search):
+        """Pages whose name matches ``query``, annotated with the ids/identifiers of
+        all projects they are linked to (pages can belong to several projects)."""
         fields = ["name"]
         q = Q()
         if query:
@@ -195,6 +211,7 @@ class GlobalSearchEndpoint(BaseAPIView):
         )
 
         if workspace_search == "false" and project_id:
+            # Restrict to pages linked to the requested project via ProjectPage
             project_subquery = ProjectPage.objects.filter(page_id=OuterRef("id"), project_id=project_id).values_list(
                 "project_id", flat=True
             )[:1]
@@ -208,6 +225,7 @@ class GlobalSearchEndpoint(BaseAPIView):
         )
 
     def filter_views(self, query, slug, project_id, workspace_search):
+        """Saved issue views whose name matches ``query``."""
         fields = ["name"]
         q = Q()
         if query:
@@ -232,6 +250,7 @@ class GlobalSearchEndpoint(BaseAPIView):
         )
 
     def filter_intakes(self, query, slug, project_id, workspace_search):
+        """Intake issues that are snoozed or pending triage (max 100)."""
         fields = ["name", "sequence_id", "project__identifier"]
         q = Q()
         if query:
@@ -250,6 +269,7 @@ class GlobalSearchEndpoint(BaseAPIView):
             project__project_projectmember__is_active=True,
             project__archived_at__isnull=True,
             workspace__slug=slug,
+        # Intake status 0 = Snoozed, -2 = Pending (see IntakeIssue.status choices)
         ).filter(models.Q(issue_intake__status=0) | models.Q(issue_intake__status=-2))
 
         if workspace_search == "false" and project_id:
@@ -269,6 +289,13 @@ class GlobalSearchEndpoint(BaseAPIView):
         )
 
     def get(self, request, slug):
+        """Run the search for each requested entity type.
+
+        Query params: ``search``, ``entities`` (comma-separated subset of the
+        mapper keys; default all), ``workspace_search`` ("false" + ``project_id``
+        limits project-scoped entities to that project). Returns
+        ``{"results": {entity: [...]}}``.
+        """
         query = request.query_params.get("search", False)
         entities_param = request.query_params.get("entities")
         workspace_search = request.query_params.get("workspace_search", "false")
@@ -303,9 +330,17 @@ class GlobalSearchEndpoint(BaseAPIView):
 
 
 class SearchEndpoint(BaseAPIView):
+    """Lightweight entity lookup (mentions, projects, issues, cycles, modules, pages)."""
+
     permission_classes = (WorkspaceUserPermission,)
 
     def get(self, request, slug):
+        """Search the entity types in ``query_type`` (comma-separated, default
+        ``user_mention``), returning up to ``count`` (default 5) rows each.
+
+        With ``project_id`` the search is scoped to that project; otherwise it
+        spans the workspace. Response is keyed by query type.
+        """
         query = request.query_params.get("query", False)
         query_types = request.query_params.get("query_type", "user_mention").split(",")
         query_types = [qt.strip() for qt in query_types]
@@ -314,6 +349,7 @@ class SearchEndpoint(BaseAPIView):
 
         response_data = {}
 
+        # Project-scoped search
         if project_id:
             for query_type in query_types:
                 if query_type == "user_mention":
@@ -336,6 +372,8 @@ class SearchEndpoint(BaseAPIView):
                             member__is_bot=False,
                             project_id=project_id,
                         )
+                        # Uploaded avatar assets are served via the static asset URL;
+                        # fall back to the legacy ``avatar`` URL field otherwise.
                         .annotate(
                             member__avatar_url=Case(
                                 When(
@@ -375,6 +413,7 @@ class SearchEndpoint(BaseAPIView):
                     projects = (
                         Project.objects.filter(
                             q,
+                            # Projects the user is a member of, or public projects (network=2)
                             Q(project_projectmember__member=self.request.user) | Q(network=2),
                             workspace__slug=slug,
                         )
@@ -436,6 +475,7 @@ class SearchEndpoint(BaseAPIView):
                             workspace__slug=slug,
                             project_id=project_id,
                         )
+                        # Derive cycle status from its date range
                         .annotate(
                             status=Case(
                                 When(
@@ -512,6 +552,7 @@ class SearchEndpoint(BaseAPIView):
                             projects__project_projectmember__is_active=True,
                             projects__id=project_id,
                             workspace__slug=slug,
+                            # access 0 = public pages only
                             access=0,
                         )
                         .order_by("-created_at")
@@ -527,6 +568,7 @@ class SearchEndpoint(BaseAPIView):
                     response_data["page"] = list(pages)
             return Response(response_data, status=status.HTTP_200_OK)
 
+        # Workspace-wide search
         else:
             for query_type in query_types:
                 if query_type == "user_mention":
@@ -547,6 +589,8 @@ class SearchEndpoint(BaseAPIView):
                             workspace__slug=slug,
                             member__is_bot=False,
                         )
+                        # Uploaded avatar assets are served via the static asset URL;
+                        # fall back to the legacy ``avatar`` URL field otherwise.
                         .annotate(
                             member__avatar_url=Case(
                                 When(
@@ -580,6 +624,7 @@ class SearchEndpoint(BaseAPIView):
                     projects = (
                         Project.objects.filter(
                             q,
+                            # Projects the user is a member of, or public projects (network=2)
                             Q(project_projectmember__member=self.request.user) | Q(network=2),
                             workspace__slug=slug,
                         )
@@ -639,6 +684,7 @@ class SearchEndpoint(BaseAPIView):
                             project__project_projectmember__is_active=True,
                             workspace__slug=slug,
                         )
+                        # Derive cycle status from its date range
                         .annotate(
                             status=Case(
                                 When(

@@ -2,6 +2,16 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 # See the LICENSE file for details.
 
+"""Integrations with external services used by the editor UI.
+
+- AI assistant ("GPT") endpoints at project and workspace level that send a
+  task + prompt to the configured LLM provider.
+- Unsplash image search proxy used by the cover-image picker.
+
+Credentials come from instance configuration (``get_configuration_value``)
+with environment variable fallbacks.
+"""
+
 # Python import
 import os
 from typing import List, Dict, Tuple
@@ -32,6 +42,7 @@ class LLMProvider:
 
     @classmethod
     def get_config(cls) -> Dict[str, str | List[str]]:
+        """Return the provider's name, supported models and default model."""
         return {
             "name": cls.name,
             "models": cls.models,
@@ -40,12 +51,16 @@ class LLMProvider:
 
 
 class OpenAIProvider(LLMProvider):
+    """OpenAI models accepted in ``LLM_MODEL``."""
+
     name = "OpenAI"
     models = ["gpt-3.5-turbo", "gpt-4o-mini", "gpt-4o", "o1-mini", "o1-preview"]
     default_model = "gpt-4o-mini"
 
 
 class AnthropicProvider(LLMProvider):
+    """Anthropic models accepted in ``LLM_MODEL``."""
+
     name = "Anthropic"
     models = [
         "claude-3-5-sonnet-20240620",
@@ -61,11 +76,14 @@ class AnthropicProvider(LLMProvider):
 
 
 class GeminiProvider(LLMProvider):
+    """Gemini models accepted in ``LLM_MODEL``."""
+
     name = "Gemini"
     models = ["gemini-pro", "gemini-1.5-pro-latest", "gemini-pro-vision"]
     default_model = "gemini-pro"
 
 
+# Maps the ``LLM_PROVIDER`` setting (lower-cased) to its provider config.
 SUPPORTED_PROVIDERS = {
     "openai": OpenAIProvider,
     "anthropic": AnthropicProvider,
@@ -95,6 +113,7 @@ def get_llm_config() -> Tuple[str | None, str | None, str | None]:
         ]
     )
 
+    # Any misconfiguration is logged and reported as (None, None, None) so callers return a 400.
     provider = SUPPORTED_PROVIDERS.get(provider_key.lower())
     if not provider:
         log_exception(ValueError(f"Unsupported provider: {provider_key}"))
@@ -128,6 +147,7 @@ def get_llm_response(task, prompt, api_key: str, model: str, provider: str) -> T
         if provider.lower() == "gemini":
             model = f"gemini/{model}"
 
+        # Note: requests are sent through the OpenAI SDK client for every provider.
         client = OpenAI(api_key=api_key)
         chat_completion = client.chat.completions.create(
             model=model, messages=[{"role": "user", "content": final_text}]
@@ -146,8 +166,11 @@ def get_llm_response(task, prompt, api_key: str, model: str, provider: str) -> T
 
 
 class GPTIntegrationEndpoint(BaseAPIView):
+    """AI text generation for a project (e.g. from the work item editor)."""
+
     @allow_permission([ROLE.ADMIN, ROLE.MEMBER])
     def post(self, request, slug, project_id):
+        """Run ``task`` + ``prompt`` through the LLM and return text plus HTML (newlines -> ``<br/>``)."""
         api_key, model, provider = get_llm_config()
 
         if not api_key or not model or not provider:
@@ -182,8 +205,11 @@ class GPTIntegrationEndpoint(BaseAPIView):
 
 
 class WorkspaceGPTIntegrationEndpoint(BaseAPIView):
+    """AI text generation at workspace level (no project context)."""
+
     @allow_permission(allowed_roles=[ROLE.ADMIN, ROLE.MEMBER], level="WORKSPACE")
     def post(self, request, slug):
+        """Run ``task`` + ``prompt`` through the LLM and return text plus HTML (newlines -> ``<br/>``)."""
         api_key, model, provider = get_llm_config()
 
         if not api_key or not model or not provider:
@@ -213,7 +239,10 @@ class WorkspaceGPTIntegrationEndpoint(BaseAPIView):
 
 
 class UnsplashEndpoint(BaseAPIView):
+    """Proxy to the Unsplash API so the access key stays server-side."""
+
     def get(self, request):
+        """Search (``query``) or list Unsplash photos; returns ``[]`` if no access key is configured."""
         (UNSPLASH_ACCESS_KEY,) = get_configuration_value(
             [
                 {

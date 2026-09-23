@@ -2,6 +2,13 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 # See the LICENSE file for details.
 
+"""
+Email check endpoint for the web app login screen (``POST /auth/email-check/``).
+
+Tells the frontend whether the email belongs to an existing user and which
+login step to show next: "MAGIC_CODE" or "CREDENTIAL" (password).
+"""
+
 # Python imports
 import os
 
@@ -27,11 +34,17 @@ from plane.license.utils.instance_value import get_configuration_value
 
 
 class EmailCheckEndpoint(APIView):
+    """Public, throttled endpoint that decides the next login step for an email."""
+
     permission_classes = [AllowAny]
 
     throttle_classes = [AuthenticationThrottle]
 
     def post(self, request):
+        """Validate ``email`` and return ``{"existing": bool, "status": "MAGIC_CODE" | "CREDENTIAL"}``.
+
+        Returns 400 with an auth error if the instance is not set up or the email is missing/invalid.
+        """
         # Check instance configuration
         instance = Instance.objects.first()
         if instance is None or not instance.is_setup_done:
@@ -80,6 +93,7 @@ class EmailCheckEndpoint(APIView):
         existing_user = User.objects.filter(email=email).first()
 
         # If existing user
+        # Existing users go to magic code only if they never set a password and magic login is available.
         if existing_user:
             # Return response
             return Response(

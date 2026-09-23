@@ -2,6 +2,18 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 # See the LICENSE file for details.
 
+"""Saved issue views (filters/display presets) at workspace and project level.
+
+- ``WorkspaceViewViewSet``: CRUD for workspace-wide views (``project`` is null).
+- ``WorkspaceViewIssuesViewSet``: paginated, filtered issue list across all projects
+  of a workspace the user can see (backs workspace views / "All issues").
+- ``IssueViewViewSet``: CRUD for project views.
+- ``IssueViewFavoriteViewSet``: favorite / unfavorite project views.
+
+Views have ``access`` (1 = public to members, otherwise private to the owner) and
+can be locked; only the owner may edit a view.
+"""
+
 import copy
 
 # Django imports
@@ -50,10 +62,13 @@ from plane.utils.filters import IssueFilterSet
 
 
 class WorkspaceViewViewSet(BaseViewSet):
+    """CRUD for workspace-level saved views."""
+
     serializer_class = IssueViewSerializer
     model = IssueView
 
     def perform_create(self, serializer):
+        """Attach the workspace from the URL and make the requester the owner."""
         workspace = Workspace.objects.get(slug=self.kwargs.get("slug"))
         serializer.save(workspace_id=workspace.id, owned_by=self.request.user)
 
@@ -63,6 +78,7 @@ class WorkspaceViewViewSet(BaseViewSet):
             .get_queryset()
             .filter(workspace__slug=self.kwargs.get("slug"))
             .filter(project__isnull=True)
+            # Own views plus public (access=1) views
             .filter(Q(owned_by=self.request.user) | Q(access=1))
             .order_by(
                 sanitize_order_by(
@@ -76,8 +92,10 @@ class WorkspaceViewViewSet(BaseViewSet):
 
     @allow_permission(allowed_roles=[ROLE.ADMIN, ROLE.MEMBER, ROLE.GUEST], level="WORKSPACE")
     def list(self, request, slug):
+        """List visible workspace views; ``?fields=a,b`` limits serialized fields."""
         queryset = self.get_queryset()
         fields = [field for field in request.GET.get("fields", "").split(",") if field]
+        # Workspace guests (role=5) only see views they own
         if WorkspaceMember.objects.filter(workspace__slug=slug, member=request.user, role=5, is_active=True).exists():
             queryset = queryset.filter(owned_by=request.user)
         views = IssueViewSerializer(queryset, many=True, fields=fields if fields else None).data
@@ -85,6 +103,10 @@ class WorkspaceViewViewSet(BaseViewSet):
 
     @allow_permission(allowed_roles=[], level="WORKSPACE", creator=True, model=IssueView)
     def partial_update(self, request, slug, pk):
+        """Update a workspace view; rejected if locked or if the requester is not the owner.
+
+        The row is locked with ``select_for_update`` for the duration of the update.
+        """
         with transaction.atomic():
             workspace_view = IssueView.objects.select_for_update().get(pk=pk, workspace__slug=slug)
 
@@ -106,6 +128,7 @@ class WorkspaceViewViewSet(BaseViewSet):
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
     def retrieve(self, request, slug, pk):
+        """Return a visible workspace view and record it as recently visited (Celery)."""
         issue_view = self.get_queryset().filter(pk=pk).first()
         serializer = IssueViewSerializer(issue_view)
         recent_visited_task.delay(
@@ -119,6 +142,7 @@ class WorkspaceViewViewSet(BaseViewSet):
 
     @allow_permission(allowed_roles=[ROLE.ADMIN], level="WORKSPACE", creator=True, model=IssueView)
     def destroy(self, request, slug, pk):
+        """Delete a workspace view (workspace admin or owner) and remove users' favorites of it."""
         workspace_view = IssueView.objects.get(pk=pk, workspace__slug=slug)
 
         workspace_member = WorkspaceMember.objects.filter(
@@ -142,6 +166,8 @@ class WorkspaceViewViewSet(BaseViewSet):
 
 
 class WorkspaceViewIssuesViewSet(BaseViewSet):
+    """Workspace-wide issue listing used by workspace views, with filtering and pagination."""
+
     filter_backends = (ComplexFilterBackend,)
     filterset_class = IssueFilterSet
 
@@ -168,6 +194,9 @@ class WorkspaceViewIssuesViewSet(BaseViewSet):
         )
 
     def apply_annotations(self, issues):
+        """Annotate issues with cycle_id and link/attachment/sub-issue counts, and prefetch
+        assignees, labels and modules for the list serializer."""
+        # Counts use correlated subqueries (Func Count) rather than joins to avoid row multiplication
         return (
             issues.annotate(
                 cycle_id=Subquery(
@@ -216,11 +245,16 @@ class WorkspaceViewIssuesViewSet(BaseViewSet):
         )
 
     def get_queryset(self):
+        """All (non-draft, non-archived) issues in the workspace; permissions are applied in list()."""
         return Issue.issue_objects.filter(workspace__slug=self.kwargs.get("slug"))
 
     @method_decorator(gzip_page)
     @allow_permission(allowed_roles=[ROLE.ADMIN, ROLE.MEMBER, ROLE.GUEST], level="WORKSPACE")
     def list(self, request, slug):
+        """Return a paginated, gzip-compressed list of issues across the workspace.
+
+        Applies filterset + legacy query filters, then per-project permission filters.
+        """
         issue_queryset = self.get_queryset()
 
         # Apply filtering from filterset
@@ -237,7 +271,7 @@ class WorkspaceViewIssuesViewSet(BaseViewSet):
         # Apply project permission filters to the issue queryset
         issue_queryset = issue_queryset.filter(permission_filters)
 
-        # Base query for the counts
+        # Base query for the counts (copied before annotations so counting stays cheap)
         total_issue_count_queryset = copy.deepcopy(issue_queryset)
         total_issue_count_queryset = total_issue_count_queryset.only("id")
 
@@ -260,13 +294,21 @@ class WorkspaceViewIssuesViewSet(BaseViewSet):
 
 
 class IssueViewViewSet(BaseViewSet):
+    """CRUD for project-level saved views."""
+
     serializer_class = IssueViewSerializer
     model = IssueView
 
     def perform_create(self, serializer):
+        """Attach the project from the URL and make the requester the owner."""
         serializer.save(project_id=self.kwargs.get("project_id"), owned_by=self.request.user)
 
     def get_queryset(self):
+        """Project views visible to the requester (own or public), favorites first then by name.
+
+        Requires active membership in a non-archived project.
+        """
+        # Used to annotate is_favorite for the current user
         subquery = UserFavorite.objects.filter(
             user=self.request.user,
             entity_identifier=OuterRef("pk"),
@@ -294,6 +336,7 @@ class IssueViewViewSet(BaseViewSet):
 
     @allow_permission(allowed_roles=[ROLE.ADMIN, ROLE.MEMBER, ROLE.GUEST])
     def list(self, request, slug, project_id):
+        """List project views; guests only see their own unless the project allows guests all features."""
         queryset = self.get_queryset()
         project = Project.objects.get(id=project_id)
         if (
@@ -313,6 +356,7 @@ class IssueViewViewSet(BaseViewSet):
 
     @allow_permission(allowed_roles=[ROLE.ADMIN, ROLE.MEMBER, ROLE.GUEST])
     def retrieve(self, request, slug, project_id, pk):
+        """Return a project view (with guest restriction) and record the visit (Celery)."""
         issue_view = self.get_queryset().filter(pk=pk, project_id=project_id).first()
         project = Project.objects.get(id=project_id)
         """
@@ -348,6 +392,7 @@ class IssueViewViewSet(BaseViewSet):
 
     @allow_permission(allowed_roles=[], creator=True, model=IssueView)
     def partial_update(self, request, slug, project_id, pk):
+        """Update a project view; rejected if locked or if the requester is not the owner."""
         with transaction.atomic():
             issue_view = IssueView.objects.select_for_update().get(pk=pk, workspace__slug=slug, project_id=project_id)
 
@@ -370,6 +415,7 @@ class IssueViewViewSet(BaseViewSet):
 
     @allow_permission(allowed_roles=[ROLE.ADMIN], creator=True, model=IssueView)
     def destroy(self, request, slug, project_id, pk):
+        """Delete a project view (project admin or owner), plus its favorites and recent-visit rows."""
         project_view = IssueView.objects.get(pk=pk, project_id=project_id, workspace__slug=slug)
         if (
             ProjectMember.objects.filter(
@@ -405,6 +451,8 @@ class IssueViewViewSet(BaseViewSet):
 
 
 class IssueViewFavoriteViewSet(BaseViewSet):
+    """Mark / unmark project views as favorites for the current user."""
+
     model = UserFavorite
 
     def get_queryset(self):
@@ -418,6 +466,7 @@ class IssueViewFavoriteViewSet(BaseViewSet):
 
     @allow_permission([ROLE.ADMIN, ROLE.MEMBER])
     def create(self, request, slug, project_id):
+        """Favorite the view given in ``request.data["view"]``."""
         _ = UserFavorite.objects.create(
             user=request.user,
             entity_identifier=request.data.get("view"),
@@ -428,6 +477,7 @@ class IssueViewFavoriteViewSet(BaseViewSet):
 
     @allow_permission([ROLE.ADMIN, ROLE.MEMBER])
     def destroy(self, request, slug, project_id, view_id):
+        """Remove the current user's favorite of the view (hard delete)."""
         view_favorite = UserFavorite.objects.get(
             project=project_id,
             user=request.user,

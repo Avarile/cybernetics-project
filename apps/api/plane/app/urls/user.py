@@ -2,6 +2,9 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 # See the LICENSE file for details.
 
+"""URL routes for the current user (``users/me/...``): profile, settings, email change/verification,
+linked accounts, onboarding/tour flags, activity, workspaces and per-workspace activity graphs/dashboard."""
+
 from django.urls import path
 
 from plane.app.views import (

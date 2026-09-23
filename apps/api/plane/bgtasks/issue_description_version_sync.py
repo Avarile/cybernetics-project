@@ -2,6 +2,13 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 # See the LICENSE file for details.
 
+"""Backfill task that snapshots existing issue descriptions into IssueDescriptionVersion.
+
+Used by the ``sync_issue_description_version`` management command to create an
+initial description version for every Issue. Work is processed in offset-based
+batches, each batch re-enqueueing the next one with a countdown delay.
+"""
+
 # Python imports
 from typing import Optional
 import logging
@@ -19,7 +26,11 @@ from plane.utils.exception_logger import log_exception
 
 
 def get_owner_id(issue: Issue) -> Optional[int]:
-    """Get the owner ID of the issue"""
+    """Get the owner ID of the issue.
+
+    Prefers the last updater, then the creator, and finally falls back to any
+    project admin. Returns None when no candidate owner can be found.
+    """
 
     if issue.updated_by_id:
         return issue.updated_by_id
@@ -38,7 +49,12 @@ def get_owner_id(issue: Issue) -> Optional[int]:
 
 @shared_task
 def sync_issue_description_version(batch_size=5000, offset=0, countdown=300):
-    """Task to create IssueDescriptionVersion records for existing Issues in batches"""
+    """Task to create IssueDescriptionVersion records for existing Issues in batches.
+
+    Processes Issues ``[offset, offset + batch_size)`` ordered by creation time,
+    bulk-creates one version per issue, then schedules itself for the next batch
+    after ``countdown`` seconds until all issues are covered.
+    """
     try:
         with transaction.atomic():
             base_query = Issue.objects
@@ -122,4 +138,5 @@ def sync_issue_description_version(batch_size=5000, offset=0, countdown=300):
 
 @shared_task
 def schedule_issue_description_version(batch_size=5000, countdown=300):
+    """Entry point that kicks off the batched description version backfill from offset 0."""
     sync_issue_description_version.delay(batch_size=int(batch_size), countdown=countdown)

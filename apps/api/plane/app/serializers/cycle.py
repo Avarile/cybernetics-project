@@ -2,6 +2,8 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 # See the LICENSE file for details.
 
+"""Serializers for cycles (time-boxed sprints), cycle-issue links and per-user cycle display properties."""
+
 # Third party imports
 from rest_framework import serializers
 
@@ -13,7 +15,14 @@ from plane.utils.timezone_converter import convert_to_utc
 
 
 class CycleWriteSerializer(BaseSerializer):
+    """Write serializer for cycles; validates the date range and stores dates in UTC."""
+
     def validate(self, data):
+        """Ensure start_date <= end_date and convert both to UTC in the project's timezone.
+
+        The project is taken from the request data, the existing instance, or the
+        serializer context (in that order).
+        """
         if (
             data.get("start_date", None) is not None
             and data.get("end_date", None) is not None
@@ -26,6 +35,7 @@ class CycleWriteSerializer(BaseSerializer):
                 or (self.instance and self.instance.project_id)
                 or self.context.get("project_id", None)
             )
+            # Start date is normalized to the start of day, end date to the end of day (project timezone -> UTC)
             data["start_date"] = convert_to_utc(
                 date=str(data.get("start_date").date()),
                 project_id=project_id,
@@ -44,6 +54,11 @@ class CycleWriteSerializer(BaseSerializer):
 
 
 class CycleSerializer(BaseSerializer):
+    """Read serializer for cycles, including annotated issue counts, favorite flag and computed status.
+
+    The count/status fields are expected to be annotated on the queryset by the view.
+    """
+
     # favorite
     is_favorite = serializers.BooleanField(read_only=True)
     total_issues = serializers.IntegerField(read_only=True)
@@ -90,6 +105,8 @@ class CycleSerializer(BaseSerializer):
 
 
 class CycleIssueSerializer(BaseSerializer):
+    """Cycle-issue link with nested issue state details and annotated ``sub_issues_count``."""
+
     issue_detail = IssueStateSerializer(read_only=True, source="issue")
     sub_issues_count = serializers.IntegerField(read_only=True)
 
@@ -100,6 +117,8 @@ class CycleIssueSerializer(BaseSerializer):
 
 
 class CycleUserPropertiesSerializer(BaseSerializer):
+    """Per-user display/filter preferences for a cycle."""
+
     class Meta:
         model = CycleUserProperties
         fields = "__all__"

@@ -15,6 +15,7 @@ set -a
 . ./.env
 set +a
 
+# Rewrite the docker-internal hostnames in the connection URLs to the host-published ports.
 export DATABASE_URL="${DATABASE_URL/@plane-db:5432/@127.0.0.1:30898}"
 export REDIS_URL="${REDIS_URL/@plane-redis:6379/@127.0.0.1:30490}"
 export AMQP_URL="${AMQP_URL/@plane-mq:5672/@127.0.0.1:30672}"

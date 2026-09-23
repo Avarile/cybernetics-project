@@ -2,6 +2,8 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 # See the LICENSE file for details.
 
+"""Central helper for logging caught exceptions to the ``plane.exception`` logger."""
+
 # Python imports
 import logging
 import traceback
@@ -11,6 +13,7 @@ from django.conf import settings
 
 
 def log_exception(e, warning=False):
+    """Log ``e`` as a warning (message only) or an error with traceback; dump the traceback at debug level in DEBUG."""
     # Log the error
     logger = logging.getLogger("plane.exception")
 

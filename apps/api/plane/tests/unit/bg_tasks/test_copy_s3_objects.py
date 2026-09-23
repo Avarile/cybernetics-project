@@ -2,6 +2,12 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 # See the LICENSE file for details.
 
+"""Unit tests for the copy_s3_object background task.
+
+Covers duplicating an issue description's embedded file assets (new FileAsset rows
+plus S3 copy_object calls) with S3Storage and the live-description sync mocked.
+"""
+
 import pytest
 from plane.db.models import Project, ProjectMember, Issue, FileAsset
 from unittest.mock import patch, MagicMock
@@ -18,6 +24,7 @@ class TestCopyS3Objects:
 
     @pytest.fixture
     def project(self, create_user, workspace):
+        """Project in the test workspace with ``create_user`` as a member."""
         project = Project.objects.create(name="Test Project", identifier="test-project", workspace=workspace)
 
         ProjectMember.objects.create(project=project, member=create_user)
@@ -25,6 +32,7 @@ class TestCopyS3Objects:
 
     @pytest.fixture
     def issue(self, workspace, project):
+        """Issue whose description embeds two image components referencing asset IDs."""
         return Issue.objects.create(
             name="Test Issue",
             workspace=workspace,
@@ -34,6 +42,7 @@ class TestCopyS3Objects:
 
     @pytest.fixture
     def file_asset(self, workspace, project, issue):
+        """FileAsset matching the first image-component ``src`` in the issue description."""
         return FileAsset.objects.create(
             issue=issue,
             workspace=workspace,
@@ -53,6 +62,8 @@ class TestCopyS3Objects:
     def test_copy_s3_objects_of_description_and_assets(
         self, mock_s3_storage, create_user, workspace, project, issue, file_asset
     ):
+        """Both assets referenced in the description are copied in S3 and duplicated as new FileAsset rows."""
+        # Second asset, matching the other image-component src in the description.
         FileAsset.objects.create(
             issue=issue,
             workspace=workspace,

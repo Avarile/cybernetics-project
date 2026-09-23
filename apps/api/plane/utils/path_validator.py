@@ -2,6 +2,14 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 # See the LICENSE file for details.
 
+"""
+Path and redirect-safety helpers.
+
+Used by upload handling (``sanitize_filename``) and by authentication flows
+that redirect users after login (``validate_next_path``,
+``get_safe_redirect_url``) to prevent path traversal and open redirects.
+"""
+
 # Django imports
 from django.utils.http import url_has_allowed_host_and_scheme
 from django.conf import settings
@@ -103,7 +111,11 @@ def get_allowed_hosts() -> list[str]:
 
 
 def validate_next_path(next_path: str) -> str:
-    """Validates that next_path is a safe relative path for redirection."""
+    """Validates that next_path is a safe relative path for redirection.
+
+    Returns the path (absolute URLs are reduced to their path component) or
+    an empty string if it is missing, too long, or looks unsafe.
+    """
     # Browsers interpret backslashes as forward slashes. Remove all backslashes.
     if not next_path or not isinstance(next_path, str):
         return ""
@@ -144,6 +156,10 @@ def get_safe_redirect_url(base_url: str, next_path: str = "", params: dict = {})
         params (dict): The parameters to append
     Returns:
         str: The safe redirect URL
+
+    If the assembled URL's host is not one of the configured Plane origins
+    (see ``get_allowed_hosts``), falls back to ``base_url`` plus ``params``
+    without ``next_path``.
     """
     from urllib.parse import urlencode
 
@@ -158,6 +174,7 @@ def get_safe_redirect_url(base_url: str, next_path: str = "", params: dict = {})
     encoded_params = ""
 
     # Add the next path to the parameters
+    # (appended unencoded; validate_next_path has already restricted its content)
     if validated_path:
         query_parts.append(f"next_path={validated_path}")
 

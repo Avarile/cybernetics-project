@@ -2,6 +2,13 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 # See the LICENSE file for details.
 
+"""Workspace-level draft issues.
+
+Draft issues are personal, not-yet-published work items that may or may not be tied to a project.
+This viewset lists/creates/updates/deletes drafts and converts a draft into a real Issue
+(copying cycle, module and file-asset associations and emitting issue activity).
+"""
+
 # Python imports
 import json
 
@@ -44,9 +51,16 @@ from plane.utils.host import base_host
 
 
 class WorkspaceDraftIssueViewSet(BaseViewSet):
+    """CRUD for draft issues in a workspace plus draft-to-issue conversion."""
+
     model = DraftIssue
 
     def get_queryset(self):
+        """Drafts in the workspace annotated with `cycle_id`, `label_ids`, `assignee_ids` and `module_ids`.
+
+        Array annotations ignore soft-deleted links, inactive assignees and archived modules,
+        and fall back to an empty list instead of NULL.
+        """
         return (
             DraftIssue.objects.filter(workspace__slug=self.kwargs.get("slug"))
             .select_related("workspace", "project", "state", "parent")
@@ -97,6 +111,7 @@ class WorkspaceDraftIssueViewSet(BaseViewSet):
     @method_decorator(gzip_page)
     @allow_permission(allowed_roles=[ROLE.ADMIN, ROLE.MEMBER, ROLE.GUEST], level="WORKSPACE")
     def list(self, request, slug):
+        """Paginated list of the requester's own drafts, filtered by standard issue filters (gzip-compressed)."""
         filters = issue_filters(request.query_params, "GET")
         issues = self.get_queryset().filter(created_by=request.user).order_by("-created_at")
 
@@ -110,6 +125,7 @@ class WorkspaceDraftIssueViewSet(BaseViewSet):
 
     @allow_permission(allowed_roles=[ROLE.ADMIN, ROLE.MEMBER, ROLE.GUEST], level="WORKSPACE")
     def create(self, request, slug):
+        """Create a draft and return it in the flat `values()` shape used by the issue list UI."""
         workspace = Workspace.objects.get(slug=slug)
 
         serializer = DraftIssueCreateSerializer(
@@ -160,6 +176,7 @@ class WorkspaceDraftIssueViewSet(BaseViewSet):
         level="WORKSPACE",
     )
     def partial_update(self, request, slug, pk):
+        """Update one of the requester's drafts; returns 204 on success."""
         issue = self.get_queryset().filter(pk=pk, created_by=request.user).first()
 
         if not issue:
@@ -173,6 +190,7 @@ class WorkspaceDraftIssueViewSet(BaseViewSet):
             partial=True,
             context={
                 "project_id": project_id,
+                # Sentinel lets the serializer distinguish "cycle not sent" from an explicit null.
                 "cycle_id": request.data.get("cycle_id", "not_provided"),
             },
         )
@@ -185,6 +203,7 @@ class WorkspaceDraftIssueViewSet(BaseViewSet):
 
     @allow_permission(allowed_roles=[ROLE.ADMIN], creator=True, model=Issue, level="WORKSPACE")
     def retrieve(self, request, slug, pk=None):
+        """Return full details of one of the requester's drafts."""
         issue = self.get_queryset().filter(pk=pk, created_by=request.user).first()
 
         if not issue:
@@ -198,12 +217,18 @@ class WorkspaceDraftIssueViewSet(BaseViewSet):
 
     @allow_permission(allowed_roles=[ROLE.ADMIN], creator=True, model=DraftIssue, level="WORKSPACE")
     def destroy(self, request, slug, pk=None):
+        """Delete a draft (admin or the draft's creator)."""
         draft_issue = DraftIssue.objects.get(workspace__slug=slug, pk=pk)
         draft_issue.delete()
         return Response(status=status.HTTP_204_NO_CONTENT)
 
     @allow_permission(allowed_roles=[ROLE.ADMIN, ROLE.MEMBER], level="WORKSPACE")
     def create_draft_to_issue(self, request, slug, draft_id):
+        """Publish a draft as a real issue in its project, then delete the draft.
+
+        Uses request data for the new issue, links optional `cycle_id`/`module_ids`, moves the
+        draft's file assets to the new issue and queues issue/cycle/module activity tasks.
+        """
         draft_issue = self.get_queryset().filter(pk=draft_id).first()
 
         if not draft_issue.project_id:

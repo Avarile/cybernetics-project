@@ -244,6 +244,7 @@ class TestAttributeDetection:
         class ViewClass:
             use_read_replica = True
 
+        # Mimics the function DRF's as_view() returns, which exposes the view class as ``.cls``.
         class ViewFunc:
             cls = ViewClass()
 
@@ -323,6 +324,8 @@ class TestExceptionHandling:
         view_func = Mock()
         view_func.use_read_replica = True
 
+        # Django normally calls process_view from inside get_response; here the two
+        # steps are invoked separately, so only the calls made are asserted, not their order.
         # Call middleware and process_view manually
         response = middleware(request)
         middleware.process_view(request, view_func, (), {})

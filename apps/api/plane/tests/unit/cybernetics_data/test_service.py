@@ -2,6 +2,14 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 # See the LICENSE file for details.
 
+"""Unit tests for ``plane.utils.cybernetics_data.service``, the layer between the views and the client.
+
+Covers client construction from a project integration, connection verification, per-project
+caching, response shaping (camelCase Teable payloads to snake_case), browsing, record snapshots
+attached to issues, and deep links. The Teable client is a ``MagicMock`` and the Django cache is
+replaced by an in-memory ``DictCache``.
+"""
+
 from types import SimpleNamespace
 from unittest.mock import MagicMock
 
@@ -23,6 +31,7 @@ from plane.utils.cybernetics_data.secrets import encrypt_token
 
 TOKEN = "cybernetics_service_token_0001"
 
+# Schema returned by the mocked ``list_fields``: primary text, text, attachment and single-select.
 FIELDS = [
     {"id": "fldPRIMARY01", "name": "Name", "type": "singleLineText", "isPrimary": True, "cellValueType": "string"},
     {"id": "fldEMAIL0001", "name": "Email", "type": "singleLineText", "cellValueType": "string"},
@@ -39,6 +48,7 @@ FIELDS = [
 
 @pytest.fixture(autouse=True)
 def fake_cache(monkeypatch):
+    """Replace the service's Django cache with an in-memory dict for every test."""
     cache = DictCache()
     monkeypatch.setattr(service, "cache", cache)
     return cache
@@ -46,11 +56,13 @@ def fake_cache(monkeypatch):
 
 @pytest.fixture
 def integration():
+    """Stand-in for ``ProjectCyberneticsDataIntegration`` with the attributes used for cache keys and links."""
     return SimpleNamespace(base_url="https://data.example.com", token_fingerprint="f" * 64, project_id="p1")
 
 
 @pytest.fixture
 def client():
+    """Mock Teable client with canned responses: three bases in two spaces, one table, ``FIELDS`` schema."""
     mock = MagicMock()
     mock.list_bases.return_value = [
         {"id": "bseAAAAAAAA", "name": "CRM", "spaceId": "spcAAAAAAAA", "icon": None},
@@ -69,6 +81,7 @@ def client():
 
 
 def _records_kwargs(**overrides):
+    """Default keyword args for ``service.list_records``, with ``overrides`` applied."""
     kwargs = dict(
         take=50,
         skip=0,
@@ -85,7 +98,10 @@ def _records_kwargs(**overrides):
 
 @pytest.mark.unit
 class TestClientFor:
+    """``client_for`` builds a client only for enabled integrations with a decryptable token."""
+
     def _integration(self, **overrides):
+        """Enabled integration stub whose token is encrypted with the current ``SECRET_KEY``."""
         values = dict(is_enabled=True, api_token_encrypted=encrypt_token(TOKEN), base_url="https://data.example.com")
         values.update(overrides)
         return SimpleNamespace(**values)
@@ -103,6 +119,7 @@ class TestClientFor:
             service.client_for(self._integration(is_enabled=False))
 
     def test_instance_flag_off(self, settings):
+        """The instance-wide ``CYBERNETICS_DATA_ENABLED`` switch overrides per-project settings."""
         settings.CYBERNETICS_DATA_ENABLED = False
         with pytest.raises(service.IntegrationNotConfigured):
             service.client_for(self._integration())
@@ -125,7 +142,10 @@ class TestClientFor:
 
 @pytest.mark.unit
 class TestVerifyConnection:
+    """``verify_connection`` probes bases -> tables -> records and maps failures to a status."""
+
     def test_ok(self, client):
+        """Probes the first base's tables and one record of the first table."""
         result = service.verify_connection(client)
         assert result == {"status": "ok", "message": "", "bases_visible": 3}
         client.list_tables.assert_called_once_with("bseAAAAAAAA")
@@ -150,6 +170,7 @@ class TestVerifyConnection:
         }
 
     def test_forbidden_after_bases(self, client):
+        """A 403 after bases were listed means the token lacks a read scope; the base count is kept."""
         client.list_records.side_effect = CyberneticsForbidden("no record scope")
         assert service.verify_connection(client) == {
             "status": "forbidden",
@@ -164,6 +185,7 @@ class TestVerifyConnection:
         assert result["bases_visible"] == 0
 
     def test_unreachable(self, client):
+        """On non-forbidden failures ``bases_visible`` is reset to 0."""
         client.list_tables.side_effect = CyberneticsUnreachable("down")
         assert service.verify_connection(client) == {"status": "unreachable", "message": "down", "bases_visible": 0}
 
@@ -183,6 +205,8 @@ class TestVerifyConnection:
 
 @pytest.mark.unit
 class TestCache:
+    """``_cached``/``_cache_key``: per-project keys, invalidation on credential change, TTLs."""
+
     def test_hit_skips_loader(self, integration, client, fake_cache):
         key = service._cache_key(integration, "databases")
         fake_cache.set(key, [{"cached": True}])
@@ -195,6 +219,7 @@ class TestCache:
         assert client.list_bases.call_count == 1
 
     def test_key_changes_with_token_fingerprint(self, integration):
+        """Rotating the token (new fingerprint) must not serve data cached under the old one."""
         before = service._cache_key(integration, "databases")
         integration.token_fingerprint = "e" * 64
         assert service._cache_key(integration, "databases") != before
@@ -210,6 +235,7 @@ class TestCache:
         assert service._cache_key(integration, "tables", "bseA").startswith("cyb:p1:")
 
     def test_key_never_contains_secrets(self, integration):
+        """The raw fingerprint is not embedded verbatim in the cache key."""
         assert integration.token_fingerprint not in service._cache_key(integration, "databases")
 
     @pytest.mark.parametrize("kind", sorted(service.CACHE_TTL))
@@ -227,6 +253,7 @@ class TestCache:
         assert loader.call_count == 1
 
     def test_none_is_not_cached(self, integration):
+        """A ``None`` result is re-fetched on every call, unlike an empty list."""
         loader = MagicMock(return_value=None)
         service._cached(integration, "table", ("bseA", "tblB"), loader)
         service._cached(integration, "table", ("bseA", "tblB"), loader)
@@ -235,7 +262,10 @@ class TestCache:
 
 @pytest.mark.unit
 class TestShaping:
+    """``_shape_field``/``_shape_record`` whitelist and rename upstream keys."""
+
     def test_shape_field(self):
+        """Booleans are coerced, unknown option keys dropped and choices capped at 100 (without ids)."""
         field = {
             "id": "fldAAAAAAAA",
             "name": "Company",
@@ -309,6 +339,8 @@ class TestShaping:
 
 @pytest.mark.unit
 class TestBrowse:
+    """Browse helpers: databases grouped by space, tables, schema, records and single record."""
+
     def test_list_databases_groups_by_space(self, integration, client):
         groups = service.list_databases(integration, client)
         assert groups == [
@@ -327,6 +359,7 @@ class TestBrowse:
 
     @pytest.mark.parametrize("exc", [CyberneticsForbidden("nope"), CyberneticsNotFound("nope")])
     def test_list_databases_tolerates_space_errors(self, integration, client, exc):
+        """If spaces cannot be listed (403/404) bases are still grouped, with blank space names."""
         client.list_spaces.side_effect = exc
         groups = service.list_databases(integration, client)
         assert [g["space"]["name"] for g in groups] == ["", ""]
@@ -346,6 +379,7 @@ class TestBrowse:
         ],
     )
     def test_list_databases_propagates_other_errors(self, integration, client, method, exc):
+        """Only 403/404 on ``list_spaces`` are tolerated; everything else propagates."""
         getattr(client, method).side_effect = exc
         with pytest.raises(type(exc)):
             service.list_databases(integration, client)
@@ -362,6 +396,7 @@ class TestBrowse:
         client.list_tables.assert_called_once_with("bseAAAAAAAA")
 
     def test_schema_checks_table_in_base_and_shapes(self, integration, client):
+        """``get_table`` is called first to prove the table belongs to the requested base."""
         schema = service.get_schema(integration, client, "bseAAAAAAAA", "tblAAAAAAAA")
         client.get_table.assert_called_once_with("bseAAAAAAAA", "tblAAAAAAAA")
         client.list_fields.assert_called_once_with("tblAAAAAAAA", None)
@@ -393,6 +428,7 @@ class TestBrowse:
         assert service.primary_field_id({"fields": [{"id": "fldA", "is_primary": False}]}) is None
 
     def test_list_records_with_total(self, integration, client):
+        """Params are forwarded, the projection is limited to schema fields and the total comes from ``row_count``."""
         client.list_records.return_value = {"records": [{"id": "recAAAAAAAA", "name": "ACME", "fields": {}}]}
         client.row_count.return_value = 7
         flt = {"conjunction": "and", "filterSet": []}
@@ -440,6 +476,7 @@ class TestBrowse:
 
     @pytest.mark.parametrize("cell_format", ["json", "text"])
     def test_get_record(self, integration, client, cell_format):
+        """Single record fetch also verifies table membership and returns a deep link plus schema fields."""
         client.get_record.return_value = {"id": "recAAAAAAAA", "name": "ACME", "fields": {"fldEMAIL0001": "a@x"}}
         data = service.get_record(integration, client, "bseAAAAAAAA", "tblAAAAAAAA", "recAAAAAAAA", cell_format)
         client.get_record.assert_called_once_with("tblAAAAAAAA", "recAAAAAAAA", cell_format=cell_format)
@@ -450,11 +487,14 @@ class TestBrowse:
 
 
 def _text_field(i, **extra):
+    """Build a ``singleLineText`` field definition with a zero-padded id."""
     return {"id": f"fldTEXT{i:05d}", "name": f"Text {i}", "type": "singleLineText", **extra}
 
 
 @pytest.mark.unit
 class TestSnapshot:
+    """``build_snapshot``: denormalised record data stored when attaching a record to an issue."""
+
     def test_build_snapshot(self, integration, client):
         client.get_record.return_value = {
             "id": "recAAAAAAAA",
@@ -486,6 +526,7 @@ class TestSnapshot:
         )
 
     def test_excluded_types_and_field_cap(self, integration, client):
+        """Attachment/button/link fields are skipped and at most 4 fields go into the preview."""
         client.list_fields.return_value = [
             {"id": "fldPRIMARY01", "name": "Name", "type": "singleLineText", "isPrimary": True},
             {"id": "fldATTACH001", "name": "Files", "type": "attachment"},
@@ -500,6 +541,7 @@ class TestSnapshot:
         assert projection == ["fldPRIMARY01", *[f"fldTEXT{i:05d}" for i in range(4)]]
 
     def test_empty_values_dropped_and_values_truncated(self, integration, client):
+        """Empty values are omitted; values are stringified and cut to 256 chars."""
         client.list_fields.return_value = [_text_field(i) for i in range(4)]
         client.get_record.return_value = {
             "name": "ACME",
@@ -509,6 +551,7 @@ class TestSnapshot:
         assert snapshot["preview"] == {"Text 2": "y" * 256, "Text 3": "42"}
 
     def test_names_truncated(self, integration, client):
+        """Base/table names are cut to 255 chars."""
         client.get_base.return_value = {"name": "b" * 300, "spaceId": "spcAAAAAAAA"}
         client.get_table.return_value = {"name": "t" * 300}
         snapshot = service.build_snapshot(integration, client, "bseAAAAAAAA", "tblAAAAAAAA", "recAAAAAAAA")
@@ -521,6 +564,7 @@ class TestSnapshot:
         strict=True,
     )
     def test_record_name_truncated_at_512(self, integration, client):
+        """Documents a known discrepancy (strict xfail): record names are capped at 256, not 512."""
         client.get_record.return_value = {"name": "r" * 600, "fields": {}}
         snapshot = service.build_snapshot(integration, client, "bseAAAAAAAA", "tblAAAAAAAA", "recAAAAAAAA")
         assert snapshot["record_name"] == "r" * 512
@@ -531,6 +575,7 @@ class TestSnapshot:
         assert 0 < len(snapshot["record_name"]) <= 512
 
     def test_primary_field_missing(self, integration, client):
+        """Without a primary field the name and primary id are blank and only preview fields are projected."""
         client.list_fields.return_value = [_text_field(0)]
         client.get_record.return_value = {"fields": {"fldTEXT00000": "v"}}
         snapshot = service.build_snapshot(integration, client, "bseAAAAAAAA", "tblAAAAAAAA", "recAAAAAAAA")
@@ -550,6 +595,7 @@ class TestSnapshot:
         assert snapshot["view_id"] == expected
 
     def test_falls_back_to_primary_value(self, integration, client):
+        """When the record has no ``name``, the primary field's value is used."""
         client.get_record.return_value = {"id": "recAAAAAAAA", "fields": {"fldPRIMARY01": "Fallback"}}
         snapshot = service.build_snapshot(integration, client, "bseAAAAAAAA", "tblAAAAAAAA", "recAAAAAAAA")
         assert snapshot["record_name"] == "Fallback"
@@ -563,6 +609,8 @@ class TestSnapshot:
 
 @pytest.mark.unit
 class TestDeepLink:
+    """``build_deep_link`` builds a Teable UI URL with quoted path segments."""
+
     def test_with_view(self):
         url = service.build_deep_link("https://d.example.com", "bseA", "tblB", "recC", "viwD")
         assert url == "https://d.example.com/base/bseA/table/tblB/viwD?recordId=recC"

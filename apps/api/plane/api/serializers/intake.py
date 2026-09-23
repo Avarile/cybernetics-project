@@ -2,6 +2,12 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 # See the LICENSE file for details.
 
+"""Serializers for intake (triage inbox) work items in the public API.
+
+Intake status values follow IntakeIssue: accepting (status == 1) moves a work
+item out of the TRIAGE state group into the project's default state.
+"""
+
 # Module imports
 from .base import BaseSerializer
 from .issue import IssueExpandSerializer
@@ -17,6 +23,7 @@ class IssueForIntakeSerializer(BaseSerializer):
     content validation and priority assignment for triage workflows.
     """
 
+    # Exposed as `description` but stored in `description_json`.
     description = serializers.JSONField(source="description_json", required=False, allow_null=True)
 
     class Meta:

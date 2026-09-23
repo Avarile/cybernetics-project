@@ -2,6 +2,8 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 # See the LICENSE file for details.
 
+"""Slack integration model linking a project to a Slack team/channel webhook."""
+
 # Python imports
 
 # Django imports
@@ -12,6 +14,8 @@ from plane.db.models.project import ProjectBaseModel
 
 
 class SlackProjectSync(ProjectBaseModel):
+    """Slack OAuth installation data for a project (bot token, scopes, incoming webhook, team)."""
+
     access_token = models.CharField(max_length=300)
     scopes = models.TextField()
     bot_user_id = models.CharField(max_length=50)

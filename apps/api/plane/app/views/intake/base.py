@@ -2,6 +2,14 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 # See the LICENSE file for details.
 
+"""Project intake (triage inbox) endpoints.
+
+Work items submitted to a project's intake live in the special "Triage"
+state and are wrapped by an ``IntakeIssue`` whose ``status`` tracks triage:
+-2 pending, -1 rejected, 0 snoozed, 1 accepted, 2 duplicate. Also serves the
+description version history of intake work items.
+"""
+
 # Python imports
 import json
 
@@ -55,10 +63,13 @@ from plane.db.models.intake import SourceType
 
 
 class IntakeViewSet(BaseViewSet):
+    """Manage the project's intake container(s)."""
+
     serializer_class = IntakeSerializer
     model = Intake
 
     def get_queryset(self):
+        """Intakes of the project, annotated with the number of pending (-2) items."""
         return (
             super()
             .get_queryset()
@@ -72,15 +83,18 @@ class IntakeViewSet(BaseViewSet):
 
     @allow_permission([ROLE.ADMIN, ROLE.MEMBER])
     def list(self, request, slug, project_id):
+        """Return the project's (first) intake."""
         intake = self.get_queryset().first()
         return Response(IntakeSerializer(intake).data, status=status.HTTP_200_OK)
 
     @allow_permission([ROLE.ADMIN, ROLE.MEMBER])
     def perform_create(self, serializer):
+        """Attach the new intake to the URL's project."""
         serializer.save(project_id=self.kwargs.get("project_id"))
 
     @allow_permission([ROLE.ADMIN, ROLE.MEMBER])
     def destroy(self, request, slug, project_id, pk):
+        """Delete a non-default intake; the default intake cannot be deleted."""
         intake = Intake.objects.filter(workspace__slug=slug, project_id=project_id, pk=pk).first()
         # Handle default intake delete
         if intake.is_default:
@@ -93,12 +107,18 @@ class IntakeViewSet(BaseViewSet):
 
 
 class IntakeIssueViewSet(BaseViewSet):
+    """List, submit, triage, view and delete intake work items."""
+
     serializer_class = IntakeIssueSerializer
     model = IntakeIssue
 
     filterset_fields = ["status"]
 
     def get_queryset(self):
+        """Project work items annotated like the main list view (counts, label/assignee/module ids).
+
+        Not used by the actions below, which query ``IntakeIssue`` directly.
+        """
         return (
             Issue.objects.filter(
                 project_id=self.kwargs.get("project_id"),
@@ -176,6 +196,12 @@ class IntakeIssueViewSet(BaseViewSet):
 
     @allow_permission([ROLE.ADMIN, ROLE.MEMBER, ROLE.GUEST])
     def list(self, request, slug, project_id):
+        """List intake items of the project (paginated).
+
+        ``status`` is a comma separated list of intake statuses (default ``-2`` =
+        pending). Guests only see their own submissions unless the project enables
+        ``guest_view_all_features``.
+        """
         intake = Intake.objects.filter(workspace__slug=slug, project_id=project_id).first()
         if not intake:
             return Response({"error": "Intake not found"}, status=status.HTTP_404_NOT_FOUND)
@@ -227,6 +253,11 @@ class IntakeIssueViewSet(BaseViewSet):
 
     @allow_permission([ROLE.ADMIN, ROLE.MEMBER, ROLE.GUEST])
     def create(self, request, slug, project_id):
+        """Submit a new work item to the intake.
+
+        The work item is created in the project's Triage state (created on first use)
+        and wrapped in an ``IntakeIssue``. Queues activity and description-version tasks.
+        """
         if not request.data.get("issue", {}).get("name", False):
             return Response({"error": "Name is required"}, status=status.HTTP_400_BAD_REQUEST)
 
@@ -333,6 +364,13 @@ class IntakeIssueViewSet(BaseViewSet):
 
     @allow_permission(allowed_roles=[ROLE.ADMIN], creator=True, model=Issue)
     def partial_update(self, request, slug, project_id, pk):
+        """Update an intake item's work item fields and/or triage fields (status, duplicate_to, ...).
+
+        Guests (and the creator) may only edit name/description of the work item;
+        only project admins or workspace admins may change the triage fields.
+        ``skip_activity`` with a description change suppresses activity logging
+        (used for description migrations).
+        """
         skip_activity = request.data.pop("skip_activity", False)
         is_description_update = request.data.get("description_html") is not None
 
@@ -365,6 +403,7 @@ class IntakeIssueViewSet(BaseViewSet):
             )
 
         # Only project members admins and created_by users can access this endpoint
+        # Guests may only edit intake items they created (workspace admins are exempt).
         if ((project_member and project_member.role <= ROLE.GUEST.value) and not is_workspace_admin) and str(
             intake_issue.created_by_id
         ) != str(request.user.id):
@@ -422,6 +461,7 @@ class IntakeIssueViewSet(BaseViewSet):
         intake_serializer = None
         intake_current_instance = None
 
+        # role > MEMBER means project admin: only admins can change triage status.
         if (project_member and project_member.role > ROLE.MEMBER.value) or is_workspace_admin:
             intake_current_instance = json.dumps(IntakeIssueSerializer(intake_issue).data, cls=DjangoJSONEncoder)
             intake_serializer = IntakeIssueSerializer(intake_issue, data=request.data, partial=True)
@@ -504,6 +544,7 @@ class IntakeIssueViewSet(BaseViewSet):
 
     @allow_permission(allowed_roles=[ROLE.ADMIN, ROLE.MEMBER, ROLE.GUEST], creator=True, model=Issue)
     def retrieve(self, request, slug, project_id, pk):
+        """Return one intake item; guests may only view their own unless ``guest_view_all_features``."""
         intake_id = Intake.objects.filter(workspace__slug=slug, project_id=project_id).first()
         project = Project.objects.get(pk=project_id)
         intake_issue = (
@@ -551,6 +592,10 @@ class IntakeIssueViewSet(BaseViewSet):
 
     @allow_permission(allowed_roles=[ROLE.ADMIN], creator=True, model=Issue)
     def destroy(self, request, slug, project_id, pk):
+        """Delete an intake item (admin or creator).
+
+        The underlying work item is deleted too unless it was accepted (status 1).
+        """
         intake_id = Intake.objects.filter(workspace__slug=slug, project_id=project_id).first()
         intake_issue = IntakeIssue.objects.get(
             issue_id=pk,
@@ -570,7 +615,10 @@ class IntakeIssueViewSet(BaseViewSet):
 
 
 class IntakeWorkItemDescriptionVersionEndpoint(BaseAPIView):
+    """Description version history for a work item in intake."""
+
     def process_paginated_result(self, fields, results, timezone):
+        """Select ``fields`` from the page of results and convert timestamps to the user's timezone."""
         paginated_data = results.values(*fields)
 
         datetime_fields = ["created_at", "updated_at"]
@@ -580,6 +628,10 @@ class IntakeWorkItemDescriptionVersionEndpoint(BaseAPIView):
 
     @allow_permission(allowed_roles=[ROLE.ADMIN, ROLE.MEMBER, ROLE.GUEST])
     def get(self, request, slug, project_id, work_item_id, pk=None):
+        """Return one description version (``pk``) or a cursor-paginated list of versions.
+
+        Guests may only access work items they created unless ``guest_view_all_features``.
+        """
         project = Project.objects.get(pk=project_id)
         issue = Issue.objects.get(workspace__slug=slug, project_id=project_id, pk=work_item_id)
 

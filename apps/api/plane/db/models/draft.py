@@ -2,6 +2,14 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 # See the LICENSE file for details.
 
+"""Draft work item models.
+
+``DraftIssue`` holds a user's unsaved/in-progress work item in a workspace
+(optionally tied to a project) before it is converted into a real ``Issue``.
+The ``DraftIssue*`` through tables mirror the issue relations for assignees,
+labels, modules and cycles.
+"""
+
 # Django imports
 from django.conf import settings
 from django.db import models
@@ -14,6 +22,8 @@ from .workspace import WorkspaceBaseModel
 
 
 class DraftIssue(WorkspaceBaseModel):
+    """A draft work item with the same core fields as ``Issue`` but no sequence id."""
+
     PRIORITY_CHOICES = (
         ("urgent", "Urgent"),
         ("high", "High"),
@@ -82,6 +92,13 @@ class DraftIssue(WorkspaceBaseModel):
         ordering = ("-created_at",)
 
     def save(self, *args, **kwargs):
+        """Fill in defaults before saving.
+
+        - No state: use the project's default non-triage state, else any non-triage state.
+        - Has state: set/clear ``completed_at`` based on whether it is in the "completed" group.
+        - Always refresh ``description_stripped``; on create, append to the end of
+          the sort order within the same project/state.
+        """
         if self.state is None:
             try:
                 from plane.db.models import State
@@ -137,6 +154,8 @@ class DraftIssue(WorkspaceBaseModel):
 
 
 class DraftIssueAssignee(WorkspaceBaseModel):
+    """Through table linking a draft work item to an assignee."""
+
     draft_issue = models.ForeignKey(DraftIssue, on_delete=models.CASCADE, related_name="draft_issue_assignee")
     assignee = models.ForeignKey(
         settings.AUTH_USER_MODEL,
@@ -163,6 +182,8 @@ class DraftIssueAssignee(WorkspaceBaseModel):
 
 
 class DraftIssueLabel(WorkspaceBaseModel):
+    """Through table linking a draft work item to a label."""
+
     draft_issue = models.ForeignKey("db.DraftIssue", on_delete=models.CASCADE, related_name="draft_label_issue")
     label = models.ForeignKey("db.Label", on_delete=models.CASCADE, related_name="draft_label_issue")
 
@@ -177,6 +198,8 @@ class DraftIssueLabel(WorkspaceBaseModel):
 
 
 class DraftIssueModule(WorkspaceBaseModel):
+    """Join table linking a draft work item to a module."""
+
     module = models.ForeignKey("db.Module", on_delete=models.CASCADE, related_name="draft_issue_module")
     draft_issue = models.ForeignKey("db.DraftIssue", on_delete=models.CASCADE, related_name="draft_issue_module")
 
@@ -201,6 +224,8 @@ class DraftIssueModule(WorkspaceBaseModel):
 class DraftIssueCycle(WorkspaceBaseModel):
     """
     Draft Issue Cycles
+
+    Join table linking a draft work item to a cycle.
     """
 
     draft_issue = models.ForeignKey("db.DraftIssue", on_delete=models.CASCADE, related_name="draft_issue_cycle")

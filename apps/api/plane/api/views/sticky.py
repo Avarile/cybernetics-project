@@ -2,6 +2,12 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 # See the LICENSE file for details.
 
+"""Public API (``plane.api``) viewset for workspace stickies (personal sticky notes).
+
+Stickies are private to their owner: every query is limited to the requesting
+user's stickies within the workspace identified by ``slug``.
+"""
+
 from rest_framework.response import Response
 from rest_framework import status
 
@@ -22,12 +28,15 @@ from plane.utils.openapi import (
 
 
 class StickyViewSet(BaseViewSet):
+    """CRUD for the requesting user's stickies in a workspace (any active workspace member)."""
+
     serializer_class = StickySerializer
     model = Sticky
     use_read_replica = True
     permission_classes = [WorkspaceUserPermission]
 
     def get_queryset(self):
+        """Stickies in the workspace owned by the requesting user."""
         return self.filter_queryset(
             super()
             .get_queryset()
@@ -46,6 +55,7 @@ class StickyViewSet(BaseViewSet):
         },
     )
     def create(self, request, slug):
+        """Create a sticky owned by the requesting user in workspace ``slug``."""
         workspace = Workspace.objects.get(slug=slug)
         serializer = StickySerializer(data=request.data)
         if serializer.is_valid():
@@ -64,6 +74,7 @@ class StickyViewSet(BaseViewSet):
         },
     )
     def list(self, request, slug):
+        """List the user's stickies newest first; optional ``query`` filters on stripped description text."""
         query = request.query_params.get("query", False)
         stickies = self.get_queryset().order_by("-created_at")
         if query:
@@ -83,6 +94,7 @@ class StickyViewSet(BaseViewSet):
         responses={200: OpenApiResponse(description="Sticky", response=StickySerializer, examples=[STICKY_EXAMPLE])},
     )
     def retrieve(self, request, slug, pk):
+        """Return a single sticky owned by the user."""
         sticky = self.get_object()
         return Response(StickySerializer(sticky).data)
 
@@ -94,6 +106,7 @@ class StickyViewSet(BaseViewSet):
         responses={200: OpenApiResponse(description="Sticky", response=StickySerializer, examples=[STICKY_EXAMPLE])},
     )
     def partial_update(self, request, slug, pk):
+        """Partially update one of the user's stickies."""
         sticky = self.get_object()
         serializer = StickySerializer(sticky, data=request.data, partial=True)
         if serializer.is_valid():
@@ -108,6 +121,7 @@ class StickyViewSet(BaseViewSet):
         responses={204: DELETED_RESPONSE},
     )
     def destroy(self, request, slug, pk):
+        """Hard-delete one of the user's stickies."""
         sticky = self.get_object()
         sticky.delete()
         return Response(status=status.HTTP_204_NO_CONTENT)

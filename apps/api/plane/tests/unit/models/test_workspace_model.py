@@ -2,6 +2,8 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 # See the LICENSE file for details.
 
+"""Basic unit tests for creating Workspace and WorkspaceMember rows."""
+
 import pytest
 from uuid import uuid4
 

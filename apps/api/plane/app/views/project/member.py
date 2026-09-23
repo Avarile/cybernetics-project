@@ -2,6 +2,13 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 # See the LICENSE file for details.
 
+"""Project membership API.
+
+Add/list/retrieve/update/remove project members (with role hierarchy
+checks against both project and workspace roles), leave a project, the
+requester's own membership, a map of the user's project roles, and
+per-member project preferences. Roles: 5 = guest, 15 = member, 20 = admin.
+"""
 # Third Party imports
 from rest_framework.response import Response
 from rest_framework import status
@@ -25,12 +32,14 @@ from plane.app.permissions.base import allow_permission, ROLE
 
 
 class ProjectMemberViewSet(BaseViewSet):
+    """Manage members of a project (bot users are excluded)."""
     serializer_class = ProjectMemberAdminSerializer
     model = ProjectMember
 
     search_fields = ["member__display_name", "member__first_name"]
 
     def get_queryset(self):
+        """Non-bot members of the project in the URL."""
         return self.filter_queryset(
             super()
             .get_queryset()
@@ -45,6 +54,12 @@ class ProjectMemberViewSet(BaseViewSet):
 
     @allow_permission([ROLE.ADMIN])
     def create(self, request, slug, project_id):
+        """Add or reactivate members from ``request.data["members"]`` ({member_id, role}).
+
+        Project roles must be consistent with workspace roles (workspace admins
+        cannot be guest/member; workspace guests cannot be member/admin).
+        Creates ProjectUserProperty rows and queues a notification email per member.
+        """
         # Get the list of members to be added to the project and their roles i.e. the user_id and the role
         members = request.data.get("members", [])
 
@@ -126,6 +141,7 @@ class ProjectMemberViewSet(BaseViewSet):
                     user_id=member.get("member_id"),
                     project_id=project_id,
                     workspace_id=project.workspace_id,
+                    # Place the project before the user's existing projects in sidebar order.
                     sort_order=(min_sort_order - 10000 if min_sort_order is not None else 65535),
                 )
             )
@@ -155,6 +171,7 @@ class ProjectMemberViewSet(BaseViewSet):
 
     @allow_permission([ROLE.ADMIN, ROLE.MEMBER, ROLE.GUEST])
     def list(self, request, slug, project_id):
+        """List active project members who are also active in the workspace (id, member, role only)."""
         # Get the list of project members for the project
         project_members = ProjectMember.objects.filter(
             project_id=project_id,
@@ -170,6 +187,7 @@ class ProjectMemberViewSet(BaseViewSet):
 
     @allow_permission([ROLE.ADMIN, ROLE.MEMBER, ROLE.GUEST])
     def retrieve(self, request, slug, project_id, pk):
+        """Return one member; full admin serializer unless the requester is a guest."""
         requesting_project_member = ProjectMember.objects.get(
             project_id=project_id,
             workspace__slug=slug,
@@ -204,6 +222,12 @@ class ProjectMemberViewSet(BaseViewSet):
 
     @allow_permission([ROLE.ADMIN, ROLE.MEMBER, ROLE.GUEST])
     def partial_update(self, request, slug, project_id, pk):
+        """Update a project member (role and other fields).
+
+        Non workspace-admins cannot change their own role, must be project admins
+        to change roles, and can only manage/assign roles below their own.
+        Workspace guests cannot be promoted to member/admin.
+        """
         project_member = ProjectMember.objects.get(pk=pk, workspace__slug=slug, project_id=project_id, is_active=True)
 
         # Fetch the target's workspace role (used to cap the new project role)
@@ -270,6 +294,10 @@ class ProjectMemberViewSet(BaseViewSet):
 
     @allow_permission([ROLE.ADMIN])
     def destroy(self, request, slug, project_id, pk):
+        """Deactivate (soft remove) a project member.
+
+        Requesters cannot remove themselves or members with a higher role.
+        """
         project_member = ProjectMember.objects.get(
             workspace__slug=slug,
             project_id=project_id,
@@ -303,6 +331,7 @@ class ProjectMemberViewSet(BaseViewSet):
 
     @allow_permission([ROLE.ADMIN, ROLE.MEMBER, ROLE.GUEST])
     def leave(self, request, slug, project_id):
+        """Leave the project; the sole remaining admin is not allowed to leave."""
         project_member = ProjectMember.objects.get(
             workspace__slug=slug,
             project_id=project_id,
@@ -331,7 +360,9 @@ class ProjectMemberViewSet(BaseViewSet):
 
 
 class ProjectMemberUserEndpoint(BaseAPIView):
+    """The requesting user's own project membership."""
     def get(self, request, slug, project_id):
+        """Return the requester's active membership in the project."""
         project_member = ProjectMember.objects.get(
             project_id=project_id,
             workspace__slug=slug,
@@ -344,10 +375,12 @@ class ProjectMemberUserEndpoint(BaseAPIView):
 
 
 class UserProjectRolesEndpoint(BaseAPIView):
+    """Map of project_id -> role for the requesting user across a workspace."""
     permission_classes = [WorkspaceUserPermission]
     use_read_replica = True
 
     def get(self, request, slug):
+        """Return the user's active project roles (only while active in the workspace)."""
         project_members = ProjectMember.objects.filter(
             workspace__slug=slug,
             member_id=request.user.id,
@@ -361,7 +394,9 @@ class UserProjectRolesEndpoint(BaseAPIView):
 
 
 class ProjectMemberPreferenceEndpoint(BaseAPIView):
+    """Read/update a project member's ``preferences`` JSON."""
     def get_queryset(self, slug, project_id, member_id):
+        """Fetch the ProjectMember row for the given member (raises if missing)."""
         return ProjectMember.objects.get(
             project_id=project_id,
             member_id=member_id,
@@ -370,6 +405,7 @@ class ProjectMemberPreferenceEndpoint(BaseAPIView):
 
     @allow_permission([ROLE.ADMIN, ROLE.MEMBER, ROLE.GUEST])
     def patch(self, request, slug, project_id, member_id):
+        """Replace the member's preferences with the request body."""
         project_member = self.get_queryset(slug, project_id, member_id)
 
         serializer = ProjectMemberPreferenceSerializer(project_member, {"preferences": request.data}, partial=True)
@@ -382,6 +418,7 @@ class ProjectMemberPreferenceEndpoint(BaseAPIView):
 
     @allow_permission([ROLE.ADMIN, ROLE.MEMBER, ROLE.GUEST])
     def get(self, request, slug, project_id, member_id):
+        """Return the member's preferences."""
         project_member = self.get_queryset(slug, project_id, member_id)
 
         serializer = ProjectMemberPreferenceSerializer(project_member)

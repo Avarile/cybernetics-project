@@ -2,6 +2,16 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 # See the LICENSE file for details.
 
+"""
+Google OAuth views for the public space frontend (``/auth/spaces/google/`` and
+``/auth/spaces/google/callback/``).
+
+The initiate view stores the frontend host and a random ``state`` (CSRF protection) in
+the session, then redirects to Google. The callback logs the user in (no invitation
+processing) and redirects back to the validated ``next_path`` on the space frontend.
+Errors are sent back to the frontend as auth error query params.
+"""
+
 # Python imports
 import uuid
 
@@ -23,7 +33,10 @@ from plane.utils.path_validator import get_safe_redirect_url, validate_next_path
 
 
 class GoogleOauthInitiateSpaceEndpoint(View):
+    """Start the Google OAuth flow for the public space frontend."""
+
     def get(self, request):
+        """Save host and ``state`` in the session and redirect to the Google authorize URL."""
         request.session["host"] = base_host(request=request, is_space=True)
         next_path = request.GET.get("next_path")
 
@@ -55,12 +68,18 @@ class GoogleOauthInitiateSpaceEndpoint(View):
 
 
 class GoogleCallbackSpaceEndpoint(View):
+    """Handle the Google redirect back to Plane and log the user in."""
+
     def get(self, request):
+        """Verify ``state``, exchange ``code`` via the provider, log the user in and redirect to the frontend."""
         code = request.GET.get("code")
         state = request.GET.get("state")
+        # NOTE: this local assignment shadows the imported ``base_host`` helper for the whole method,
+        # so the ``base_host(request=...)`` calls below would try to call that str (or None) and raise TypeError.
         base_host = request.session.get("host")
         next_path = request.session.get("next_path")
 
+        # Reject callbacks whose state doesn't match the one issued at initiate (CSRF).
         if state != request.session.get("state", ""):
             exc = AuthenticationException(
                 error_code=AUTHENTICATION_ERROR_CODES["GOOGLE_OAUTH_PROVIDER_ERROR"],

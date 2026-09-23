@@ -2,6 +2,13 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 # See the LICENSE file for details.
 
+"""
+Throttles for authentication endpoints.
+
+Throttled requests get a RATE_LIMIT_EXCEEDED auth error (HTTP 429) in the
+same shape as other auth errors.
+"""
+
 # Python imports
 import os
 
@@ -18,12 +25,15 @@ from plane.authentication.adapter.error import (
 
 
 class AuthenticationThrottle(AnonRateThrottle):
+    """Per-IP (anonymous) throttle applied to sign-in/sign-up and related auth endpoints."""
+
     # Rate is configurable per-deployment via the AUTHENTICATION_RATE_LIMIT
     # env var (DRF format: "<num>/<period>" where period is second/minute/hour/day).
     rate = os.environ.get("AUTHENTICATION_RATE_LIMIT", "10/minute")
     scope = "authentication"
 
     def throttle_failure_view(self, request, *args, **kwargs):
+        """Return a 429 response carrying the RATE_LIMIT_EXCEEDED error dict."""
         try:
             raise AuthenticationException(
                 error_code=AUTHENTICATION_ERROR_CODES["RATE_LIMIT_EXCEEDED"],
@@ -59,6 +69,7 @@ class EmailVerificationThrottle(UserRateThrottle):
     scope = "email_verification"
 
     def throttle_failure_view(self, request, *args, **kwargs):
+        """Return a 429 response carrying the RATE_LIMIT_EXCEEDED error dict."""
         try:
             raise AuthenticationException(
                 error_code=AUTHENTICATION_ERROR_CODES["RATE_LIMIT_EXCEEDED"],

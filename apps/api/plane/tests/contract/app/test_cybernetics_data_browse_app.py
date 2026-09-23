@@ -2,6 +2,15 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 # See the LICENSE file for details.
 
+"""Contract tests for the read-only Cybernetics-Data browse endpoints.
+
+Covers ``/api/workspaces/<slug>/projects/<id>/cybernetics-data/`` routes for
+databases, tables, table schema, records and a single record: role checks,
+integration configuration states, upstream error mapping, cross-project
+isolation and query-parameter validation. The upstream client is replaced by
+the ``fake_client`` MagicMock from ``conftest_cybernetics``.
+"""
+
 import json
 from urllib.parse import urlencode
 
@@ -35,18 +44,22 @@ from plane.utils.cybernetics_data.client import (
 pytest_plugins = ["plane.tests.contract.app.conftest_cybernetics"]
 pytestmark = [pytest.mark.contract, pytest.mark.django_db]
 
+# Well-formed upstream IDs: a 3-letter type prefix (bse/tbl/rec/fld/viw) plus 8 chars.
 BASE = "bseAAAAAAAA"
 TABLE = "tblAAAAAAAA"
 RECORD = "recAAAAAAAA"
 FILTER = {"conjunction": "and", "filterSet": [{"fieldId": "fldEMAIL0001", "operator": "contains", "value": "acme"}]}
+# Client-facing order_by uses snake_case ``field_id``; the view converts it to upstream ``fieldId``.
 ORDER = [{"field_id": "fldEMAIL0001", "order": "desc"}]
 
 
 @pytest.fixture(autouse=True)
 def _isolate(isolate):
+    """Opt every test in this module into the shared ``isolate`` fixture."""
     return isolate
 
 
+# URL builders for each browse endpoint; extra kwargs become the query string.
 def _databases(workspace, project):
     return config_url(workspace, project, "databases/")
 
@@ -72,6 +85,7 @@ def _qs(params):
 
 
 def _all_urls(workspace, project):
+    """Return one valid URL for every browse endpoint (used by the role matrix)."""
     return [
         _databases(workspace, project),
         _tables(workspace, project),
@@ -82,6 +96,8 @@ def _all_urls(workspace, project):
 
 
 class TestRoleMatrix:
+    """Only project admins and members may browse; guests and non-members get 403."""
+
     @pytest.mark.parametrize("role", [ADMIN, MEMBER])
     def test_admin_and_member_can_browse(self, make_member, workspace, project, integration, fake_client, role):
         client = make_member(role)
@@ -93,6 +109,7 @@ class TestRoleMatrix:
         client = make_member(role)
         for url in _all_urls(workspace, project):
             assert client.get(url).status_code == status.HTTP_403_FORBIDDEN, url
+        # The permission check must reject before any upstream call is made.
         fake_client.list_bases.assert_not_called()
         fake_client.get_record.assert_not_called()
 
@@ -102,6 +119,8 @@ class TestRoleMatrix:
 
 
 class TestConfigurationStates:
+    """Missing, disabled, instance-disabled, unreadable or disconnected integrations."""
+
     # No fake_client here: the real client_for decides, and no request is made.
     def test_not_configured(self, session_client, workspace, project):
         assert_error(
@@ -122,12 +141,14 @@ class TestConfigurationStates:
         )
 
     def test_unreadable_token(self, session_client, workspace, project, integration):
+        # Bypass the model's encryption so decryption fails at request time.
         ProjectCyberneticsDataIntegration.objects.filter(pk=integration.pk).update(api_token_encrypted="garbage")
         assert_error(
             session_client.get(_databases(workspace, project)), status.HTTP_409_CONFLICT, "CYBERNETICS_TOKEN_UNREADABLE"
         )
 
     def test_disconnected(self, session_client, workspace, project, integration):
+        """DELETE on the config endpoint disconnects; browsing then reports not configured."""
         assert session_client.delete(config_url(workspace, project)).status_code == status.HTTP_204_NO_CONTENT
         assert_error(
             session_client.get(_databases(workspace, project)), status.HTTP_404_NOT_FOUND, "CYBERNETICS_NOT_CONFIGURED"
@@ -135,6 +156,8 @@ class TestConfigurationStates:
 
 
 class TestUpstreamErrors:
+    """Each upstream client exception maps to a fixed HTTP status and error code."""
+
     @pytest.mark.parametrize(
         "exc,status_code,error_message",
         [
@@ -156,12 +179,15 @@ class TestUpstreamErrors:
         assert response.data["error"] == exc.message
 
     def test_upstream_401_is_not_401(self, session_client, workspace, project, integration, fake_client):
+        """An upstream 401 becomes 424, so it is not confused with the caller's own Plane auth failing."""
         fake_client.list_records.side_effect = CyberneticsUnauthorized("token revoked")
         response = session_client.get(_records(workspace, project, base_id=BASE))
         assert response.status_code == status.HTTP_424_FAILED_DEPENDENCY
 
 
 class TestIsolation:
+    """Integrations are scoped per project and per workspace."""
+
     def test_other_project_does_not_see_integration(
         self, session_client, workspace, project, other_project, integration, fake_client
     ):
@@ -174,6 +200,7 @@ class TestIsolation:
         fake_client.list_bases.assert_not_called()
 
     def test_other_workspace_slug(self, session_client, create_user, workspace, project, integration, fake_client):
+        """A project ID addressed under a different workspace slug is rejected, even for its admin."""
         other = WorkspaceFactory(owner=create_user, slug="other-workspace")
         WorkspaceMemberFactory(workspace=other, member=create_user, role=ADMIN)
         url = f"/api/workspaces/{other.slug}/projects/{project.id}/cybernetics-data/databases/"
@@ -192,6 +219,8 @@ class TestIsolation:
 
 
 class TestDatabasesAndTables:
+    """Databases listing (bases grouped by space) and tables listing per base."""
+
     def test_databases(self, session_client, workspace, project, integration, fake_client):
         response = session_client.get(_databases(workspace, project))
         assert response.status_code == status.HTTP_200_OK
@@ -210,6 +239,7 @@ class TestDatabasesAndTables:
         ]
         fake_client.list_tables.assert_called_once_with(BASE)
 
+    # Wrong prefix, too short, and characters outside the ID alphabet.
     @pytest.mark.parametrize("base_id", ["tblAAAAAAAA", "bseshort", "bseAAAA-AAAA", "bse..AAAAAAAA"])
     def test_tables_invalid_base_id(self, session_client, workspace, project, integration, fake_client, base_id):
         response = session_client.get(_tables(workspace, project, base_id))
@@ -218,6 +248,8 @@ class TestDatabasesAndTables:
 
 
 class TestSchema:
+    """Table schema endpoint: requires ``base_id``, validates IDs, forwards ``view_id``."""
+
     def test_base_id_required(self, session_client, workspace, project, integration, fake_client):
         response = session_client.get(_schema(workspace, project))
         assert_error(response, status.HTTP_400_BAD_REQUEST, "CYBERNETICS_BAD_REQUEST")
@@ -252,6 +284,9 @@ class TestSchema:
 
 
 class TestRecords:
+    """Records listing: parameter validation, defaults, clamping and pass-through."""
+
+    # Each case must be rejected with 400 before any upstream call.
     @pytest.mark.parametrize(
         "table_id,params",
         [
@@ -278,16 +313,19 @@ class TestRecords:
         fake_client.list_records.assert_not_called()
 
     def test_defaults(self, session_client, workspace, project, integration, fake_client):
+        """With no params: take=50, skip=0, text cells, projection from the table's fields, no total."""
         response = session_client.get(_records(workspace, project, base_id=BASE))
         assert response.status_code == status.HTTP_200_OK
         assert response.data == {"records": [], "take": 50, "skip": 0}
         kwargs = fake_client.list_records.call_args.kwargs
         assert (kwargs["take"], kwargs["skip"], kwargs["view_id"], kwargs["search"]) == (50, 0, None, None)
         assert kwargs["filter_"] is None and kwargs["order_by"] is None
+        # Projection comes from the fake list_fields result.
         assert kwargs["projection"] == ["fldPRIMARY01", "fldEMAIL0001"]
         assert kwargs["cell_format"] == "text"
         fake_client.row_count.assert_not_called()
 
+    # take is clamped to [1, 200], skip to [0, 10_000_000]; blanks fall back to defaults.
     @pytest.mark.parametrize(
         "take,skip,expected",
         [("0", "-5", (1, 0)), ("500", "20", (200, 20)), ("25", "", (25, 0)), ("", "99999999999", (50, 10_000_000))],
@@ -302,6 +340,7 @@ class TestRecords:
         assert (response.data["take"], response.data["skip"]) == expected
 
     def test_search_filter_order_passed_through(self, session_client, workspace, project, integration, fake_client):
+        """Search is stripped, filter forwarded as-is, and order_by keys converted to camelCase."""
         fake_client.list_records.return_value = {"records": [{"id": RECORD, "name": "ACME", "fields": {"f": 1}}]}
         response = session_client.get(
             _records(
@@ -326,6 +365,7 @@ class TestRecords:
         assert kwargs["order_by"] == [{"fieldId": "fldEMAIL0001", "order": "desc"}]
 
     def test_search_of_200_characters(self, session_client, workspace, project, integration, fake_client):
+        """200 characters is the maximum accepted search length (201 is rejected above)."""
         response = session_client.get(_records(workspace, project, base_id=BASE, search="x" * 200))
         assert response.status_code == status.HTTP_200_OK
 
@@ -338,6 +378,7 @@ class TestRecords:
 
     @pytest.mark.parametrize("value", ["0", "false", "no", "maybe", ""])
     def test_with_total_falsy(self, session_client, workspace, project, integration, fake_client, value):
+        """Anything not truthy skips the (extra) row_count upstream call and omits ``total``."""
         response = session_client.get(_records(workspace, project, base_id=BASE, with_total=value))
         assert response.status_code == status.HTTP_200_OK
         assert "total" not in response.data
@@ -345,6 +386,8 @@ class TestRecords:
 
 
 class TestRecordDetail:
+    """Single-record endpoint: ID validation, cell format, deep link and base ownership."""
+
     def test_invalid_cell_format(self, session_client, workspace, project, integration, fake_client):
         response = session_client.get(_record(workspace, project, base_id=BASE, cell_format="html"))
         assert_error(response, status.HTTP_400_BAD_REQUEST, "CYBERNETICS_BAD_REQUEST")
@@ -380,6 +423,7 @@ class TestRecordDetail:
         assert response.data["deep_link"] == f"https://data.example.com/base/{BASE}/table/{TABLE}?recordId={RECORD}"
 
     def test_table_must_belong_to_base(self, session_client, workspace, project, integration, fake_client):
+        """get_table(base, table) is checked first; a table outside the base is 404 and no record fetch."""
         fake_client.get_table.side_effect = CyberneticsNotFound("table not in base")
         response = session_client.get(_record(workspace, project, base_id=BASE))
         assert_error(response, status.HTTP_404_NOT_FOUND, "CYBERNETICS_NOT_FOUND")

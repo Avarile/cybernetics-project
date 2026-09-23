@@ -2,6 +2,12 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 # See the LICENSE file for details.
 
+"""Workspace-level cycle listing.
+
+Provides the endpoint that returns every non-archived cycle across all projects
+of a workspace, annotated with per-state-group issue counts.
+"""
+
 # Django imports
 from django.db.models import Q, Count
 
@@ -17,9 +23,14 @@ from plane.app.serializers.cycle import CycleSerializer
 
 
 class WorkspaceCyclesEndpoint(BaseAPIView):
+    """List all cycles in a workspace (read access for any workspace member)."""
+
     permission_classes = [WorkspaceViewerPermission]
 
     def get(self, request, slug):
+        """Return non-archived cycles with total/completed/cancelled/started/unstarted/backlog issue counts."""
+        # Every count below excludes archived, draft and soft-deleted issues as well as
+        # soft-deleted cycle-issue links, so the numbers match what users see in the UI.
         cycles = (
             Cycle.objects.filter(workspace__slug=slug)
             .select_related("project")

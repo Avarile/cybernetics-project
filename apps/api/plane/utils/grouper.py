@@ -2,6 +2,14 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 # See the LICENSE file for details.
 
+"""Helpers for grouped / sub-grouped issue list responses.
+
+Issue list views call ``issue_queryset_grouper`` to annotate array fields,
+``issue_on_results`` to serialise rows with ``.values()``, and
+``issue_group_values`` to enumerate every possible group key (so empty groups
+still appear in the grouped paginator output).
+"""
+
 # Django imports
 from django.contrib.postgres.aggregates import ArrayAgg
 from django.contrib.postgres.fields import ArrayField
@@ -30,12 +38,20 @@ def issue_queryset_grouper(
     group_by: Optional[str],
     sub_group_by: Optional[str],
 ) -> QuerySet[Issue]:
+    """Annotate ``assignee_ids``/``label_ids``/``module_ids`` arrays on ``queryset``.
+
+    When grouping by one of these many-to-many relations the queryset is joined
+    per related row instead (one row per group key), so that field's array
+    annotation is skipped and soft-deleted join rows are filtered out.
+    """
+    # Response field name -> ORM lookup used as the group key
     FIELD_MAPPER: Dict[str, str] = {
         "label_ids": "labels__id",
         "assignee_ids": "assignees__id",
         "module_ids": "issue_module__module_id",
     }
 
+    # Exclude soft-deleted through-table rows when grouping across a relation
     GROUP_FILTER_MAPPER: Dict[str, Q] = {
         "assignees__id": Q(issue_assignee__deleted_at__isnull=True),
         "labels__id": Q(label_issue__deleted_at__isnull=True),
@@ -46,6 +62,8 @@ def issue_queryset_grouper(
         if group_key in GROUP_FILTER_MAPPER:
             queryset = queryset.filter(GROUP_FILTER_MAPPER[group_key])
 
+    # Correlated subqueries aggregating active related IDs into a UUID array;
+    # Coalesce below turns "no rows" (NULL) into an empty array.
     issue_assignee_subquery = Subquery(
         IssueAssignee.objects.filter(
             issue_id=OuterRef("pk"),
@@ -60,7 +78,7 @@ def issue_queryset_grouper(
         ModuleIssue.objects.filter(
             issue_id=OuterRef("pk"),
             deleted_at__isnull=True,
-            module__archived_at__isnull=True,
+            module__archived_at__isnull=True,  # archived modules are hidden
         )
         .values("issue_id")
         .annotate(arr=ArrayAgg("module_id", distinct=True))
@@ -95,6 +113,12 @@ def issue_on_results(
     group_by: Optional[str],
     sub_group_by: Optional[str],
 ) -> List[Dict[str, Any]]:
+    """Return issues as a list of dicts with the fields needed by list/board views.
+
+    For a relation used as group/sub-group key, the raw ORM lookup (e.g.
+    ``labels__id``) is selected instead of the annotated array field.
+    """
+    # ORM group lookup -> annotated array field it replaces
     FIELD_MAPPER: Dict[str, str] = {
         "labels__id": "label_ids",
         "assignees__id": "assignee_ids",
@@ -148,7 +172,14 @@ def issue_group_values(
     filters: Dict[str, Any] = {},
     queryset: Optional[QuerySet] = None,
 ) -> List[Union[str, Any]]:
+    """Return all possible group values for ``field`` within workspace ``slug``.
+
+    Optionally scoped to ``project_id``. Nullable relations append the string
+    ``"None"`` as a group for issues without a value. Date/creator fields are
+    derived from the given issue ``queryset``. Unknown fields return ``[]``.
+    """
     if field == "state_id":
+        # Triage states are internal (intake) and never shown as groups
         queryset = State.objects.filter(is_triage=False, workspace__slug=slug).values_list("id", flat=True)
         if project_id:
             return list(queryset.filter(project_id=project_id))

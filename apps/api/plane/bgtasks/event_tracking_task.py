@@ -2,6 +2,13 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 # See the LICENSE file for details.
 
+"""
+Celery task that sends product analytics events to PostHog.
+
+Tracking is a no-op unless POSTHOG_API_KEY and POSTHOG_HOST are configured
+(instance config or env). Event names live in ``plane.utils.analytics_events``.
+"""
+
 import logging
 import os
 import uuid
@@ -22,6 +29,7 @@ logger = logging.getLogger("plane.worker")
 
 
 def posthogConfiguration():
+    """Return ``(api_key, host)`` for PostHog, or ``(None, None)`` if either is missing."""
     POSTHOG_API_KEY, POSTHOG_HOST = get_configuration_value(
         [
             {
@@ -43,6 +51,8 @@ def posthogConfiguration():
 def preprocess_data_properties(
     user_id: uuid.UUID, event_name: str, slug: str, data_properties: Dict[str, Any]
 ) -> Dict[str, Any]:
+    """Enrich event properties before sending; for invite/workspace-deleted events adds the actor's ``role``
+    ("owner", "admin" or "unknown")."""
     if event_name == USER_INVITED_TO_WORKSPACE or event_name == WORKSPACE_DELETED:
         try:
             # Check if the current user is the workspace owner
@@ -60,6 +70,7 @@ def preprocess_data_properties(
 
 @shared_task
 def track_event(user_id: uuid.UUID, event_name: str, slug: str, event_properties: Dict[str, Any]):
+    """Capture ``event_name`` for ``user_id`` in PostHog, grouped by workspace ``slug``; errors are logged."""
     POSTHOG_API_KEY, POSTHOG_HOST = posthogConfiguration()
 
     if not (POSTHOG_API_KEY and POSTHOG_HOST):

@@ -2,6 +2,15 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 # See the LICENSE file for details.
 
+"""
+Issue export serializer used by the issue export background task
+(``plane/bgtasks/export_task.py``) together with ``DataExporter``.
+
+Most fields are SerializerMethodFields reading related managers
+(assignees, labels, cycles, ...); callers should prefetch those relations
+to avoid N+1 queries.
+"""
+
 # Third party imports
 from rest_framework import serializers
 
@@ -34,6 +43,7 @@ class IssueExportSerializer(IssueSerializer):
     subscribers = serializers.SerializerMethodField()
 
     class Meta(IssueSerializer.Meta):
+        # Order here defines the column order in exported files
         fields = [
             "project_name",
             "project_identifier",
@@ -66,9 +76,11 @@ class IssueExportSerializer(IssueSerializer):
         ]
 
     def get_identifier(self, obj):
+        """Human-readable issue key, e.g. ``PROJ-42``."""
         return f"{obj.project.identifier}-{obj.sequence_id}"
 
     def get_assignees(self, obj):
+        """Full names of active assignees."""
         return [u.full_name for u in obj.assignees.all() if u.is_active]
 
     def get_subscribers(self, obj):
@@ -76,11 +88,13 @@ class IssueExportSerializer(IssueSerializer):
         return [sub.subscriber.full_name for sub in obj.issue_subscribers.all() if sub.subscriber]
 
     def get_parent(self, obj):
+        """Parent issue key (``PROJ-12``) or empty string."""
         if not obj.parent:
             return ""
         return f"{obj.parent.project.identifier}-{obj.parent.sequence_id}"
 
     def get_labels(self, obj):
+        """Names of labels whose issue-label link is not soft-deleted."""
         return [
             il.label.name
             for il in obj.label_issue.all()
@@ -88,9 +102,11 @@ class IssueExportSerializer(IssueSerializer):
         ]
 
     def get_cycles(self, obj):
+        """Names of cycles the issue belongs to."""
         return [ic.cycle.name for ic in obj.issue_cycle.all()]
 
     def get_modules(self, obj):
+        """Names of modules the issue belongs to."""
         return [im.module.name for im in obj.issue_module.all()]
 
     def get_estimate(self, obj):
@@ -134,7 +150,10 @@ class IssueExportSerializer(IssueSerializer):
         return relations
 
     def get_comments(self, obj):
-        """Return list of comments with author and timestamp."""
+        """Return list of comments with author and timestamp.
+
+        Prefers the plain-text ``comment_stripped`` over HTML when available.
+        """
         return [
             {
                 "comment": comment.comment_stripped if hasattr(comment, 'comment_stripped') else comment.comment_html,

@@ -2,6 +2,16 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 # See the LICENSE file for details.
 
+"""
+Celery tasks that batch issue-activity notifications into digest emails.
+
+Issue activity writes pending ``EmailNotificationLog`` rows. The periodic
+``stack_email_notification`` task groups unprocessed rows per receiver and per
+issue, and queues ``send_email_notification`` for each group, which renders the
+``issue-updates`` email template and sends it via the instance SMTP settings.
+A Redis lock prevents the same batch from being emailed twice.
+"""
+
 import logging
 import re
 from datetime import datetime
@@ -25,6 +35,7 @@ from plane.utils.exception_logger import log_exception
 
 
 def remove_unwanted_characters(input_text):
+    """Strip control characters from ``input_text`` (used for email subjects)."""
     # Remove only control characters and potentially problematic characters for email subjects
     processed_text = re.sub(r"[\x00-\x1F\x7F-\x9F]", "", input_text)
     return processed_text
@@ -32,6 +43,7 @@ def remove_unwanted_characters(input_text):
 
 # acquire and delete redis lock
 def acquire_lock(lock_id, expire_time=300):
+    """Try to take a Redis lock via ``SET NX EX``; returns truthy if acquired, None if already held."""
     redis_client = redis_instance()
     """Attempt to acquire a lock with a specified expiration time."""
     return redis_client.set(lock_id, "true", nx=True, ex=expire_time)
@@ -45,6 +57,10 @@ def release_lock(lock_id):
 
 @shared_task
 def stack_email_notification():
+    """Group unprocessed notification logs by receiver and issue and queue one email per group.
+
+    Marks the grouped logs as processed (``processed_at``) immediately after queuing.
+    """
     # get all email notifications
     email_notifications = EmailNotificationLog.objects.filter(processed_at__isnull=True).order_by("receiver").values()
 
@@ -85,6 +101,12 @@ def stack_email_notification():
 
 
 def create_payload(notification_data):
+    """Collapse raw activity data per actor and field.
+
+    Result shape: ``{actor_id: {field: {"old_value": [...], "new_value": [...]}, "activity_time": ...}}``.
+
+    Values are de-duplicated per field.
+    """
     # return format {"actor_id":  { "key": { "old_value": [], "new_value": [] } }}
     data = {}
     for actor_id, changes in notification_data.items():
@@ -117,6 +139,8 @@ def create_payload(notification_data):
                         else None
                     )
 
+                # NOTE: this checks the literal key "actor_id" (always missing), so activity_time is overwritten
+                # with each change's time and ends up as the last one processed for the actor.
                 if not data.get("actor_id", {}).get("activity_time", False):
                     data[actor_id]["activity_time"] = str(
                         datetime.fromisoformat(issue_activity.get("activity_time").rstrip("Z")).strftime(
@@ -128,6 +152,7 @@ def create_payload(notification_data):
 
 
 def process_mention(mention_component):
+    """Replace ``<mention-component>`` tags in the HTML with ``@display_name`` text."""
     soup = BeautifulSoup(mention_component, "html.parser")
     mentions = soup.find_all("mention-component")
     for mention in mentions:
@@ -140,6 +165,7 @@ def process_mention(mention_component):
 
 
 def process_html_content(content):
+    """Apply ``process_mention`` to each HTML string in ``content`` (None passes through)."""
     if content is None:
         return None
     processed_content_list = []
@@ -151,7 +177,15 @@ def process_html_content(content):
 
 @shared_task
 def send_email_notification(issue_id, notification_data, receiver_id, email_notification_ids):
+    """Render and send the issue-updates digest email for one receiver/issue batch.
+
+    ``notification_data`` maps actor id -> list of activity payloads. The frontend
+    base URL is read from Redis (keyed by issue id, set when the activity was
+    recorded); if missing, nothing is sent. On success, ``sent_at`` is set on the
+    given ``EmailNotificationLog`` ids.
+    """
     # Convert UUIDs to a sorted, concatenated string
+    # Lock key is unique per issue, receiver and exact set of log ids, so duplicate task deliveries are skipped.
     sorted_ids = sorted(email_notification_ids)
     ids_str = "_".join(str(id) for id in sorted_ids)
     lock_id = f"send_email_notif_{issue_id}_{receiver_id}_{ids_str}"
@@ -189,6 +223,7 @@ def send_email_notification(issue_id, notification_data, receiver_id, email_noti
             for actor_id, changes in data.items():
                 actor = User.objects.get(pk=actor_id)
                 total_changes = total_changes + len(changes)
+                # Comments and mentions are rendered in a separate section from field changes.
                 comment = changes.pop("comment", False)
                 mention = changes.pop("mention", False)
                 actors_involved.append(actor_id)

@@ -2,6 +2,8 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 # See the LICENSE file for details.
 
+"""Helper that establishes a Django session for an authenticated user."""
+
 # Django imports
 from django.contrib.auth import login
 from django.conf import settings
@@ -12,6 +14,10 @@ from plane.utils.ip_address import get_client_ip
 
 
 def user_login(request, user, is_app=False, is_admin=False, is_space=False):
+    """Log ``user`` into the session and store device info (user agent, IP, frontend domain) on it.
+
+    Admin logins get the shorter ADMIN_SESSION_COOKIE_AGE expiry.
+    """
     login(request=request, user=user)
 
     # If is admin cookie set the custom age

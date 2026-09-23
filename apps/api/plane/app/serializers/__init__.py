@@ -2,6 +2,13 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 # See the LICENSE file for details.
 
+"""Serializer package for the internal ``plane.app`` API.
+
+Re-exports every serializer so views can import from ``plane.app.serializers``.
+``DynamicBaseSerializer`` also imports the Lite serializers from here lazily
+to support ``expand``.
+"""
+
 from .base import BaseSerializer
 from .user import (
     UserSerializer,

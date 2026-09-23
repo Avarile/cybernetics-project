@@ -2,6 +2,12 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 # See the LICENSE file for details.
 
+"""MCP tools for project modules (feature groupings) and their work items.
+
+Note: each tool function's docstring is sent to MCP clients as the tool description,
+so edit those docstrings as user-facing text.
+"""
+
 # Python imports
 from typing import Annotated, Optional
 from uuid import UUID
@@ -25,6 +31,7 @@ from plane.mcp.tools.common import WORK_ITEM_LIST_FIELDS, compact, page_params, 
 
 
 def module_path(workspace_slug: str, project_id: UUID, module_id: Optional[UUID] = None) -> str:
+    """Relative API path of a project's modules, or of one module when ``module_id`` is given."""
     base = f"{project_path(workspace_slug, project_id)}/modules"
     return f"{base}/{module_id}" if module_id else base
 
@@ -97,6 +104,7 @@ async def remove_work_item_from_module(
 
 
 def register(tool) -> None:
+    """Register this module's tools with their read-only/destructive/idempotent hints."""
     tool(read_only=True, title="List modules")(list_modules)
     tool(read_only=False, title="Create module")(create_module)
     tool(read_only=True, title="List module work items")(list_module_work_items)

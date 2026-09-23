@@ -2,6 +2,13 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 # See the LICENSE file for details.
 
+"""Public API (``plane.api``) endpoints for project workflow states.
+
+Supports list/create and retrieve/update/delete of states. Triage states
+(``is_triage=True``, used by intake) are hidden from these endpoints, and
+external_id/external_source pairs are kept unique for integrations.
+"""
+
 # Django imports
 from django.db import IntegrityError
 
@@ -45,6 +52,7 @@ class StateListCreateAPIEndpoint(BaseAPIView):
     use_read_replica = True
 
     def get_queryset(self):
+        """Non-triage states of the project, limited to projects the user is an active member of and not archived."""
         return (
             State.objects.filter(workspace__slug=self.kwargs.get("slug"))
             .filter(project_id=self.kwargs.get("project_id"))
@@ -86,6 +94,7 @@ class StateListCreateAPIEndpoint(BaseAPIView):
         try:
             serializer = StateSerializer(data=request.data, context={"project_id": project_id})
             if serializer.is_valid():
+                # Reject duplicates coming from an external integration (same external_source + external_id)
                 if (
                     request.data.get("external_id")
                     and request.data.get("external_source")
@@ -114,6 +123,7 @@ class StateListCreateAPIEndpoint(BaseAPIView):
                 return Response(serializer.data, status=status.HTTP_200_OK)
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
         except IntegrityError:
+            # Unique (project, name) constraint violated: return the id of the existing state
             state = State.objects.filter(
                 workspace__slug=slug,
                 project_id=project_id,
@@ -168,6 +178,7 @@ class StateDetailAPIEndpoint(BaseAPIView):
     use_read_replica = True
 
     def get_queryset(self):
+        """Same scoping as the list endpoint: non-triage states in active, non-archived projects the user belongs to."""
         return (
             State.objects.filter(workspace__slug=self.kwargs.get("slug"))
             .filter(project_id=self.kwargs.get("project_id"))
@@ -278,6 +289,7 @@ class StateDetailAPIEndpoint(BaseAPIView):
         state = State.objects.get(workspace__slug=slug, project_id=project_id, pk=state_id)
         serializer = StateSerializer(state, data=request.data, partial=True)
         if serializer.is_valid():
+            # When external_id changes, make sure it doesn't collide with another state's external mapping
             if (
                 request.data.get("external_id")
                 and (state.external_id != str(request.data.get("external_id")))

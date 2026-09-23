@@ -2,6 +2,12 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 # See the LICENSE file for details.
 
+"""Management command ``reset_password``: set a new password for a user from the CLI.
+
+Usage: ``python manage.py reset_password <email>``. Prompts twice for the new
+password (hidden input) and enforces a minimum zxcvbn strength score.
+"""
+
 # Python imports
 import getpass
 
@@ -16,6 +22,8 @@ from plane.db.models import User
 
 
 class Command(BaseCommand):
+    """Reset the password of the user with the given email."""
+
     help = "Reset password of the user with the given email"
 
     def add_arguments(self, parser):
@@ -23,6 +31,7 @@ class Command(BaseCommand):
         parser.add_argument("email", type=str, help="user email")
 
     def handle(self, *args, **options):
+        """Prompt for and validate a new password, then save it and clear ``is_password_autoset``."""
         # get the user email from console
         email = options.get("email", False)
 
@@ -53,6 +62,7 @@ class Command(BaseCommand):
             self.stderr.write("Error: Blank passwords aren't allowed.")
             return
 
+        # zxcvbn scores 0 (weakest) to 4 (strongest); require at least 3
         results = zxcvbn(password)
 
         if results["score"] < 3:
@@ -60,7 +70,7 @@ class Command(BaseCommand):
 
         # Set user password
         user.set_password(password)
-        user.is_password_autoset = False
+        user.is_password_autoset = False  # the user now has an explicitly chosen password
         user.save()
 
         self.stdout.write(self.style.SUCCESS("User password updated successfully"))

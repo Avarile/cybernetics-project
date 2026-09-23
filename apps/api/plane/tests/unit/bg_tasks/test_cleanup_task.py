@@ -28,6 +28,7 @@ from plane.tests.factories import UserFactory, WorkspaceFactory
 
 
 def _make_api_log(created_at):
+    """Create an APIActivityLog and backdate its ``created_at`` to the given time."""
     log = APIActivityLog.objects.create(
         token_identifier="hashed-token",
         path="/api/v1/workspaces/",
@@ -40,6 +41,7 @@ def _make_api_log(created_at):
 
 
 def _make_webhook_log(workspace, created_at):
+    """Create a WebhookLog in ``workspace`` and backdate its ``created_at``."""
     log = WebhookLog.objects.create(
         workspace=workspace,
         webhook=uuid4(),
@@ -47,11 +49,13 @@ def _make_webhook_log(workspace, created_at):
         request_method="POST",
         response_status="200",
     )
+    # created_at is auto-set on insert; backdate via a queryset update.
     WebhookLog.all_objects.filter(pk=log.pk).update(created_at=created_at)
     return log
 
 
 def _make_email_log(user, sent_at):
+    """Create an EmailNotificationLog; retention for these is based on ``sent_at``."""
     return EmailNotificationLog.objects.create(
         receiver=user,
         triggered_by=user,
@@ -64,6 +68,8 @@ def _make_email_log(user, sent_at):
 @pytest.mark.unit
 @pytest.mark.django_db
 class TestDeleteApiLogs:
+    """delete_api_logs honours API_ACTIVITY_LOG_RETENTION_DAYS."""
+
     def test_expired_logs_are_hard_deleted(self):
         retention_days = settings.API_ACTIVITY_LOG_RETENTION_DAYS
         expired = _make_api_log(timezone.now() - timedelta(days=retention_days + 1))
@@ -85,6 +91,8 @@ class TestDeleteApiLogs:
 @pytest.mark.unit
 @pytest.mark.django_db
 class TestDeleteWebhookLogs:
+    """delete_webhook_logs honours WEBHOOK_LOG_RETENTION_DAYS."""
+
     def test_expired_logs_are_hard_deleted(self):
         workspace = WorkspaceFactory()
         retention_days = settings.WEBHOOK_LOG_RETENTION_DAYS
@@ -107,6 +115,8 @@ class TestDeleteWebhookLogs:
 @pytest.mark.unit
 @pytest.mark.django_db
 class TestDeleteEmailLogs:
+    """delete_email_notification_logs honours EMAIL_LOG_RETENTION_DAYS."""
+
     def test_expired_logs_are_hard_deleted(self):
         user = UserFactory()
         retention_days = settings.EMAIL_LOG_RETENTION_DAYS
@@ -128,9 +138,12 @@ class TestDeleteEmailLogs:
 
 @pytest.mark.unit
 class TestProcessCleanupTaskErrorHandling:
+    """process_cleanup_task must be resilient to per-batch database errors."""
+
     def test_batch_delete_failure_is_swallowed(self):
         """A failing batch is logged and skipped; the run does not raise."""
 
+        # Stand-in model whose manager fails on every filter() call.
         class _BoomManager:
             @staticmethod
             def filter(**kwargs):

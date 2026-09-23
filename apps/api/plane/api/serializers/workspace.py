@@ -2,6 +2,8 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 # See the LICENSE file for details.
 
+"""Lightweight workspace serializer used for nested/expanded workspace references."""
+
 # Module imports
 from plane.db.models import Workspace
 from .base import BaseSerializer

@@ -2,6 +2,8 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 # See the LICENSE file for details.
 
+"""Recently visited entities per user (powers the "recents" list on the home page)."""
+
 # Django imports
 from django.db import models
 from django.conf import settings
@@ -11,6 +13,8 @@ from .workspace import WorkspaceBaseModel
 
 
 class EntityNameEnum(models.TextChoices):
+    """Entity kinds that can be recorded as a recent visit."""
+
     VIEW = "VIEW", "View"
     PAGE = "PAGE", "Page"
     ISSUE = "ISSUE", "Issue"
@@ -20,7 +24,10 @@ class EntityNameEnum(models.TextChoices):
 
 
 class UserRecentVisit(WorkspaceBaseModel):
+    """A user's visit to an entity; ``visited_at`` is refreshed on every save (``auto_now``)."""
+
     entity_identifier = models.UUIDField(null=True)
+    # One of EntityNameEnum values
     entity_name = models.CharField(max_length=30)
     user = models.ForeignKey(
         settings.AUTH_USER_MODEL,

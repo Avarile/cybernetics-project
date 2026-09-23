@@ -2,6 +2,12 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 # See the LICENSE file for details.
 
+"""GitHub integration models.
+
+Map GitHub repositories, issues and comments to projects, work items and work
+item comments so they can be kept in sync.
+"""
+
 # Python imports
 
 # Django imports
@@ -12,6 +18,8 @@ from plane.db.models.project import ProjectBaseModel
 
 
 class GithubRepository(ProjectBaseModel):
+    """A GitHub repository connected to a project (``repository_id`` is GitHub's id)."""
+
     name = models.CharField(max_length=500)
     url = models.URLField(null=True)
     config = models.JSONField(default=dict)
@@ -30,6 +38,12 @@ class GithubRepository(ProjectBaseModel):
 
 
 class GithubRepositorySync(ProjectBaseModel):
+    """Sync configuration between a repository and a project.
+
+    ``actor`` is the bot user that performs synced changes and ``label`` is the
+    label applied to work items created from GitHub.
+    """
+
     repository = models.OneToOneField("db.GithubRepository", on_delete=models.CASCADE, related_name="syncs")
     credentials = models.JSONField(default=dict)
     # Bot user
@@ -52,6 +66,8 @@ class GithubRepositorySync(ProjectBaseModel):
 
 
 class GithubIssueSync(ProjectBaseModel):
+    """Links a GitHub issue to a work item within a repository sync."""
+
     repo_issue_id = models.BigIntegerField()
     github_issue_id = models.BigIntegerField()
     issue_url = models.URLField(blank=False)
@@ -60,6 +76,7 @@ class GithubIssueSync(ProjectBaseModel):
 
     def __str__(self):
         """Return the github issue sync"""
+        # Note: this model has no ``repository`` field (only ``repository_sync``), so this would raise AttributeError
         return f"{self.repository.name}-{self.project.name}-{self.issue.name}"
 
     class Meta:
@@ -71,6 +88,8 @@ class GithubIssueSync(ProjectBaseModel):
 
 
 class GithubCommentSync(ProjectBaseModel):
+    """Links a GitHub issue comment to a work item comment within an issue sync."""
+
     repo_comment_id = models.BigIntegerField()
     comment = models.ForeignKey("db.IssueComment", related_name="comment_syncs", on_delete=models.CASCADE)
     issue_sync = models.ForeignKey("db.GithubIssueSync", related_name="comment_syncs", on_delete=models.CASCADE)

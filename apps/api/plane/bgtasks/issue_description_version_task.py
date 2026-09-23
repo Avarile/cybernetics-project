@@ -2,6 +2,13 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 # See the LICENSE file for details.
 
+"""Celery task that records issue description history (IssueDescriptionVersion).
+
+Enqueued from the issue and intake API views whenever an issue is created or its
+description changes. Edits by the same user within a short window are merged
+into the latest version instead of creating a new one, to avoid version spam.
+"""
+
 from celery import shared_task
 from django.db import transaction
 from django.utils import timezone
@@ -15,6 +22,9 @@ from plane.utils.exception_logger import log_exception
 def should_update_existing_version(
     version: IssueDescriptionVersion, user_id: str, max_time_difference: int = 600
 ) -> bool:
+    """Return True if ``version`` belongs to ``user_id`` and was saved within
+    ``max_time_difference`` seconds (default 10 minutes), i.e. it can be amended in place.
+    """
     if not version:
         return
 
@@ -23,6 +33,7 @@ def should_update_existing_version(
 
 
 def update_existing_version(version: IssueDescriptionVersion, issue) -> None:
+    """Overwrite the version's description fields with the issue's current description."""
     version.description_json = issue.description_json
     version.description_html = issue.description_html
     version.description_binary = issue.description_binary
@@ -42,6 +53,12 @@ def update_existing_version(version: IssueDescriptionVersion, issue) -> None:
 
 @shared_task
 def issue_description_version_task(updated_issue, issue_id, user_id, is_creating=False) -> Optional[bool]:
+    """Create or amend an IssueDescriptionVersion after an issue description change.
+
+    ``updated_issue`` is a JSON string of the issue before the update (or the
+    request payload on create); if its ``description_html`` matches the current
+    one and this is not a create, nothing is recorded. Errors are logged and swallowed.
+    """
     try:
         # Parse updated issue data
         current_issue: Dict = json.loads(updated_issue) if updated_issue else {}

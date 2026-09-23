@@ -2,6 +2,8 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 # See the LICENSE file for details.
 
+"""Public API route returning the authenticated user (``users/me/``)."""
+
 from django.urls import path
 
 from plane.api.views import UserEndpoint

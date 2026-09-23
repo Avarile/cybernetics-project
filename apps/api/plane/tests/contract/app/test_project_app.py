@@ -2,6 +2,13 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 # See the LICENSE file for details.
 
+"""Contract tests for the app project endpoints under ``/api/workspaces/<slug>/projects/``.
+
+Covers create (with default states, admin membership and user properties),
+list / details list / retrieve, partial update and delete, including role
+checks. Role values used throughout: 20 = admin, 15 = member, 10/5 = guest.
+"""
+
 import pytest
 from rest_framework import status
 import uuid
@@ -18,6 +25,8 @@ from plane.db.models import (
 
 
 class TestProjectBase:
+    """Shared URL helper for the project contract test classes."""
+
     def get_project_url(self, workspace_slug: str, pk: uuid.UUID = None, details: bool = False) -> str:
         """
         Constructs the project endpoint URL for the given workspace as reverse() is
@@ -60,6 +69,7 @@ class TestProjectAPIPost(TestProjectBase):
 
     @pytest.mark.django_db
     def test_create_project_valid_data(self, session_client, workspace, create_user):
+        """Creating a project makes the creator admin and seeds user properties and 5 default states."""
         url = self.get_project_url(workspace.slug)
 
         project_data = {

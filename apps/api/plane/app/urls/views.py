@@ -2,6 +2,9 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 # See the LICENSE file for details.
 
+"""URL routes for saved issue views (project-level and workspace-level "global" views),
+the workspace-wide issue list used by global views, and view favorites."""
+
 from django.urls import path
 
 

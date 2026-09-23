@@ -2,6 +2,15 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 # See the LICENSE file for details.
 
+"""URL routes for issues (work items) in the internal API.
+
+Covers issue CRUD and list variants (plain, detail, paginated v2), labels, bulk
+operations, sub-issues, links, attachments (legacy and V2 asset endpoints),
+activity history, comments, subscribers, reactions, per-user display
+properties, archiving, relations, deleted issues, bulk date updates, version
+history and lookup by human-readable identifier (e.g. ``PROJ-42``).
+"""
+
 from django.urls import path
 
 from plane.app.views import (
@@ -243,6 +252,7 @@ urlpatterns = [
         name="issue-relation",
     ),
     ## End Issue Relation
+    # Ids of project issues that were archived or soft-deleted
     path(
         "workspaces/<str:slug>/projects/<uuid:project_id>/deleted-issues/",
         DeletedIssuesListViewSet.as_view(),
@@ -278,6 +288,7 @@ urlpatterns = [
         IssueMetaEndpoint.as_view(),
         name="issue-meta",
     ),
+    # Lookup by "<PROJECT_IDENTIFIER>-<sequence_id>"
     path(
         "workspaces/<str:slug>/work-items/<str:project_identifier>-<str:issue_identifier>/",
         IssueDetailIdentifierEndpoint.as_view(),

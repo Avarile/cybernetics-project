@@ -2,6 +2,15 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 # See the LICENSE file for details.
 
+"""Core work item (issue) endpoints for a project.
+
+Covers work item CRUD and the main list view (filters, ordering, grouping,
+offset pagination), lookups by id list or by ``PROJ-123`` identifier,
+incremental sync endpoints (cursor pagination by ``updated_at``, deleted id
+list), bulk delete / bulk date updates and per-user project display settings.
+Writes queue issue activity, webhook and description-version Celery tasks.
+"""
+
 # Python imports
 import copy
 import json
@@ -78,11 +87,18 @@ from .. import BaseAPIView, BaseViewSet
 
 
 class IssueListEndpoint(BaseAPIView):
+    """Fetch a specific set of work items by id (``?issues=id1,id2``)."""
+
     filter_backends = (ComplexFilterBackend,)
     filterset_class = IssueFilterSet
 
     @allow_permission([ROLE.ADMIN, ROLE.MEMBER, ROLE.GUEST])
     def get(self, request, slug, project_id):
+        """Return the requested work items with list-view annotations.
+
+        Serialized with ``IssueSerializer`` when ``fields``/``expand`` are given,
+        otherwise as a flat ``values()`` dict list. Also records a project visit.
+        """
         issue_ids = request.GET.get("issues", False)
 
         if not issue_ids:
@@ -194,6 +210,8 @@ class IssueListEndpoint(BaseAPIView):
 
 
 class IssueViewSet(BaseViewSet):
+    """CRUD and list endpoints for work items in a project (webhook event ``issue``)."""
+
     model = Issue
     webhook_event = "issue"
     search_fields = ["name"]
@@ -201,9 +219,11 @@ class IssueViewSet(BaseViewSet):
     filterset_class = IssueFilterSet
 
     def get_serializer_class(self):
+        """Use the write serializer for create/update actions, the read serializer otherwise."""
         return IssueCreateSerializer if self.action in ["create", "update", "partial_update"] else IssueSerializer
 
     def get_queryset(self):
+        """Active (non-archived, non-draft) work items of the URL's project."""
         issues = Issue.issue_objects.filter(
             project_id=self.kwargs.get("project_id"),
             workspace__slug=self.kwargs.get("slug"),
@@ -212,6 +232,7 @@ class IssueViewSet(BaseViewSet):
         return issues
 
     def apply_annotations(self, issues):
+        """Add current cycle id and link/attachment/sub-issue counts as subqueries."""
         issues = (
             issues.annotate(
                 cycle_id=Subquery(
@@ -252,6 +273,11 @@ class IssueViewSet(BaseViewSet):
     @method_decorator(gzip_page)
     @allow_permission([ROLE.ADMIN, ROLE.MEMBER, ROLE.GUEST])
     def list(self, request, slug, project_id):
+        """List work items with rich + legacy filters, ordering and optional (sub-)grouping.
+
+        ``updated_at__gt`` returns only recently changed items. Guests (role 5) only
+        see their own work items unless ``guest_view_all_features`` is enabled.
+        """
         extra_filters = {}
         if request.GET.get("updated_at__gt", None) is not None:
             extra_filters = {"updated_at__gt": request.GET.get("updated_at__gt")}
@@ -271,6 +297,7 @@ class IssueViewSet(BaseViewSet):
         issue_queryset = issue_queryset.filter(**filters, **extra_filters)
 
         # Keeping a copy of the queryset before applying annotations
+        # (used for total counts and group values, without the extra annotations)
         filtered_issue_queryset = copy.deepcopy(issue_queryset)
 
         # Applying annotations to the issue queryset
@@ -295,6 +322,7 @@ class IssueViewSet(BaseViewSet):
             entity_identifier=project_id,
             user_id=request.user.id,
         )
+        # role=5 is ROLE.GUEST
         if (
             ProjectMember.objects.filter(
                 workspace__slug=slug,
@@ -343,6 +371,8 @@ class IssueViewSet(BaseViewSet):
                         ),
                         group_by_field_name=group_by,
                         sub_group_by_field_name=sub_group_by,
+                        # Only count accepted (1), rejected (-1) and duplicate (2) intake items or
+                        # regular (non-intake) work items that are not archived or drafts.
                         count_filter=Q(
                             Q(issue_intake__status=1)
                             | Q(issue_intake__status=-1)
@@ -391,6 +421,11 @@ class IssueViewSet(BaseViewSet):
 
     @allow_permission([ROLE.ADMIN, ROLE.MEMBER])
     def create(self, request, slug, project_id):
+        """Create a work item and return it in list-view shape.
+
+        Queues issue activity, webhook ``model_activity`` and the initial
+        description version task.
+        """
         project = Project.objects.get(pk=project_id)
 
         serializer = IssueCreateSerializer(
@@ -479,6 +514,11 @@ class IssueViewSet(BaseViewSet):
 
     @allow_permission(allowed_roles=[ROLE.ADMIN, ROLE.MEMBER, ROLE.GUEST], creator=True, model=Issue)
     def retrieve(self, request, slug, project_id, pk=None):
+        """Return full work item detail (labels, assignees, modules, reactions, links, subscription).
+
+        Guests may only view their own work items unless ``guest_view_all_features``.
+        Records a recent visit.
+        """
         project = Project.objects.get(pk=project_id, workspace__slug=slug)
 
         issue = (
@@ -614,6 +654,11 @@ class IssueViewSet(BaseViewSet):
 
     @allow_permission(allowed_roles=[ROLE.ADMIN, ROLE.MEMBER], creator=True, model=Issue)
     def partial_update(self, request, slug, project_id, pk=None):
+        """Partially update a work item (admin/member or creator); returns 204.
+
+        ``skip_activity`` combined with a description change suppresses activity,
+        webhook and version tasks (used for description migrations).
+        """
         queryset = self.get_queryset()
         queryset = self.apply_annotations(queryset)
 
@@ -703,6 +748,7 @@ class IssueViewSet(BaseViewSet):
 
     @allow_permission([ROLE.ADMIN], creator=True, model=Issue)
     def destroy(self, request, slug, project_id, pk=None):
+        """Delete a work item (admin or creator), drop it from recent visits and log the activity."""
         issue = Issue.objects.get(workspace__slug=slug, project_id=project_id, pk=pk)
 
         issue.delete()
@@ -729,8 +775,11 @@ class IssueViewSet(BaseViewSet):
 
 
 class ProjectUserDisplayPropertyEndpoint(BaseAPIView):
+    """Per-user display settings (filters, display properties) for a project's work item views."""
+
     @allow_permission([ROLE.ADMIN, ROLE.MEMBER, ROLE.GUEST])
     def patch(self, request, slug, project_id):
+        """Partially update the user's project display settings, creating the row if needed."""
         try:
             issue_property = ProjectUserProperty.objects.get(
                 user=request.user, 
@@ -753,14 +802,18 @@ class ProjectUserDisplayPropertyEndpoint(BaseAPIView):
 
     @allow_permission([ROLE.ADMIN, ROLE.MEMBER, ROLE.GUEST])
     def get(self, request, slug, project_id):
+        """Return (creating if needed) the user's project display settings."""
         issue_property, _ = ProjectUserProperty.objects.get_or_create(user=request.user, project_id=project_id)
         serializer = ProjectUserPropertySerializer(issue_property)
         return Response(serializer.data, status=status.HTTP_200_OK)
 
 
 class BulkDeleteIssuesEndpoint(BaseAPIView):
+    """Delete many work items at once (project admins only)."""
+
     @allow_permission([ROLE.ADMIN])
     def delete(self, request, slug, project_id):
+        """Delete ``issue_ids`` together with their cycle and module links."""
         issue_ids = request.data.get("issue_ids", [])
 
         if not len(issue_ids):
@@ -786,8 +839,11 @@ class BulkDeleteIssuesEndpoint(BaseAPIView):
 
 
 class DeletedIssuesListViewSet(BaseAPIView):
+    """Ids of work items that were archived or deleted (used by clients to prune local caches)."""
+
     @allow_permission([ROLE.ADMIN, ROLE.MEMBER, ROLE.GUEST])
     def get(self, request, slug, project_id):
+        """Return ids of archived/deleted work items, optionally only those changed after ``updated_at__gt``."""
         filters = {}
         if request.GET.get("updated_at__gt", None) is not None:
             filters = {"updated_at__gt": request.GET.get("updated_at__gt")}
@@ -802,7 +858,10 @@ class DeletedIssuesListViewSet(BaseAPIView):
 
 
 class IssuePaginatedViewSet(BaseViewSet):
+    """Cursor-paginated work item feed ordered by ``updated_at`` for client-side sync."""
+
     def get_queryset(self):
+        """Project work items annotated with cycle id and link/attachment/sub-issue counts."""
         workspace_slug = self.kwargs.get("slug")
         project_id = self.kwargs.get("project_id")
 
@@ -841,6 +900,7 @@ class IssuePaginatedViewSet(BaseViewSet):
         )
 
     def process_paginated_result(self, fields, results, timezone):
+        """Select ``fields`` from the page of results and convert timestamps to the user's timezone."""
         paginated_data = results.values(*fields)
 
         # converting the datetime fields in paginated data
@@ -851,6 +911,11 @@ class IssuePaginatedViewSet(BaseViewSet):
 
     @allow_permission([ROLE.ADMIN, ROLE.MEMBER, ROLE.GUEST])
     def list(self, request, slug, project_id):
+        """Return a page of work items (``cursor``), optionally with ``description_html``.
+
+        ``updated_at__gt`` limits to changes since the last sync. Guests only get
+        their own work items unless ``guest_view_all_features``.
+        """
         cursor = request.GET.get("cursor", None)
         is_description_required = request.GET.get("description", "false")
         updated_at = request.GET.get("updated_at__gt", None)
@@ -961,10 +1026,13 @@ class IssuePaginatedViewSet(BaseViewSet):
 
 
 class IssueDetailEndpoint(BaseAPIView):
+    """Paginated work item list with detailed serialization (supports ``fields`` / ``expand``)."""
+
     filter_backends = (ComplexFilterBackend,)
     filterset_class = IssueFilterSet
 
     def apply_annotations(self, issues):
+        """Add cycle id, counts and prefetch assignee/label/module bridge rows."""
         return (
             issues.annotate(
                 cycle_id=Subquery(
@@ -1014,6 +1082,10 @@ class IssueDetailEndpoint(BaseAPIView):
 
     @allow_permission([ROLE.ADMIN, ROLE.MEMBER, ROLE.GUEST])
     def get(self, request, slug, project_id):
+        """Return work items the user may see, with filters, ordering and pagination.
+
+        ``expand=issue_relation`` / ``issue_related`` prefetch relations.
+        """
         filters = issue_filters(request.query_params, "GET")
 
         # check for the project member role, if the role is 5 then check for the guest_view_all_features
@@ -1092,6 +1164,8 @@ class IssueDetailEndpoint(BaseAPIView):
 
 
 class IssueBulkUpdateDateEndpoint(BaseAPIView):
+    """Bulk update start/target dates (e.g. from the Gantt/timeline view)."""
+
     def validate_dates(self, current_start, current_target, new_start, new_target):
         """
         Validate that start date is before target date.
@@ -1113,6 +1187,11 @@ class IssueBulkUpdateDateEndpoint(BaseAPIView):
 
     @allow_permission([ROLE.ADMIN, ROLE.MEMBER])
     def post(self, request, slug, project_id):
+        """Apply ``updates`` (list of ``{id, start_date, target_date}``) and log activities.
+
+        Rejects the whole request if any resulting start date is after its target
+        date; unknown ids are skipped.
+        """
         updates = request.data.get("updates", [])
 
         issue_ids = [update["id"] for update in updates]
@@ -1172,8 +1251,11 @@ class IssueBulkUpdateDateEndpoint(BaseAPIView):
 
 
 class IssueMetaEndpoint(BaseAPIView):
+    """Minimal work item info used to build its human-readable identifier."""
+
     @allow_permission([ROLE.ADMIN, ROLE.MEMBER, ROLE.GUEST], level="PROJECT")
     def get(self, request, slug, project_id, issue_id):
+        """Return the work item's ``sequence_id`` and project identifier."""
         issue = Issue.issue_objects.only("sequence_id", "project__identifier").get(
             id=issue_id, project_id=project_id, workspace__slug=slug
         )
@@ -1187,12 +1269,21 @@ class IssueMetaEndpoint(BaseAPIView):
 
 
 class IssueDetailIdentifierEndpoint(BaseAPIView):
+    """Look up a work item by project identifier + sequence number (e.g. ``PROJ-42``)."""
+
     def strict_str_to_int(self, s):
+        """Parse a string as an int, rejecting anything that is not an optional '-' followed by digits."""
         if not s.isdigit() and not (s.startswith("-") and s[1:].isdigit()):
             raise ValueError("Invalid integer string")
         return int(s)
 
     def get(self, request, slug, project_identifier, issue_identifier):
+        """Return full work item detail for ``project_identifier``-``issue_identifier``.
+
+        Requires active project membership; guests may only view their own work
+        items unless ``guest_view_all_features``. ``is_intake`` flags items still
+        pending (-2) or snoozed (0) in intake.
+        """
         # Check if the issue identifier is a valid integer
         try:
             issue_identifier = self.strict_str_to_int(issue_identifier)

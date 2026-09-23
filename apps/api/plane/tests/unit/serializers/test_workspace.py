@@ -2,6 +2,13 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 # See the LICENSE file for details.
 
+"""Unit tests for workspace serializers.
+
+Covers WorkspaceLiteSerializer output/read-only behaviour and the validate_name rules
+(reject symbol-only names and names containing URLs) shared by the app
+WorkSpaceSerializer and the instance/license WorkspaceSerializer.
+"""
+
 import pytest
 from uuid import uuid4
 

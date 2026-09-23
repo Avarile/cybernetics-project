@@ -2,6 +2,9 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 # See the LICENSE file for details.
 
+"""URL routes for projects: CRUD, identifiers, invitations, membership (join/leave/roles),
+favorites, deploy boards (public publishing), archiving and per-member preferences."""
+
 from django.urls import path
 
 from plane.app.views import (

@@ -2,6 +2,14 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 # See the LICENSE file for details.
 
+"""Management command ``fix_duplicate_sequences``: repair issues sharing a sequence number.
+
+Usage: ``python manage.py fix_duplicate_sequences <PROJ-123>`` (prompts for the
+workspace slug). When several issues in a project share the same ``sequence_id``,
+all but the first are renumbered after the project's current max sequence, and
+their ``IssueSequence`` rows are updated to match.
+"""
+
 # Django imports
 from django.core.management.base import BaseCommand, CommandError
 from django.db.models import Max
@@ -13,6 +21,8 @@ from plane.utils.uuid import convert_uuid_to_integer
 
 
 class Command(BaseCommand):
+    """Reassign unique sequence IDs to duplicated issues of a project."""
+
     help = "Fix duplicate sequences"
 
     def add_arguments(self, parser):
@@ -20,11 +30,16 @@ class Command(BaseCommand):
         parser.add_argument("issue_identifier", type=str, help="Issue Identifier")
 
     def strict_str_to_int(self, s):
+        """Convert an optionally negative all-digit string to int; raise ValueError otherwise."""
         if not s.isdigit() and not (s.startswith("-") and s[1:].isdigit()):
             raise ValueError("Invalid integer string")
         return int(s)
 
     def handle(self, *args, **options):
+        """Parse ``<PROJECT_IDENTIFIER>-<SEQ>``, find duplicates and renumber them atomically.
+
+        Any failure is re-raised as ``CommandError``.
+        """
         workspace_slug = input("Workspace slug: ")
 
         if not workspace_slug:
@@ -65,7 +80,8 @@ class Command(BaseCommand):
                     # Get an exclusive lock using the project ID as the lock key
                     cursor.execute("SELECT pg_advisory_xact_lock(%s)", [lock_key])
 
-                # Get the maximum sequence ID for the project
+                # Get the maximum sequence ID for the project (read after taking the lock so
+                # concurrent issue creation cannot allocate the same numbers)
                 last_sequence = IssueSequence.objects.filter(project=project).aggregate(largest=Max("sequence"))[
                     "largest"
                 ]
@@ -75,7 +91,7 @@ class Command(BaseCommand):
 
                 issue_sequence_map = {isq.issue_id: isq for isq in IssueSequence.objects.filter(project=project)}
 
-                # change the ids of duplicate issues
+                # change the ids of duplicate issues; the first one keeps the original sequence
                 for index, issue in enumerate(issues[1:]):
                     updated_sequence_id = last_sequence + index + 1
                     issue.sequence_id = updated_sequence_id

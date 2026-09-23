@@ -2,6 +2,12 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 # See the LICENSE file for details.
 
+"""Helpers for reading instance configuration values.
+
+Values come either from the InstanceConfiguration table (when ``settings.SKIP_ENV_VAR`` is
+true, i.e. configured via god mode) or straight from environment variables.
+"""
+
 # Python imports
 import os
 
@@ -15,6 +21,12 @@ from plane.license.utils.encryption import decrypt_data
 
 # Helper function to return value from the passed key
 def get_configuration_value(keys):
+    """Resolve configuration values for ``keys`` and return them as a tuple in the same order.
+
+    ``keys`` is a list of ``{"key": NAME, "default": VALUE}`` dicts. With ``SKIP_ENV_VAR`` set,
+    values are read from the DB (decrypting encrypted ones) and ``default`` is used for missing
+    keys; otherwise ``os.environ[NAME]`` is used, falling back to ``default``.
+    """
     environment_list = []
     if settings.SKIP_ENV_VAR:
         # Get the configurations
@@ -29,6 +41,7 @@ def get_configuration_value(keys):
                         environment_list.append(item.get("value"))
 
                     break
+            # for/else: no DB row for this key, so use its default
             else:
                 environment_list.append(key.get("default"))
     else:
@@ -40,6 +53,9 @@ def get_configuration_value(keys):
 
 
 def get_email_configuration():
+    """Return the SMTP settings tuple:
+    (host, user, password, port, use_tls, use_ssl, from_address).
+    """
     return get_configuration_value(
         [
             {"key": "EMAIL_HOST", "default": os.environ.get("EMAIL_HOST")},

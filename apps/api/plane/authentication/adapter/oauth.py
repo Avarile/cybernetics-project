@@ -2,6 +2,14 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 # See the LICENSE file for details.
 
+"""
+Base adapter for OAuth2 providers (Google, GitHub, GitLab, Gitea).
+
+Handles the token exchange, user-info fetch and persistence of the provider
+``Account`` (tokens and expiry); providers in ``plane.authentication.provider.oauth``
+supply the URLs and map the provider payload into ``user_data``.
+"""
+
 # Python imports
 import requests
 from django.db import DatabaseError, IntegrityError
@@ -22,6 +30,8 @@ from .base import Adapter
 
 
 class OauthAdapter(Adapter):
+    """Common OAuth2 authorization-code flow; subclasses implement ``set_token_data``/``set_user_data``."""
+
     def __init__(
         self,
         request,
@@ -47,6 +57,7 @@ class OauthAdapter(Adapter):
         self.code = code
 
     def authentication_error_code(self):
+        """Return the provider-specific error key used when a call to the provider fails."""
         if self.provider == "google":
             return "GOOGLE_OAUTH_PROVIDER_ERROR"
         elif self.provider == "github":
@@ -68,11 +79,13 @@ class OauthAdapter(Adapter):
         return self.userinfo_url
 
     def authenticate(self):
+        """Exchange the code for tokens, load the user profile, then log in or sign up."""
         self.set_token_data()
         self.set_user_data()
         return self.complete_login_or_signup()
 
     def get_user_token(self, data, headers=None):
+        """POST ``data`` to the token endpoint and return the JSON token payload; raise a provider error on failure."""
         try:
             headers = headers or {}
             response = requests.post(self.get_token_url(), data=data, headers=headers)
@@ -84,6 +97,7 @@ class OauthAdapter(Adapter):
             raise AuthenticationException(error_code=AUTHENTICATION_ERROR_CODES[code], error_message=str(code))
 
     def get_user_response(self):
+        """GET the user-info endpoint with the bearer access token and return the JSON profile."""
         try:
             headers = {"Authorization": f"Bearer {self.token_data.get('access_token')}"}
             response = requests.get(self.get_user_info_url(), headers=headers)
@@ -103,6 +117,10 @@ class OauthAdapter(Adapter):
         self.user_data = data
 
     def create_update_account(self, user):
+        """Upsert the ``Account`` row linking ``user`` to this provider and store the latest tokens.
+
+        Database errors are logged and swallowed so they do not block the login.
+        """
         try:
             # Check if the account already exists
             account = Account.objects.filter(

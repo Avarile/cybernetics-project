@@ -2,6 +2,13 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 # See the LICENSE file for details.
 
+"""Celery task that tracks embedded components (mentions, images) in page content via PageLog.
+
+Enqueued when a page description is saved. It diffs components between the old
+and new HTML and keeps one PageLog row per component (keyed by the component's
+``id`` as ``transaction``), so pages can be queried by what they reference.
+"""
+
 # Python imports
 import logging
 
@@ -18,6 +25,8 @@ from plane.utils.exception_logger import log_exception
 
 logger = logging.getLogger("plane.worker")
 
+# Editor custom elements to track: which HTML attributes to read from each tag and
+# how to normalise them into PageLog entity fields.
 COMPONENT_MAP = {
     "mention-component": {
         "attributes": ["id", "entity_identifier", "entity_name", "entity_type"],
@@ -109,6 +118,8 @@ def page_transaction(new_description_html, old_description_html, page_id):
 
             for mention in new_entities:
                 mention_id = mention.get("id")
+                # Skip components that already existed, unless the page has no logs yet
+                # (first run backfills everything currently in the page).
                 if not mention_id or (mention_id in old_ids and has_existing_logs):
                     continue
 

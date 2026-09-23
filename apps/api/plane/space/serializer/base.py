@@ -2,14 +2,20 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 # See the LICENSE file for details.
 
+"""Base serializers for the public (space) API."""
+
 from rest_framework import serializers
 
 
 class BaseSerializer(serializers.ModelSerializer):
+    """ModelSerializer with a read-only primary key ``id`` field."""
+
     id = serializers.PrimaryKeyRelatedField(read_only=True)
 
 
 class DynamicBaseSerializer(BaseSerializer):
+    """Serializer accepting a ``fields=[...]`` kwarg to restrict which fields are output."""
+
     def __init__(self, *args, **kwargs):
         # If 'fields' is provided in the arguments, remove it and store it separately.
         # This is done so as not to pass this custom argument up to the superclass.

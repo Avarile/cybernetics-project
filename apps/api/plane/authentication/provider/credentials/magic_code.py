@@ -2,6 +2,15 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 # See the LICENSE file for details.
 
+"""
+Magic-code (passwordless email OTP) credential provider.
+
+``initiate`` issues a 6-digit code stored in Redis under ``magic_<email>`` for
+10 minutes (the email is sent by the calling view via a background task).
+``set_user_data`` verifies a submitted code with per-token brute-force limits.
+Requires SMTP to be configured and ENABLE_MAGIC_LINK_LOGIN not disabled.
+"""
+
 # Python imports
 import json
 import os
@@ -20,6 +29,8 @@ from plane.db.models import User
 
 
 class MagicCodeProvider(CredentialAdapter):
+    """Passwordless login: ``key`` is the email (initiate) or the Redis key ``magic_<email>`` (verify)."""
+
     provider = "magic-code"
 
     # Max wrong-code verification attempts per issued token before the token
@@ -41,9 +52,11 @@ class MagicCodeProvider(CredentialAdapter):
 
     @staticmethod
     def _verify_attempts_key(token_key):
+        """Redis key of the wrong-code counter associated with a magic token key."""
         return f"{token_key}:verify_attempts"
 
     def __init__(self, request, key, code=None, callback=None):
+        """Raise SMTP_NOT_CONFIGURED / MAGIC_LINK_LOGIN_DISABLED if the instance can't do magic-code login."""
         (EMAIL_HOST, ENABLE_MAGIC_LINK_LOGIN) = get_configuration_value(
             [
                 {"key": "EMAIL_HOST", "default": os.environ.get("EMAIL_HOST")},
@@ -73,6 +86,11 @@ class MagicCodeProvider(CredentialAdapter):
         self.code = code
 
     def initiate(self):
+        """Generate and store a new code for ``self.key`` and return ``(redis_key, token)``.
+
+        Regenerating is limited: after 3 regenerations within the key's lifetime an
+        EMAIL_CODE_ATTEMPT_EXHAUSTED_* error is raised. Each regeneration resets the TTL to 600s.
+        """
         ## Generate a random token
         token = str(secrets.randbelow(900000) + 100000)
 
@@ -119,6 +137,13 @@ class MagicCodeProvider(CredentialAdapter):
         return key, token
 
     def set_user_data(self):
+        """Verify ``self.code`` against the stored token and populate ``user_data`` on success.
+
+        Raises INVALID_* for a wrong code, EXPIRED_* when no token exists, and
+        EMAIL_CODE_ATTEMPT_EXHAUSTED_* (after invalidating the token) once
+        MAX_VERIFY_ATTEMPTS wrong codes were submitted. SIGN_IN vs SIGN_UP variants
+        depend on whether the user already exists.
+        """
         ri = redis_instance()
         if ri.exists(self.key):
             data = json.loads(ri.get(self.key))

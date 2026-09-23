@@ -9,6 +9,8 @@
 # DO NOT remove or modify this notice.
 # NOTICE: Proprietary and confidential. Unauthorized use or distribution is prohibited.
 
+"""Email helpers, e.g. deriving a plain-text alternative body from an HTML template."""
+
 # Python imports
 import re
 

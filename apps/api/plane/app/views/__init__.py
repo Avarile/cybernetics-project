@@ -2,6 +2,14 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 # See the LICENSE file for details.
 
+"""Public view namespace for the web app API (``plane.app``).
+
+Re-exports every view class from the feature sub-packages (projects,
+workspaces, cycles, modules, work items, pages, assets, analytics, etc.) so
+``plane/app/urls/*`` can import them from ``plane.app.views``. Sub-packages
+also import ``BaseAPIView`` / ``BaseViewSet`` from here (``from .. import ...``).
+"""
+
 from .project.base import (
     ProjectViewSet,
     ProjectIdentifierEndpoint,

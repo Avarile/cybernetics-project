@@ -2,6 +2,12 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 # See the LICENSE file for details.
 
+"""Celery task that records a user's recently visited entities (issues, pages, projects...).
+
+Backs the "recent" lists in the UI via UserRecentVisit; each user keeps at most
+20 entries per workspace.
+"""
+
 # Python imports
 from django.utils import timezone
 from django.db import DatabaseError
@@ -16,6 +22,11 @@ from plane.utils.exception_logger import log_exception
 
 @shared_task
 def recent_visited_task(entity_name, entity_identifier, user_id, project_id, slug):
+    """Upsert a UserRecentVisit for the entity in workspace ``slug``.
+
+    An existing entry just has ``visited_at`` bumped; otherwise a new one is created,
+    evicting the oldest entry when the user already has 20 in this workspace.
+    """
     try:
         workspace = Workspace.objects.get(slug=slug)
         recent_visited = UserRecentVisit.objects.filter(

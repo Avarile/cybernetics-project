@@ -2,6 +2,9 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 # See the LICENSE file for details.
 
+"""Custom logging handlers referenced from the Django LOGGING settings.
+"""
+
 import logging.handlers as handlers
 import time
 

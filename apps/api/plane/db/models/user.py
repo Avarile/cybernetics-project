@@ -2,6 +2,14 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 # See the LICENSE file for details.
 
+"""User identity models.
+
+``User`` is the custom auth user (``AUTH_USER_MODEL``, logs in by email),
+``Profile`` stores per-user UI/onboarding preferences, and ``Account`` stores
+linked OAuth provider accounts. A ``post_save`` signal creates default
+notification preferences for every new non-bot user.
+"""
+
 # Python imports
 import random
 import string
@@ -23,6 +31,7 @@ from plane.utils.color import get_random_color
 
 
 def get_default_onboarding():
+    """Default web onboarding checklist state (all steps incomplete)."""
     return {
         "profile_complete": False,
         "workspace_create": False,
@@ -32,6 +41,7 @@ def get_default_onboarding():
 
 
 def get_mobile_default_onboarding():
+    """Default mobile onboarding checklist state (all steps incomplete)."""
     return {
         "profile_complete": False,
         "workspace_create": False,
@@ -40,6 +50,7 @@ def get_mobile_default_onboarding():
 
 
 def get_default_product_tour():
+    """Default per-feature product tour completion flags (none seen yet)."""
     return {
         "work_items": False,
         "cycles": False,
@@ -50,11 +61,19 @@ def get_default_product_tour():
 
 
 class BotTypeEnum(models.TextChoices):
+    """Kinds of bot users (stored in ``User.bot_type`` when ``is_bot`` is set)."""
+
     WORKSPACE_SEED = "WORKSPACE_SEED", "Workspace Seed"
 
 
 class User(AbstractBaseUser, PermissionsMixin):
-    id = models.UUIDField(default=uuid.uuid4, unique=True, editable=False, db_index=True, primary_key=True)
+    """Custom user model; authenticates by ``email`` (``USERNAME_FIELD``).
+
+    Tracks login/logout metadata, avatar/cover images (uploaded asset or URL),
+    bot users (``is_bot``/``bot_type``) and account masking (``masked_at``).
+    """
+
+    id =models.UUIDField(default=uuid.uuid4, unique=True, editable=False, db_index=True, primary_key=True)
     username = models.CharField(max_length=128, unique=True)
     # user fields
     mobile_number = models.CharField(max_length=255, blank=True, null=True)
@@ -141,6 +160,7 @@ class User(AbstractBaseUser, PermissionsMixin):
 
     @property
     def avatar_url(self):
+        """Avatar URL, preferring the uploaded asset over the legacy ``avatar`` URL."""
         # Return the logo asset url if it exists
         if self.avatar_asset:
             return self.avatar_asset.asset_url
@@ -152,6 +172,7 @@ class User(AbstractBaseUser, PermissionsMixin):
 
     @property
     def cover_image_url(self):
+        """Cover image URL, preferring the uploaded asset over the legacy ``cover_image`` URL."""
         # Return the logo asset url if it exists
         if self.cover_image_asset:
             return self.cover_image_asset.asset_url
@@ -167,13 +188,18 @@ class User(AbstractBaseUser, PermissionsMixin):
         return f"{self.first_name} {self.last_name}".strip()
 
     def save(self, *args, **kwargs):
+        """Normalize email, rotate the token, default the display name, and sync staff flag."""
         self.email = self.email.lower().strip()
         self.mobile_number = self.mobile_number
 
+        # Once a token has been issued (token_updated_at set), it is regenerated
+        # on every save.
         if self.token_updated_at is not None:
             self.token = uuid.uuid4().hex + uuid.uuid4().hex
             self.token_updated_at = timezone.now()
 
+        # Default display name is the email's local part (the random fallback is
+        # effectively unreachable since split() always returns at least one item).
         if not self.display_name:
             self.display_name = (
                 self.email.split("@")[0]
@@ -188,6 +214,7 @@ class User(AbstractBaseUser, PermissionsMixin):
 
     @classmethod
     def get_display_name(cls, email):
+        """Derive a display name from an email's local part, or a random 6-letter string."""
         if not email:
             return "".join(random.choice(string.ascii_letters) for _ in range(6))
         return (
@@ -198,6 +225,8 @@ class User(AbstractBaseUser, PermissionsMixin):
 
 
 class Profile(TimeAuditModel):
+    """One-to-one user preferences: theme, onboarding progress, language, week start, tours, etc."""
+
     SUNDAY = 0
     MONDAY = 1
     TUESDAY = 2
@@ -207,6 +236,8 @@ class Profile(TimeAuditModel):
     SATURDAY = 6
 
     class NotificationViewMode(models.TextChoices):
+        """How the notification inbox is rendered for this user."""
+
         FULL = "full", "Full"
         COMPACT = "compact", "Compact"
 
@@ -269,6 +300,11 @@ class Profile(TimeAuditModel):
 
 
 class Account(TimeAuditModel):
+    """An OAuth provider account linked to a user, with its stored tokens.
+
+    Unique per (provider, provider_account_id).
+    """
+
     PROVIDER_CHOICES = (
         ("google", "Google"),
         ("github", "Github"),
@@ -297,6 +333,7 @@ class Account(TimeAuditModel):
 
 @receiver(post_save, sender=User)
 def create_user_notification(sender, instance, created, **kwargs):
+    """Signal handler: give each newly created non-bot user default notification preferences."""
     # create preferences
     if created and not instance.is_bot:
         # Module imports

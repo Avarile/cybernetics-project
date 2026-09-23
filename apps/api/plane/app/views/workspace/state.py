@@ -2,6 +2,8 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 # See the LICENSE file for details.
 
+"""Workspace-level state listing across all projects the user belongs to."""
+
 # Third party modules
 from rest_framework import status
 from rest_framework.response import Response
@@ -15,10 +17,13 @@ from collections import defaultdict
 
 
 class WorkspaceStatesEndpoint(BaseAPIView):
+    """List workflow states from every non-archived project where the user is an active member."""
+
     permission_classes = [WorkspaceEntityPermission]
     use_read_replica = True
 
     def get(self, request, slug):
+        """Return non-triage states with a computed `order` attribute within each state group."""
         states = State.objects.filter(
             workspace__slug=slug,
             project__project_projectmember__member=request.user,
@@ -27,6 +32,8 @@ class WorkspaceStatesEndpoint(BaseAPIView):
             is_triage=False,
         )
 
+        # Assign each state a fractional position (0, 1] within its group so clients can
+        # order states from different projects consistently. Not persisted.
         grouped_states = defaultdict(list)
         for state in states:
             grouped_states[state.group].append(state)

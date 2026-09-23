@@ -2,6 +2,13 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 # See the LICENSE file for details.
 
+"""Unit tests for ``plane.app.serializers.cybernetics_data``.
+
+Covers the SSRF-aware base-URL validator, the integration read/write serializers (the API
+token is write-only and never echoed back), record reference/attach payloads, and the
+issue-record serializer's deep link. DNS is mocked; models are built in memory, not saved.
+"""
+
 import ipaddress
 import socket
 from uuid import uuid4
@@ -20,16 +27,19 @@ from plane.app.serializers.cybernetics_data import (
 )
 from plane.db.models import IssueCyberneticsRecord, ProjectCyberneticsDataIntegration
 
+# DNS lookup used by the URL validator's private-IP check; patched to control resolution.
 GETADDRINFO = "plane.utils.ip_address.socket.getaddrinfo"
 REF = {"base_id": "bseAAAAAAAA", "table_id": "tblAAAAAAAA", "record_id": "recAAAAAAAA"}
 
 
 def _addrinfo(ip):
+    """Fake ``getaddrinfo`` result resolving to a single IPv4 address."""
     return [(socket.AF_INET, socket.SOCK_STREAM, 6, "", (ip, 0))]
 
 
 @pytest.fixture
 def allowlisted(settings):
+    """Allowlist ``data.example.com`` by hostname (no IP allowlist)."""
     settings.CYBERNETICS_DATA_ALLOWED_HOSTS = ["data.example.com"]
     settings.CYBERNETICS_DATA_ALLOWED_IPS = []
     return settings
@@ -37,10 +47,13 @@ def allowlisted(settings):
 
 @pytest.mark.unit
 class TestUrlValidator:
+    """``validate_cybernetics_base_url``: normalisation plus SSRF protection."""
+
     def test_normalises(self, allowlisted):
         assert validate_cybernetics_base_url(" https://data.example.com/api/ ") == "https://data.example.com"
 
     def test_allowlisted_host_skips_dns(self, allowlisted, mocker):
+        """Allowlisted hosts (case-insensitive) are accepted without a DNS lookup."""
         lookup = mocker.patch(GETADDRINFO, side_effect=AssertionError("DNS must not be used"))
         assert validate_cybernetics_base_url("https://DATA.example.com") == "https://DATA.example.com"
         lookup.assert_not_called()
@@ -53,6 +66,7 @@ class TestUrlValidator:
 
     @pytest.mark.parametrize("ip", ["10.1.2.3", "127.0.0.1", "169.254.169.254", "192.168.0.10"])
     def test_private_ip_rejected(self, settings, mocker, ip):
+        """Hosts resolving to private, loopback or link-local (cloud metadata) IPs are rejected."""
         settings.CYBERNETICS_DATA_ALLOWED_HOSTS = []
         settings.CYBERNETICS_DATA_ALLOWED_IPS = []
         mocker.patch(GETADDRINFO, return_value=_addrinfo(ip))
@@ -73,6 +87,8 @@ class TestUrlValidator:
 
 @pytest.mark.unit
 class TestWriteSerializer:
+    """Create/update payload for a project's integration settings."""
+
     def test_defaults(self, allowlisted):
         serializer = ProjectCyberneticsDataIntegrationWriteSerializer(data={})
         assert serializer.is_valid(), serializer.errors
@@ -96,11 +112,13 @@ class TestWriteSerializer:
         }
 
     def test_blank_token_allowed(self, allowlisted):
+        """A whitespace-only token is valid and stripped to an empty string."""
         serializer = ProjectCyberneticsDataIntegrationWriteSerializer(data={"api_token": "   "})
         assert serializer.is_valid(), serializer.errors
         assert serializer.validated_data["api_token"] == ""
 
     def test_length_limits(self, allowlisted):
+        """``api_token`` is capped at 1024 chars and ``base_url`` rejects overly long URLs."""
         ok = ProjectCyberneticsDataIntegrationWriteSerializer(data={"api_token": "t" * 1024})
         assert ok.is_valid(), ok.errors
         too_long = ProjectCyberneticsDataIntegrationWriteSerializer(data={"api_token": "t" * 1025})
@@ -122,7 +140,10 @@ class TestWriteSerializer:
 
 @pytest.mark.unit
 class TestConnectionTestSerializer:
+    """Payload for the "test connection" endpoint; both fields are optional."""
+
     def test_blank_url_passes_through(self, mocker):
+        """A blank URL skips validation (and DNS) entirely."""
         lookup = mocker.patch(GETADDRINFO)
         serializer = CyberneticsConnectionTestSerializer(data={"base_url": "", "api_token": ""})
         assert serializer.is_valid(), serializer.errors
@@ -137,6 +158,8 @@ class TestConnectionTestSerializer:
 
 @pytest.mark.unit
 class TestRecordRefSerializer:
+    """Reference to a single Teable record (base/table/record, optional view)."""
+
     def test_valid(self):
         serializer = CyberneticsRecordRefSerializer(data=REF)
         assert serializer.is_valid(), serializer.errors
@@ -147,6 +170,7 @@ class TestRecordRefSerializer:
         [("base_id", "tblAAAAAAAA"), ("table_id", "bseAAAAAAAA"), ("record_id", "rec../../x"), ("view_id", "viw")],
     )
     def test_each_id_kind_is_checked(self, field, value):
+        """Each id must carry its own kind prefix; errors surface as ``non_field_errors``."""
         serializer = CyberneticsRecordRefSerializer(data={**REF, field: value})
         assert not serializer.is_valid()
         assert "non_field_errors" in serializer.errors
@@ -166,7 +190,10 @@ class TestRecordRefSerializer:
 
 @pytest.mark.unit
 class TestAttachSerializer:
+    """Bulk attach payload: 1-10 record references per request."""
+
     def _refs(self, count):
+        """Build ``count`` distinct record references."""
         return [{**REF, "record_id": f"rec{i:08d}"} for i in range(count)]
 
     def test_empty_rejected(self):
@@ -186,6 +213,8 @@ class TestAttachSerializer:
 
 @pytest.mark.unit
 class TestReadSerializer:
+    """Integration read serializer must expose status fields but never token material."""
+
     def test_fields_and_no_token(self):
         integration = ProjectCyberneticsDataIntegration(
             id=uuid4(),
@@ -219,7 +248,10 @@ class TestReadSerializer:
 
 @pytest.mark.unit
 class TestRecordSerializer:
+    """``IssueCyberneticsRecordSerializer`` output fields and deep-link construction."""
+
     def _record(self):
+        """Unsaved ``IssueCyberneticsRecord`` with a stale ``source_url`` host."""
         return IssueCyberneticsRecord(
             id=uuid4(),
             issue_id=uuid4(),
@@ -231,6 +263,7 @@ class TestRecordSerializer:
         )
 
     def test_deep_link_uses_context_base_url(self):
+        """The deep link is rebuilt from the integration's current ``base_url`` in context."""
         data = IssueCyberneticsRecordSerializer(self._record(), context={"base_url": "https://new.example.com"}).data
         assert data["deep_link"] == "https://new.example.com/base/bseAAAAAAAA/table/tblAAAAAAAA?recordId=recAAAAAAAA"
 

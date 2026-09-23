@@ -2,3 +2,4 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 # See the LICENSE file for details.
 
+"""Authentication adapters: base, credential and OAuth adapters plus auth error definitions."""

@@ -2,12 +2,16 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 # See the LICENSE file for details.
 
+"""Cycle serializer for the public (space) API."""
+
 # Module imports
 from .base import BaseSerializer
 from plane.db.models import Cycle
 
 
 class CycleBaseSerializer(BaseSerializer):
+    """All cycle fields; ownership/audit fields read-only."""
+
     class Meta:
         model = Cycle
         fields = "__all__"

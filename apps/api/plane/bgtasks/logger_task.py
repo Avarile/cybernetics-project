@@ -2,6 +2,11 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 # See the LICENSE file for details.
 
+"""Celery task that persists public (external) API request logs to APIActivityLog.
+
+Enqueued by the API request-logging middleware so logging does not block responses.
+"""
+
 # Python imports
 import logging
 from typing import Dict, Any

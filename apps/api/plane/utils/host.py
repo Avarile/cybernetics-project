@@ -2,6 +2,12 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 # See the LICENSE file for details.
 
+"""Helpers to resolve the public base URL for redirects and the client IP.
+
+Used by authentication flows and emails to build links to the web app, the
+admin (god-mode) app or the public spaces app, based on Django settings.
+"""
+
 # Django imports
 from django.conf import settings
 from django.core.exceptions import ImproperlyConfigured
@@ -20,7 +26,12 @@ def base_host(
     is_space: bool = False,
     is_app: bool = False,
 ) -> str:
-    """Utility function to return host / origin from the request"""
+    """Return the base URL (origin + optional base path) for the requested app.
+
+    Despite taking ``request``, the value is derived purely from settings:
+    WEB_URL/APP_BASE_URL, plus ADMIN_*/SPACE_* overrides when ``is_admin`` /
+    ``is_space`` is set. Raises ImproperlyConfigured if no base URL is set.
+    """
     # Calculate the base origin from request
     base_origin = settings.WEB_URL or settings.APP_BASE_URL
 
@@ -29,6 +40,7 @@ def base_host(
 
     # Admin redirection
     if is_admin:
+        # Normalise the base path to the form "/path/" (default "/god-mode/")
         admin_base_path = getattr(settings, "ADMIN_BASE_PATH", None)
         if not isinstance(admin_base_path, str):
             admin_base_path = "/god-mode/"
@@ -44,6 +56,7 @@ def base_host(
 
     # Space redirection
     if is_space:
+        # Normalise the base path to the form "/path/" (default "/spaces/")
         space_base_path = getattr(settings, "SPACE_BASE_PATH", None)
         if not isinstance(space_base_path, str):
             space_base_path = "/spaces/"
@@ -68,4 +81,5 @@ def base_host(
 
 
 def user_ip(request: Request | HttpRequest) -> str:
+    """Return the client IP for ``request`` (see ``plane.utils.ip_address``)."""
     return get_client_ip(request=request)

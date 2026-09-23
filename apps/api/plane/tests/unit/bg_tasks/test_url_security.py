@@ -31,6 +31,7 @@ def _addr(ip):
 
 
 def _resp(status_code=200, headers=None, content=b"OK"):
+    """Build a mock requests.Response with the given status, headers and body."""
     resp = MagicMock(spec=requests.Response)
     resp.status_code = status_code
     resp.headers = headers or {}
@@ -43,6 +44,8 @@ def _resp(status_code=200, headers=None, content=b"OK"):
 # ---------------------------------------------------------------------------
 @pytest.mark.unit
 class TestIsBlockedIp:
+    """is_blocked_ip flags every internal/special-purpose range (incl. IPv4-mapped, NAT64, 6to4)."""
+
     @pytest.mark.parametrize(
         "ip",
         [
@@ -93,6 +96,8 @@ class TestIsBlockedIp:
 # ---------------------------------------------------------------------------
 @pytest.mark.unit
 class TestResolveAndValidate:
+    """resolve_and_validate returns the IPs to pin, or raises ValueError for unsafe/unresolvable hosts."""
+
     def test_returns_public_ips(self):
         with patch("plane.utils.ip_address.socket.getaddrinfo") as dns:
             dns.return_value = [_addr("93.184.216.34")]
@@ -133,6 +138,8 @@ class TestResolveAndValidate:
 # ---------------------------------------------------------------------------
 @pytest.mark.unit
 class TestPinnedFetch:
+    """pinned_fetch sends the request to the validated IP literal with Host/SNI set to the hostname."""
+
     @patch("plane.utils.url_security.requests.Session")
     @patch("plane.utils.url_security.resolve_and_validate")
     def test_connects_to_validated_ip_not_hostname(self, mock_resolve, mock_session_cls):
@@ -237,6 +244,8 @@ class TestPinnedFetch:
 # ---------------------------------------------------------------------------
 @pytest.mark.unit
 class TestPinnedFetchRedirects:
+    """pinned_fetch_following_redirects validates every hop and caps the redirect count."""
+
     @patch("plane.utils.url_security.requests.Session")
     @patch("plane.utils.url_security.resolve_and_validate")
     def test_no_redirect_returns_response(self, mock_resolve, mock_session_cls):
@@ -300,8 +309,11 @@ class TestPinnedFetchRedirects:
 # ---------------------------------------------------------------------------
 @pytest.mark.unit
 class TestPinnedIPAdapter:
+    """PinnedIPAdapter passes the real hostname to the pool so TLS verifies the right certificate."""
+
     def test_injects_server_hostname_into_pool(self):
         adapter = PinnedIPAdapter(server_hostname="example.com")
+        # Stub out requests internals so only the pool_kwargs injection is exercised.
         adapter.build_connection_pool_key_attributes = MagicMock(
             return_value=({"scheme": "https", "host": "93.184.216.34", "port": 443}, {})
         )
@@ -319,6 +331,8 @@ class TestPinnedIPAdapter:
 # ---------------------------------------------------------------------------
 @pytest.mark.unit
 class TestValidateUrlHardening:
+    """validate_url rejects ranges that the older private-IP check missed."""
+
     @pytest.mark.parametrize("ip", ["100.64.0.1", "224.0.0.1", "0.0.0.0"])
     def test_rejects_newly_covered_ranges(self, ip):
         with patch("plane.utils.ip_address.socket.getaddrinfo") as dns:
@@ -332,6 +346,8 @@ class TestValidateUrlHardening:
 # ---------------------------------------------------------------------------
 @pytest.mark.unit
 class TestReviewFixes:
+    """Edge cases in pinned_fetch/resolve_and_validate: URL credentials, IPv6 Host, IDNA errors, streaming."""
+
     @patch("plane.utils.url_security.requests.Session")
     @patch("plane.utils.url_security.resolve_and_validate")
     def test_url_embedded_credentials_become_basic_auth(self, mock_resolve, mock_session_cls):

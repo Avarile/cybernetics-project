@@ -25,21 +25,29 @@ from plane.middleware.logger import APITokenLogMiddleware
 
 @pytest.fixture
 def request_factory():
+    """Django RequestFactory used to build bare requests without the URL router."""
     return RequestFactory()
 
 
 @pytest.fixture
 def middleware():
+    """Middleware instance wrapping a dummy get_response that returns an empty JSON body."""
     return APITokenLogMiddleware(Mock(return_value=HttpResponse(b"{}")))
 
 
 @pytest.mark.unit
 class TestAPITokenLogMiddleware:
+    """Checks what APITokenLogMiddleware hands to the process_logs Celery task."""
+
     API_KEY = "plane_api_supersecretvalue"
     AUTHORIZATION = "Bearer secret-bearer-token"
     COOKIE = "sessionid=secret-session-value"
 
     def _captured_log_data(self, middleware, request_factory):
+        """Run a GET carrying an API key, auth and cookie headers through the middleware.
+
+        Patches the process_logs task and returns the `log_data` kwarg it was queued with.
+        """
         request = request_factory.get(
             "/api/v1/workspaces/",
             HTTP_X_API_KEY=self.API_KEY,
@@ -54,6 +62,7 @@ class TestAPITokenLogMiddleware:
             return process_logs.delay.call_args.kwargs["log_data"]
 
     def test_token_identifier_is_hashed_not_plaintext(self, middleware, request_factory):
+        """token_identifier must be the HMAC-SHA256 (keyed by SECRET_KEY) of the API key."""
         log_data = self._captured_log_data(middleware, request_factory)
 
         expected_hash = hmac.new(
@@ -63,6 +72,7 @@ class TestAPITokenLogMiddleware:
         assert self.API_KEY not in log_data["token_identifier"]
 
     def test_sensitive_headers_are_redacted(self, middleware, request_factory):
+        """X-Api-Key, Authorization and Cookie values are replaced by [REDACTED]."""
         log_data = self._captured_log_data(middleware, request_factory)
 
         # None of the sensitive header values may appear in the logged headers.
@@ -72,6 +82,7 @@ class TestAPITokenLogMiddleware:
         assert "[REDACTED]" in log_data["headers"]
 
     def test_no_log_without_api_key(self, middleware, request_factory):
+        """Requests without an X-Api-Key header are not logged at all."""
         request = request_factory.get("/api/v1/workspaces/")
         request.user = AnonymousUser()
         with patch("plane.middleware.logger.process_logs") as process_logs:

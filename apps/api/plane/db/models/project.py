@@ -2,6 +2,15 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 # See the LICENSE file for details.
 
+"""Project models.
+
+Defines ``Project`` (a workspace-scoped container for work items, cycles,
+modules, pages, etc.), the abstract ``ProjectBaseModel`` that most
+project-scoped models inherit from, project membership/invites, per-user
+project settings, and the project identifier registry. Also exposes the
+project role constants (``ROLE``/``ROLE_CHOICES``) used by permission checks.
+"""
+
 # Python imports
 import pytz
 from uuid import uuid4
@@ -18,25 +27,32 @@ from plane.db.mixins import AuditModel
 
 from .base import BaseModel
 
+# Project roles; a higher value means more privileges.
 ROLE_CHOICES = ((20, "Admin"), (15, "Member"), (5, "Guest"))
 
 
 class ROLE(Enum):
+    """Enum form of the project role values in ``ROLE_CHOICES``."""
+
     ADMIN = 20
     MEMBER = 15
     GUEST = 5
 
 
 class ProjectNetwork(Enum):
+    """Project visibility: SECRET (invite-only) or PUBLIC (joinable by workspace members)."""
+
     SECRET = 0
     PUBLIC = 2
 
     @classmethod
     def choices(cls):
+        """Return Django-style ``(value, label)`` choices."""
         return [(0, "Secret"), (2, "Public")]
 
 
 def get_default_props():
+    """Default saved filters/display filters for a member's project work item view."""
     return {
         "filters": {
             "priority": None,
@@ -62,10 +78,19 @@ def get_default_props():
 
 
 def get_default_preferences():
+    """Default per-user project preferences (page display and navigation tab)."""
     return {"pages": {"block_display": True}, "navigation": {"default_tab": "work_items", "hide_in_more_menu": []}}
 
 
 class Project(BaseModel):
+    """A project within a workspace.
+
+    ``identifier`` is the short uppercase key used in work item ids (e.g. "PROJ-12");
+    it and ``name`` are unique per workspace among non-deleted projects. The
+    ``*_view`` flags toggle optional features (cycles, modules, views, pages, intake).
+    ``archive_in``/``close_in`` are month counts (0-12) for automatic archiving/closing.
+    """
+
     NETWORK_CHOICES = ((0, "Secret"), (2, "Public"))
     name = models.CharField(max_length=255, verbose_name="Project Name")
     description = models.TextField(verbose_name="Project Description", blank=True)
@@ -126,6 +151,7 @@ class Project(BaseModel):
 
     @property
     def cover_image_url(self):
+        """Cover image URL, preferring the uploaded asset over the legacy ``cover_image`` value."""
         # Return cover image url
         if self.cover_image_asset:
             return self.cover_image_asset.asset_url
@@ -140,6 +166,7 @@ class Project(BaseModel):
         """Return name of the project"""
         return f"{self.name} <{self.workspace.name}>"
 
+    # Identifiers containing any of these punctuation characters are rejected.
     FORBIDDEN_IDENTIFIER_CHARS_PATTERN = r"^.*[&+,:;$^}{*=?@#|'<>.()%!-].*$"
 
     class Meta:
@@ -165,6 +192,11 @@ class Project(BaseModel):
         ordering = ("-created_at",)
 
     def save(self, *args, **kwargs):
+        """Normalize the identifier to uppercase and inherit the workspace timezone on create.
+
+        The workspace timezone is only applied if no ``timezone`` kwarg was passed
+        to the constructor.
+        """
         from plane.db.models import Workspace
 
         self.identifier = self.identifier.strip().upper()
@@ -178,6 +210,8 @@ class Project(BaseModel):
 
 
 class ProjectBaseModel(BaseModel):
+    """Abstract base for project-scoped models; adds ``project`` and a denormalized ``workspace`` FK."""
+
     project = models.ForeignKey(Project, on_delete=models.CASCADE, related_name="project_%(class)s")
     workspace = models.ForeignKey("db.Workspace", on_delete=models.CASCADE, related_name="workspace_%(class)s")
 
@@ -185,11 +219,14 @@ class ProjectBaseModel(BaseModel):
         abstract = True
 
     def save(self, *args, **kwargs):
+        """Always copy ``workspace`` from the project so the two can never diverge."""
         self.workspace = self.project.workspace
         super(ProjectBaseModel, self).save(*args, **kwargs)
 
 
 class ProjectMemberInvite(ProjectBaseModel):
+    """A pending invitation (by email + token) to join a project with a given role."""
+
     email = models.CharField(max_length=255)
     accepted = models.BooleanField(default=False)
     token = models.CharField(max_length=255)
@@ -208,7 +245,12 @@ class ProjectMemberInvite(ProjectBaseModel):
 
 
 class ProjectMember(ProjectBaseModel):
-    member = models.ForeignKey(
+    """A user's membership in a project, with their role (see ``ROLE``) and view settings.
+
+    ``is_active`` flags whether the membership is currently active.
+    """
+
+    member =models.ForeignKey(
         settings.AUTH_USER_MODEL,
         on_delete=models.CASCADE,
         null=True,
@@ -224,6 +266,11 @@ class ProjectMember(ProjectBaseModel):
     is_active = models.BooleanField(default=True)
 
     def save(self, *args, **kwargs):
+        """On create, also create the member's ``ProjectUserProperty``.
+
+        The new project is placed at the top of the user's sidebar ordering
+        (min sort_order across their projects in the workspace minus 10000).
+        """
         if self._state.adding and self.member:
             # Get the minimum sort_order for this member in the workspace
             min_sort_order_result = ProjectUserProperty.objects.filter(
@@ -262,6 +309,8 @@ class ProjectMember(ProjectBaseModel):
 
 # TODO: Remove workspace relation later
 class ProjectIdentifier(AuditModel):
+    """Registry reserving a project identifier name so it is unique within a workspace."""
+
     workspace = models.ForeignKey("db.Workspace", models.CASCADE, related_name="project_identifiers", null=True)
     project = models.OneToOneField(Project, on_delete=models.CASCADE, related_name="project_identifier")
     name = models.CharField(max_length=12, db_index=True)
@@ -282,10 +331,12 @@ class ProjectIdentifier(AuditModel):
 
 
 def get_anchor():
+    """Generate a random public anchor (hex UUID) for a deploy board URL."""
     return uuid4().hex
 
 
 def get_default_views():
+    """Default set of layouts enabled on a published project board."""
     return {
         "list": True,
         "kanban": True,
@@ -298,6 +349,8 @@ def get_default_views():
 # DEPRECATED TODO:
 # used to get the old anchors for the project deploy boards
 class ProjectDeployBoard(ProjectBaseModel):
+    """Legacy public (published) project board settings; kept only to resolve old anchors."""
+
     anchor = models.CharField(max_length=255, default=get_anchor, unique=True, db_index=True)
     comments = models.BooleanField(default=False)
     reactions = models.BooleanField(default=False)
@@ -318,6 +371,8 @@ class ProjectDeployBoard(ProjectBaseModel):
 
 
 class ProjectPublicMember(ProjectBaseModel):
+    """A user registered as a public member of a project (unique per project)."""
+
     member = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         on_delete=models.CASCADE,
@@ -340,6 +395,10 @@ class ProjectPublicMember(ProjectBaseModel):
 
 
 class ProjectUserProperty(ProjectBaseModel):
+    """Per-user project settings: saved work item filters/display options, preferences and sidebar order."""
+
+    # Imported inside the class body to avoid a circular import with issue.py
+    # (which imports ProjectBaseModel from this module).
     from .issue import get_default_filters, get_default_display_filters, get_default_display_properties
 
     user = models.ForeignKey(

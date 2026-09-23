@@ -2,6 +2,13 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 # See the LICENSE file for details.
 
+"""Declarative export schema framework (similar in spirit to DRF serializers).
+
+``ExportField`` subclasses describe how to read and format one value; ``ExportSchema``
+subclasses collect them (via ``ExportSchemaMeta``) and serialize objects/querysets into
+plain dicts that the formatters render.
+"""
+
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional
 
@@ -17,6 +24,7 @@ class ExportField:
     label: Optional[str] = None  # Display name for export headers
 
     def get_value(self, obj: Any, context: Dict[str, Any]) -> Any:
+        """Read the value at ``source`` (dotted path) from ``obj`` (or ``obj`` itself) and format it."""
         raw: Any
         if self.source:
             raw = self._resolve_dotted_path(obj, self.source)
@@ -30,6 +38,7 @@ class ExportField:
         return raw if raw is not None else self.default
 
     def _resolve_dotted_path(self, obj: Any, path: str) -> Any:
+        """Follow ``a.b.c`` through attributes or dict keys; returns None if any step is missing."""
         current = obj
         for part in path.split("."):
             if current is None:
@@ -145,6 +154,12 @@ class JSONField(ExportField):
 
 
 class ExportSchemaMeta(type):
+    """Metaclass that moves ``ExportField`` class attributes into ``_declared_fields``.
+
+    Fields inherited from base schemas come first (in base order); a subclass can override
+    a field by redeclaring it under the same name.
+    """
+
     def __new__(mcls, name, bases, attrs):
         declared: Dict[str, ExportField] = {
             key: value for key, value in list(attrs.items()) if isinstance(value, ExportField)

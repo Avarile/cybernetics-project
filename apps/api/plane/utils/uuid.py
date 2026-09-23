@@ -2,6 +2,8 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 # See the LICENSE file for details.
 
+"""UUID helpers: v4 validation and deterministic UUID -> 64-bit integer conversion."""
+
 # Python imports
 import uuid
 import hashlib
@@ -17,7 +19,13 @@ def is_valid_uuid(uuid_str):
 
 
 def convert_uuid_to_integer(uuid_val: uuid.UUID) -> int:
-    """Convert a UUID to a 64-bit signed integer"""
+    """Convert a UUID to a 64-bit signed integer
+
+    The mapping is deterministic (same UUID -> same int) but not reversible; it
+    takes the first 8 bytes of the SHA-256 digest, so collisions are possible
+    but unlikely. Useful where a signed bigint key is required (e.g. Postgres
+    advisory locks).
+    """
     # Ensure UUID is a string
     uuid_value: str = str(uuid_val)
     # Hash to 64-bit signed int

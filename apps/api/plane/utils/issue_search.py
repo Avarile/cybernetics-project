@@ -2,6 +2,9 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 # See the LICENSE file for details.
 
+"""Free-text issue search used by issue list/search endpoints.
+"""
+
 # Python imports
 import re
 
@@ -12,6 +15,11 @@ from django.db.models import Q
 
 
 def search_issues(query, queryset):
+    """Filter ``queryset`` to issues matching ``query``.
+
+    Matches name / project identifier by case-insensitive substring and, for
+    short queries (<= 20 chars), any standalone numbers as exact sequence IDs.
+    """
     fields = ["name", "sequence_id", "project__identifier"]
     q = Q()
     for field in fields:

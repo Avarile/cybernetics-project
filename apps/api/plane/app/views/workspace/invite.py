@@ -2,6 +2,13 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 # See the LICENSE file for details.
 
+"""Workspace invitation flows.
+
+- WorkspaceInvitationsViewset: admins create/list/delete invites; each invite emails a JWT token.
+- WorkspaceJoinEndpoint: an invitee views an invite and accepts/rejects it with the token.
+- UserWorkspaceInvitationsViewSet: a logged-in user lists and bulk-accepts invites sent to their email.
+"""
+
 # Python imports
 from datetime import datetime
 
@@ -36,7 +43,7 @@ from .. import BaseViewSet
 
 
 class WorkspaceInvitationsViewset(BaseViewSet):
-    """Endpoint for creating, listing and  deleting workspaces"""
+    """Endpoint for creating, listing and deleting workspace invitations (workspace admins only)."""
 
     serializer_class = WorkSpaceMemberInviteSerializer
     model = WorkspaceMemberInvite
@@ -44,6 +51,7 @@ class WorkspaceInvitationsViewset(BaseViewSet):
     permission_classes = [WorkSpaceAdminPermission]
 
     def get_queryset(self):
+        """Invitations belonging to the workspace in the URL."""
         return self.filter_queryset(
             super()
             .get_queryset()
@@ -52,6 +60,11 @@ class WorkspaceInvitationsViewset(BaseViewSet):
         )
 
     def create(self, request, slug):
+        """Bulk-invite `emails` (list of `{email, role}`) and queue invitation emails + analytics events.
+
+        Rejects the request if any invitee would get a higher role than the inviter, or if any
+        email already belongs to an active member. Role defaults to 5 (Guest).
+        """
         emails = request.data.get("emails", [])
         # Check if email is provided
         if not emails:
@@ -94,6 +107,7 @@ class WorkspaceInvitationsViewset(BaseViewSet):
                     WorkspaceMemberInvite(
                         email=email.get("email").strip().lower(),
                         workspace_id=workspace.id,
+                        # Unique per-invite token the invitee must present to accept.
                         token=jwt.encode(
                             {"email": email, "timestamp": datetime.now().timestamp()},
                             settings.SECRET_KEY,
@@ -143,12 +157,15 @@ class WorkspaceInvitationsViewset(BaseViewSet):
         return Response({"message": "Emails sent successfully"}, status=status.HTTP_200_OK)
 
     def destroy(self, request, slug, pk):
+        """Revoke (delete) a pending invitation."""
         workspace_member_invite = WorkspaceMemberInvite.objects.get(pk=pk, workspace__slug=slug)
         workspace_member_invite.delete()
         return Response(status=status.HTTP_204_NO_CONTENT)
 
 
 class WorkspaceJoinEndpoint(BaseAPIView):
+    """Public endpoint for viewing and responding to a single workspace invitation."""
+
     permission_classes = [AllowAny]
     """Invitation response endpoint the user can respond to the invitation"""
 
@@ -162,6 +179,12 @@ class WorkspaceJoinEndpoint(BaseAPIView):
     )
     @invalidate_cache(path="/api/users/me/settings/", multiple=True)
     def post(self, request, slug, pk):
+        """Accept or reject an invitation.
+
+        Requires the invite token and an authenticated user whose email matches the invite.
+        On acceptance, creates or reactivates the WorkspaceMember, sets it as the user's last
+        workspace and deletes the invite. Invalidates workspace/member caches.
+        """
         workspace_invite = WorkspaceMemberInvite.objects.get(pk=pk, workspace__slug=slug)
 
         token = request.data.get("token", "")
@@ -252,6 +275,7 @@ class WorkspaceJoinEndpoint(BaseAPIView):
         )
 
     def get(self, request, slug, pk):
+        """Return public invitation details (without the token)."""
         workspace_invitation = WorkspaceMemberInvite.objects.get(workspace__slug=slug, pk=pk)
         # Use the public serializer that omits the token and invite_link fields so
         # that an unauthenticated caller cannot retrieve the acceptance token
@@ -261,17 +285,21 @@ class WorkspaceJoinEndpoint(BaseAPIView):
 
 
 class UserWorkspaceInvitationsViewSet(BaseViewSet):
+    """Invitations addressed to the current user's email, across all workspaces."""
+
     serializer_class = WorkSpaceMemberInviteSerializer
     model = WorkspaceMemberInvite
 
     def get_queryset(self):
         return self.filter_queryset(
+            # Only invites sent to the requester's own email address.
             super().get_queryset().filter(email=self.request.user.email).select_related("workspace")
         )
 
     @invalidate_cache(path="/api/workspaces/", user=False)
     @invalidate_cache(path="/api/users/me/workspaces/", multiple=True)
     def create(self, request):
+        """Accept the given invitation ids: reactivate existing memberships, create missing ones, delete the invites."""
         invitations = request.data.get("invitations", [])
         workspace_invitations = WorkspaceMemberInvite.objects.filter(
             pk__in=invitations, email=request.user.email
@@ -305,6 +333,7 @@ class UserWorkspaceInvitationsViewSet(BaseViewSet):
             )
 
         # Bulk create the user for all the workspaces
+        # (ignore_conflicts skips workspaces where a membership row already exists and was reactivated above)
         WorkspaceMember.objects.bulk_create(
             [
                 WorkspaceMember(

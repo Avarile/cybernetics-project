@@ -2,6 +2,12 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 # See the LICENSE file for details.
 
+"""Public API routes for asset uploads (mounted under /api/v1/).
+
+User avatar/cover assets, server-side user asset uploads, and generic
+workspace assets; handled by the views in plane.api.views.asset.
+"""
+
 from django.urls import path
 
 from plane.api.views import (

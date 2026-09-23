@@ -28,6 +28,8 @@ from plane.utils.url_security import pinned_fetch
 
 
 class CyberneticsDataError(Exception):
+    """Base error for upstream failures; ``code``/``http_status`` drive the API error response."""
+
     code = "CYBERNETICS_ERROR"
     http_status = 502
 
@@ -44,30 +46,41 @@ class CyberneticsUnauthorized(CyberneticsDataError):
 
 
 class CyberneticsForbidden(CyberneticsDataError):
+    """Upstream returned 403: the token lacks access to the resource."""
+
     code = "CYBERNETICS_FORBIDDEN"
     http_status = 403
 
 
 class CyberneticsNotFound(CyberneticsDataError):
+    """Upstream returned 404."""
+
     code = "CYBERNETICS_NOT_FOUND"
     http_status = 404
 
 
 class CyberneticsBadRequest(CyberneticsDataError):
+    """Upstream rejected the request (400/422)."""
+
     code = "CYBERNETICS_BAD_REQUEST"
     http_status = 400
 
 
 class CyberneticsRateLimited(CyberneticsDataError):
+    """Upstream returned 429."""
+
     code = "CYBERNETICS_RATE_LIMITED"
     http_status = 429
 
 
 class CyberneticsUnreachable(CyberneticsDataError):
+    """Network failure, disallowed URL, redirect, oversized or malformed upstream response."""
+
     code = "CYBERNETICS_UNREACHABLE"
     http_status = 502
 
 
+# Upstream HTTP status -> exception class; any other >=400 status maps to CyberneticsUnreachable.
 _STATUS_EXCEPTIONS = {
     400: CyberneticsBadRequest,
     401: CyberneticsUnauthorized,
@@ -77,6 +90,7 @@ _STATUS_EXCEPTIONS = {
     429: CyberneticsRateLimited,
 }
 
+# Truncation limit for upstream error messages surfaced to clients.
 MAX_MESSAGE_LENGTH = 300
 
 
@@ -87,6 +101,7 @@ def normalize_base_url(value, require_https=None):
     credentials, query strings and fragments. Raises ``ValueError``.
     """
     if require_https is None:
+        # HTTPS is only enforced outside DEBUG so local http instances work in development
         require_https = settings.CYBERNETICS_DATA_REQUIRE_HTTPS and not settings.DEBUG
     url = (value or "").strip()
     if not url:
@@ -102,6 +117,7 @@ def normalize_base_url(value, require_https=None):
         raise ValueError("URL must not contain credentials")
     if parts.query or parts.fragment:
         raise ValueError("URL must not contain a query string or fragment")
+    # The client appends "/api" itself, so drop it if the user pasted the API root
     path = parts.path.rstrip("/")
     if path.endswith("/api"):
         path = path[: -len("/api")]
@@ -109,6 +125,7 @@ def normalize_base_url(value, require_https=None):
 
 
 def _extract_message(body, status_code):
+    """Pull ``message`` from an upstream JSON error body, falling back to a generic text; truncated."""
     try:
         data = json.loads(body or b"null")
         message = data.get("message") if isinstance(data, dict) else None
@@ -138,7 +155,14 @@ def _expect_dict(data):
 
 
 class CyberneticsDataClient:
+    """Read-only client bound to one Cybernetics-Data instance and API token.
+
+    All public methods issue GET requests and raise ``CyberneticsDataError`` subclasses on failure.
+    """
+
+    # Upper bound on page size for list_records
     MAX_TAKE = 200
+    # Responses larger than this (5 MiB) are aborted while streaming
     MAX_RESPONSE_BYTES = 5 * 1024 * 1024
 
     def __init__(self, base_url, token, timeout=None):
@@ -151,6 +175,11 @@ class CyberneticsDataClient:
         return f"<CyberneticsDataClient {self.base_url}>"
 
     def _get(self, path, params=None):
+        """GET ``{base_url}/api{path}`` via pinned_fetch and return the decoded JSON body.
+
+        ``params`` is a list of (key, value) tuples so repeated keys (``name[]``) are preserved.
+        Transport errors, redirects and >=400 statuses are mapped to ``CyberneticsDataError`` subclasses.
+        """
         query = urlencode(params or [], doseq=True)
         url = f"{self.base_url}/api{path}" + (f"?{query}" if query else "")
         headers = {
@@ -169,6 +198,7 @@ class CyberneticsDataClient:
                 stream=True,
             )
         except ValueError:
+            # pinned_fetch raises ValueError when the host fails SSRF validation / allow-lists
             raise CyberneticsUnreachable("The Cybernetics-Data URL is not allowed or could not be resolved")
         except requests.Timeout as e:
             log_exception(e, warning=True)
@@ -179,6 +209,7 @@ class CyberneticsDataClient:
 
         try:
             status_code = response.status_code
+            # Redirects are never followed (they could point at an internal host)
             if 300 <= status_code < 400:
                 raise CyberneticsUnreachable("Cybernetics-Data responded with an unexpected redirect", status_code)
             body = self._read_body(response)
@@ -194,6 +225,7 @@ class CyberneticsDataClient:
             raise CyberneticsUnreachable("Cybernetics-Data returned an invalid response", status_code)
 
     def _read_body(self, response):
+        """Read a streamed response body, aborting once it exceeds MAX_RESPONSE_BYTES."""
         chunks = []
         size = 0
         try:
@@ -209,36 +241,46 @@ class CyberneticsDataClient:
 
     @staticmethod
     def _seg(value):
+        """Percent-encode a value for safe use as a single URL path segment."""
         return quote(str(value), safe="")
 
     def list_spaces(self):
+        """Return the spaces visible to the token."""
         return _expect_list(self._get("/space"))
 
     def list_bases(self):
+        """Return all bases the token can access."""
         return _expect_list(self._get("/base/access/all"))
 
     def get_base(self, base_id):
+        """Return a single base."""
         return _expect_dict(self._get(f"/base/{self._seg(base_id)}"))
 
     def list_tables(self, base_id):
+        """Return the tables in a base."""
         return _expect_list(self._get(f"/base/{self._seg(base_id)}/table"))
 
     def get_table(self, base_id, table_id):
+        """Return a single table of a base."""
         return _expect_dict(self._get(f"/base/{self._seg(base_id)}/table/{self._seg(table_id)}"))
 
     def list_fields(self, table_id, view_id=None):
+        """Return the fields of a table, optionally as seen through ``view_id``."""
         params = [("viewId", view_id)] if view_id else []
         return _expect_list(self._get(f"/table/{self._seg(table_id)}/field", params))
 
     def list_views(self, table_id):
+        """Return the views of a table."""
         return _expect_list(self._get(f"/table/{self._seg(table_id)}/view"))
 
     @staticmethod
     def _query_params(view_id=None, search=None, search_field=None, filter_=None):
+        """Build the shared record-query params (view, search tuple, JSON filter) keyed by field id."""
         params = [("fieldKeyType", "id")]
         if view_id:
             params.append(("viewId", view_id))
         if search:
+            # Teable's search is a [value, fieldId, hideNotMatchRow] tuple sent as repeated search[]
             params.append(("search[]", search))
             params.append(("search[]", search_field or ""))
             params.append(("search[]", "true"))
@@ -260,6 +302,11 @@ class CyberneticsDataClient:
         projection=None,
         cell_format="text",
     ):
+        """Return one page of records (``{"records": [...], ...}``) for a table.
+
+        ``take`` is clamped to 1..MAX_TAKE; ``order_by``/``filter_`` are sent as compact JSON;
+        ``projection`` limits the returned field ids.
+        """
         take = max(1, min(int(take), self.MAX_TAKE))
         params = self._query_params(view_id, search, search_field, filter_)
         params += [("take", take), ("skip", max(0, int(skip))), ("cellFormat", cell_format)]
@@ -272,11 +319,13 @@ class CyberneticsDataClient:
         return data
 
     def row_count(self, table_id, *, view_id=None, search=None, search_field=None, filter_=None):
+        """Return the number of records matching the same view/search/filter as list_records."""
         params = self._query_params(view_id, search, search_field, filter_)
         data = _expect_dict(self._get(f"/table/{self._seg(table_id)}/aggregation/row-count", params))
         return int(data.get("rowCount") or 0)
 
     def get_record(self, table_id, record_id, *, cell_format="json", projection=None):
+        """Return a single record (cell values as JSON by default)."""
         params = [("fieldKeyType", "id"), ("cellFormat", cell_format)]
         for field_id in projection or []:
             params.append(("projection[]", field_id))

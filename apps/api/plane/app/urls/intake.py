@@ -2,6 +2,11 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 # See the LICENSE file for details.
 
+"""URL routes for project intake (triage inbox) and intake issues.
+
+The ``inboxes``/``inbox-issues`` routes are legacy aliases of ``intakes``/``intake-issues``.
+"""
+
 from django.urls import path
 
 

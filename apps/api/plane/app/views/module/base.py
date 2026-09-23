@@ -2,6 +2,12 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 # See the LICENSE file for details.
 
+"""Project module (a.k.a. "module" grouping of issues) API views.
+
+Contains the module CRUD viewset (with progress/estimate statistics),
+module links, module favorites and per-user module display properties.
+Mutations emit webhook model activities and issue activity background tasks.
+"""
 # Python imports
 import json
 
@@ -69,13 +75,25 @@ from plane.utils.host import base_host
 
 
 class ModuleViewSet(BaseViewSet):
+    """CRUD for project modules, scoped to the project in the URL.
+
+    Responses are built from annotated querysets (issue counts per state
+    group, estimate point sums, member ids, favorite flag).
+    """
     model = Module
     webhook_event = "module"
 
     def get_serializer_class(self):
+        """Use the write serializer for mutations and the read serializer otherwise."""
         return ModuleWriteSerializer if self.action in ["create", "update", "partial_update"] else ModuleSerializer
 
     def get_queryset(self):
+        """Return the project's modules annotated with progress statistics.
+
+        Includes archived modules; callers filter on archived_at as needed.
+        """
+        # Each subquery below counts/sums issues of a module (OuterRef("pk"))
+        # for one state group; soft-deleted module-issue links are excluded.
         favorite_subquery = UserFavorite.objects.filter(
             user=self.request.user,
             entity_type="module",
@@ -142,6 +160,8 @@ class ModuleViewSet(BaseViewSet):
             .annotate(cnt=Count("pk"))
             .values("cnt")
         )
+        # Estimate sums only apply to "points" estimates; the numeric value is
+        # stored as text, so it is cast to float before summing.
         completed_estimate_point = (
             Issue.issue_objects.filter(
                 estimate_point__estimate__type="points",
@@ -276,6 +296,7 @@ class ModuleViewSet(BaseViewSet):
                 total_estimate_points=Coalesce(Subquery(total_estimate_point), Value(0, output_field=FloatField()))
             )
             .annotate(
+            # Only count active (non soft-deleted) module memberships.
                 member_ids=Coalesce(
                     ArrayAgg(
                         "members__id",
@@ -293,6 +314,10 @@ class ModuleViewSet(BaseViewSet):
 
     @allow_permission([ROLE.ADMIN, ROLE.MEMBER])
     def create(self, request, slug, project_id):
+        """Create a module in the project and return its annotated values.
+
+        Side effect: queues a "module" webhook model activity.
+        """
         project = Project.objects.get(workspace__slug=slug, pk=project_id)
         serializer = ModuleWriteSerializer(data=request.data, context={"project": project})
 
@@ -352,6 +377,7 @@ class ModuleViewSet(BaseViewSet):
 
     @allow_permission([ROLE.ADMIN, ROLE.MEMBER, ROLE.GUEST])
     def list(self, request, slug, project_id):
+        """List non-archived modules; honors the ``fields`` query param."""
         queryset = self.get_queryset().filter(archived_at__isnull=True)
         if self.fields:
             modules = ModuleSerializer(queryset, many=True, fields=self.fields).data
@@ -394,6 +420,12 @@ class ModuleViewSet(BaseViewSet):
 
     @allow_permission([ROLE.ADMIN, ROLE.MEMBER])
     def retrieve(self, request, slug, project_id, pk):
+        """Return a non-archived module's detail with distributions and charts.
+
+        Adds assignee/label distributions (issue counts, plus estimate points
+        when the project uses point estimates) and burndown charts, and
+        records the visit in the user's recent visits (background task).
+        """
         queryset = (
             self.get_queryset()
             .filter(archived_at__isnull=True)
@@ -414,6 +446,8 @@ class ModuleViewSet(BaseViewSet):
         if not queryset.exists():
             return Response({"error": "Module not found"}, status=status.HTTP_404_NOT_FOUND)
 
+        # Point-based distributions are only computed when the project's
+        # estimate system is of type "points".
         estimate_type = Project.objects.filter(
             workspace__slug=slug,
             pk=project_id,
@@ -526,6 +560,7 @@ class ModuleViewSet(BaseViewSet):
             data["estimate_distribution"]["assignees"] = assignee_distribution
             data["estimate_distribution"]["labels"] = label_distribution
 
+            # A burndown chart needs a date range.
             if modules and modules.start_date and modules.target_date:
                 data["estimate_distribution"]["completion_chart"] = burndown_plot(
                     queryset=modules,
@@ -535,6 +570,7 @@ class ModuleViewSet(BaseViewSet):
                     module_id=pk,
                 )
 
+        # Issue-count based distributions are always returned.
         assignee_distribution = (
             Issue.issue_objects.filter(
                 issue_module__module_id=pk,
@@ -650,6 +686,10 @@ class ModuleViewSet(BaseViewSet):
 
     @allow_permission([ROLE.ADMIN, ROLE.MEMBER])
     def partial_update(self, request, slug, project_id, pk):
+        """Partially update a module; archived modules are read-only.
+
+        Side effect: queues a webhook model activity with the prior state.
+        """
         module_queryset = self.get_queryset().filter(pk=pk)
 
         current_module = module_queryset.first()
@@ -665,6 +705,7 @@ class ModuleViewSet(BaseViewSet):
                 {"error": "Archived module cannot be updated"},
                 status=status.HTTP_400_BAD_REQUEST,
             )
+        # Snapshot the current state so the activity can diff old vs new.
         current_instance = json.dumps(ModuleSerializer(current_module).data, cls=DjangoJSONEncoder)
         serializer = ModuleWriteSerializer(current_module, data=request.data, partial=True)
 
@@ -722,6 +763,12 @@ class ModuleViewSet(BaseViewSet):
 
     @allow_permission([ROLE.ADMIN], creator=True, model=Module)
     def destroy(self, request, slug, project_id, pk):
+        """Delete a module (admins or the module creator).
+
+        Logs a "module.activity.deleted" issue activity for each linked issue,
+        then removes module-issue links, the requester's favorite and recent
+        visits for the module.
+        """
         module = Module.objects.get(workspace__slug=slug, project_id=project_id, pk=pk)
 
         module_issues = list(ModuleIssue.objects.filter(module_id=pk).values_list("issue", flat=True))
@@ -760,18 +807,21 @@ class ModuleViewSet(BaseViewSet):
 
 
 class ModuleLinkViewSet(BaseViewSet):
+    """CRUD for external links attached to a module."""
     permission_classes = [ProjectEntityPermission]
 
     model = ModuleLink
     serializer_class = ModuleLinkSerializer
 
     def perform_create(self, serializer):
+        """Attach the new link to the project and module from the URL."""
         serializer.save(
             project_id=self.kwargs.get("project_id"),
             module_id=self.kwargs.get("module_id"),
         )
 
     def get_queryset(self):
+        """Links of the module, restricted to active members of a non-archived project."""
         return (
             super()
             .get_queryset()
@@ -789,10 +839,12 @@ class ModuleLinkViewSet(BaseViewSet):
 
 
 class ModuleFavoriteViewSet(BaseViewSet):
+    """Add/remove a module from the requesting user's favorites."""
     model = UserFavorite
     permission_classes = [ProjectLitePermission]
 
     def get_queryset(self):
+        """Favorites of the current user in the workspace."""
         return self.filter_queryset(
             super()
             .get_queryset()
@@ -802,6 +854,7 @@ class ModuleFavoriteViewSet(BaseViewSet):
         )
 
     def create(self, request, slug, project_id):
+        """Mark the module in ``request.data["module"]`` as a favorite."""
         _ = UserFavorite.objects.create(
             project_id=project_id,
             user=request.user,
@@ -811,6 +864,7 @@ class ModuleFavoriteViewSet(BaseViewSet):
         return Response(status=status.HTTP_204_NO_CONTENT)
 
     def destroy(self, request, slug, project_id, module_id):
+        """Remove the module from the user's favorites (hard delete)."""
         module_favorite = UserFavorite.objects.get(
             project_id=project_id,
             user=request.user,
@@ -823,8 +877,10 @@ class ModuleFavoriteViewSet(BaseViewSet):
 
 
 class ModuleUserPropertiesEndpoint(BaseAPIView):
+    """Per-user display settings (filters, display props) for a module."""
     @allow_permission([ROLE.ADMIN, ROLE.MEMBER, ROLE.GUEST])
     def patch(self, request, slug, project_id, module_id):
+        """Update the user's module filters/display settings; omitted keys keep their value."""
         module_properties = ModuleUserProperties.objects.get(
             user=request.user,
             module_id=module_id,
@@ -845,6 +901,7 @@ class ModuleUserPropertiesEndpoint(BaseAPIView):
 
     @allow_permission([ROLE.ADMIN, ROLE.MEMBER, ROLE.GUEST])
     def get(self, request, slug, project_id, module_id):
+        """Return the user's module display settings, creating defaults if missing."""
         module_properties, _ = ModuleUserProperties.objects.get_or_create(
             user=request.user,
             project_id=project_id,

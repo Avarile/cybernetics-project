@@ -2,6 +2,15 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 # See the LICENSE file for details.
 
+"""Contract tests for the project Cybernetics-Data integration config endpoint.
+
+Exercises ``/api/workspaces/<slug>/projects/<id>/cybernetics-data/`` (GET/PUT/DELETE)
+and its ``test/`` sub-route (POST): role-based read bodies, admin-only writes,
+create/update rules (token encryption, connection verification, URL changes
+requiring a new token), soft-delete purging of secrets, and throttling. The
+upstream ``CyberneticsDataClient`` is replaced by ``fake_client``.
+"""
+
 import json
 from datetime import timedelta
 
@@ -33,6 +42,7 @@ pytestmark = [pytest.mark.contract, pytest.mark.django_db]
 
 NEW_TOKEN = "cybernetics_new456_bmV3c2lnbmF0dXJlMDAx"
 OTHER_URL = "https://other.example.com"
+# Exact key set of the full (admin/member) read body; must never include token material.
 READ_FIELDS = {
     "id",
     "project",
@@ -50,11 +60,13 @@ READ_FIELDS = {
 
 @pytest.fixture(autouse=True)
 def _isolate(isolate):
+    """Opt every test in this module into the shared ``isolate`` fixture."""
     return isolate
 
 
 @pytest.fixture
 def verified_integration(integration):
+    """The default integration with a prior successful verification recorded a day ago."""
     integration.last_verified_at = timezone.now() - timedelta(days=1)
     integration.last_verified_status = "ok"
     integration.last_verified_message = "previous"
@@ -63,14 +75,18 @@ def verified_integration(integration):
 
 
 def _put(client, workspace, project, payload):
+    """PUT (create or update) the project integration config."""
     return client.put(config_url(workspace, project), payload, format="json")
 
 
 def _test(client, workspace, project, payload=None):
+    """POST to the connection-test sub-route; an empty body tests the stored config."""
     return client.post(config_url(workspace, project, "test/"), payload or {}, format="json")
 
 
 class TestRoleMatrix:
+    """Read body varies by role (full / reduced for guests / 403); writes are admin-only."""
+
     def test_get_not_configured(self, session_client, workspace, project):
         response = session_client.get(config_url(workspace, project))
         assert response.status_code == status.HTTP_200_OK
@@ -84,6 +100,7 @@ class TestRoleMatrix:
         assert response.data["is_configured"] is True
         assert response.data["base_url"] == BASE_URL
         assert response.data["token_hint"] == token_hint(TOKEN)
+        # Neither the plaintext nor the ciphertext may leak into the response.
         assert TOKEN not in json.dumps(response.data, default=str)
         assert integration.api_token_encrypted not in json.dumps(response.data, default=str)
 
@@ -105,6 +122,7 @@ class TestRoleMatrix:
         assert _put(client, workspace, project, {"is_enabled": False}).status_code == status.HTTP_403_FORBIDDEN
         assert _test(client, workspace, project).status_code == status.HTTP_403_FORBIDDEN
         assert client.delete(config_url(workspace, project)).status_code == status.HTTP_403_FORBIDDEN
+        # Nothing changed and no upstream client was ever built.
         integration.refresh_from_db()
         assert integration.is_enabled is True
         fake_client.constructor.assert_not_called()
@@ -115,6 +133,8 @@ class TestRoleMatrix:
 
 
 class TestPutCreate:
+    """First PUT creates the integration: both URL and token required, verified unless skipped."""
+
     def test_create_without_token(self, session_client, workspace, project):
         response = _put(session_client, workspace, project, {"base_url": BASE_URL})
         assert_error(response, status.HTTP_400_BAD_REQUEST, "CYBERNETICS_BAD_REQUEST")
@@ -130,6 +150,7 @@ class TestPutCreate:
         fake_client.constructor.assert_not_called()
 
     def test_create_ok(self, session_client, workspace, project, fake_client):
+        """The URL is normalised (``/api/`` stripped), the token is encrypted, hinted and fingerprinted."""
         response = _put(
             session_client, workspace, project, {"base_url": "https://data.example.com/api/", "api_token": TOKEN}
         )
@@ -158,6 +179,7 @@ class TestPutCreate:
         ],
     )
     def test_blocking_verification(self, session_client, workspace, project, fake_client, exc, expected_status):
+        """Auth/reachability/other failures abort the save and return the verification result."""
         fake_client.list_bases.side_effect = exc
         response = _put(session_client, workspace, project, {"base_url": BASE_URL, "api_token": TOKEN})
         assert_error(response, status.HTTP_400_BAD_REQUEST, "CYBERNETICS_VERIFICATION_FAILED")
@@ -172,6 +194,7 @@ class TestPutCreate:
         assert response.data["error"] == "Could not verify the connection."
 
     def test_forbidden_saves_with_warning(self, session_client, workspace, project, fake_client):
+        """A missing read scope (403 on records) is non-blocking: the config is saved with a warning."""
         fake_client.list_records.side_effect = CyberneticsForbidden("no record scope")
         response = _put(session_client, workspace, project, {"base_url": BASE_URL, "api_token": TOKEN})
         assert response.status_code == status.HTTP_200_OK
@@ -192,6 +215,7 @@ class TestPutCreate:
         fake_client.constructor.assert_not_called()
 
     def test_ssrf_blocked_url(self, session_client, workspace, project, settings, fake_client):
+        """Loopback URLs are rejected by serializer validation when no host allowlist overrides it."""
         settings.CYBERNETICS_DATA_ALLOWED_HOSTS = []
         response = _put(session_client, workspace, project, {"base_url": "https://127.0.0.1", "api_token": TOKEN})
         assert response.status_code == status.HTTP_400_BAD_REQUEST
@@ -200,6 +224,8 @@ class TestPutCreate:
 
 
 class TestPutUpdate:
+    """Updates to an existing integration: token rotation, URL changes and toggles."""
+
     def test_skip_verification_clears_last_verified(
         self, session_client, workspace, project, verified_integration, fake_client
     ):
@@ -232,6 +258,7 @@ class TestPutUpdate:
         assert decrypt_token(verified_integration.api_token_encrypted) == TOKEN
 
     def test_url_change_requires_token(self, session_client, workspace, project, verified_integration, fake_client):
+        """The stored token is never sent to a new URL; changing the URL needs a fresh token."""
         response = _put(session_client, workspace, project, {"base_url": OTHER_URL})
         assert_error(response, status.HTTP_400_BAD_REQUEST, "CYBERNETICS_TOKEN_REQUIRED")
         fake_client.constructor.assert_not_called()
@@ -270,6 +297,7 @@ class TestPutUpdate:
         assert verified_integration.last_verified_message == "previous"
         assert verified_integration.api_token_encrypted == "garbage"
 
+    # Both normalise to BASE_URL, so neither counts as a URL change.
     @pytest.mark.parametrize("url", [BASE_URL, "https://data.example.com/api/"])
     def test_same_url_is_not_a_change(self, session_client, workspace, project, verified_integration, fake_client, url):
         response = _put(session_client, workspace, project, {"base_url": url, "is_enabled": True})
@@ -294,16 +322,20 @@ class TestPutUpdate:
         assert list(rows.values_list("id", flat=True)) == [integration.id]
 
     def test_put_after_disconnect_creates_fresh_row(self, session_client, workspace, project, integration, fake_client):
+        """After a soft delete, PUT creates a new row rather than reviving the deleted one."""
         assert session_client.delete(config_url(workspace, project)).status_code == status.HTTP_204_NO_CONTENT
         response = _put(session_client, workspace, project, {"base_url": BASE_URL, "api_token": NEW_TOKEN})
         assert response.status_code == status.HTTP_200_OK
         assert str(response.data["id"]) != str(integration.id)
+        # ``objects`` excludes soft-deleted rows; ``all_objects`` includes them.
         assert ProjectCyberneticsDataIntegration.objects.filter(project=project).count() == 1
         assert ProjectCyberneticsDataIntegration.all_objects.filter(project=project).count() == 2
         fake_client.constructor.assert_called_once_with(BASE_URL, NEW_TOKEN)
 
 
 class TestConnectionTest:
+    """POST ``test/``: probes a connection; only a test of the stored config updates last_verified_*."""
+
     def test_no_body_uses_stored_values_and_records(
         self, session_client, workspace, project, verified_integration, fake_client
     ):
@@ -335,6 +367,7 @@ class TestConnectionTest:
         assert verified_integration.last_verified_message == ""
 
     def test_other_url_never_uses_stored_token(self, session_client, workspace, project, integration, fake_client):
+        """Prevents exfiltrating the stored token by testing against an attacker-chosen URL."""
         response = _test(session_client, workspace, project, {"base_url": OTHER_URL})
         assert_error(response, status.HTTP_400_BAD_REQUEST, "CYBERNETICS_BAD_REQUEST")
         fake_client.constructor.assert_not_called()
@@ -362,6 +395,7 @@ class TestConnectionTest:
         fake_client.constructor.assert_not_called()
 
     def test_unauthorized_result_is_200(self, session_client, workspace, project, integration, fake_client):
+        """A failed probe is a successful test request: the outcome is reported in the body."""
         fake_client.list_bases.side_effect = CyberneticsUnauthorized("bad token")
         response = _test(session_client, workspace, project)
         assert response.status_code == status.HTTP_200_OK
@@ -369,6 +403,8 @@ class TestConnectionTest:
 
 
 class TestDelete:
+    """DELETE soft-deletes the integration and wipes all token material from the row."""
+
     def test_delete_purges_secret(self, session_client, workspace, project, integration):
         response = session_client.delete(config_url(workspace, project))
         assert response.status_code == status.HTTP_204_NO_CONTENT
@@ -385,8 +421,11 @@ class TestDelete:
 
 
 class TestThrottling:
+    """PUT and ``test/`` are rate limited (they hit upstream); GET and DELETE are not."""
+
     @pytest.fixture
     def throttled(self, mocker):
+        """Force the proxy throttle to reject every request with a 30s wait."""
         mocker.patch.object(CyberneticsDataProxyThrottle, "allow_request", return_value=False)
         mocker.patch.object(CyberneticsDataProxyThrottle, "wait", return_value=30)
 

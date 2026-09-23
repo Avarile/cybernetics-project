@@ -2,6 +2,12 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 # See the LICENSE file for details.
 
+"""Date-range and filter helpers for the workspace analytics endpoints.
+
+Translate UI date presets ("last_7_days", "custom", ...) into ORM-ready ranges and
+build the membership-scoped base/project filters shared by analytics views.
+"""
+
 from datetime import datetime, timedelta, date
 from django.utils import timezone
 from typing import Dict, Optional, List, Union, Tuple, Any
@@ -24,7 +30,9 @@ def get_analytics_date_range(
         end_date (str): End date for custom range (format: YYYY-MM-DD)
 
     Returns:
-        dict: Dictionary containing current and previous date ranges
+        dict: Dictionary containing current and previous date ranges ("gte"/"lte" datetimes),
+        or None for a missing/unknown filter or unparsable custom dates. "yesterday" and
+        "custom" have no "previous" period.
     """
     if not date_filter:
         return None
@@ -39,6 +47,7 @@ def get_analytics_date_range(
                 "lte": datetime.combine(yesterday, datetime.max.time()),
             }
         }
+    # Rolling windows: "previous" is the equally sized window immediately before "current"
     elif date_filter == "last_7_days":
         return {
             "current": {
@@ -100,10 +109,10 @@ def get_chart_period_range(
             - "last_7_days": Last 7 days
             - "last_30_days": Last 30 days
             - "last_3_months": Last 90 days
-            Defaults to "last_7_days" if not specified or invalid.
 
     Returns:
-        tuple: A tuple containing (start_date, end_date) as date objects
+        tuple: A tuple containing (start_date, end_date) as date objects, or None if
+        the filter is missing or not one of the options above
     """
     if not date_filter:
         return None
@@ -150,7 +159,8 @@ def get_analytics_filters(
     if project_ids and isinstance(project_ids, str):
         project_ids = [str(project_id) for project_id in project_ids.split(",")]
 
-    # Base filters for workspace and user
+    # Base filters for workspace and user: for models with a ``project`` FK (e.g. issues),
+    # restricted to active, non-archived projects the user is an active member of
     base_filters = {
         "workspace__slug": slug,
         "project__project_projectmember__member": user,
@@ -159,7 +169,7 @@ def get_analytics_filters(
         "project__archived_at__isnull": True,
     }
 
-    # Project filters
+    # Project filters: the same membership restriction applied to the Project model itself
     project_filters = {
         "workspace__slug": slug,
         "project_projectmember__member": user,

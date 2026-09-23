@@ -2,6 +2,11 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 # See the LICENSE file for details.
 
+"""Permission classes and the ``allow_permission`` decorator used by ``plane.app`` views.
+
+Re-exports workspace-, project- and page-level DRF permission classes.
+"""
+
 from .workspace import (
     WorkSpaceBasePermission,
     WorkspaceOwnerPermission,

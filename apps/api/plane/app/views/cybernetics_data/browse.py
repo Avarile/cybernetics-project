@@ -26,37 +26,53 @@ from .base import CyberneticsDataErrorMixin
 
 
 class CyberneticsDataBrowseBaseEndpoint(CyberneticsDataErrorMixin, BaseAPIView):
+    """Common base for the browse endpoints: shared throttle and id query-param helpers.
+
+    All ids are validated (``validate_id``) before being sent upstream.
+    """
+
     throttle_classes = [CyberneticsDataProxyThrottle]
 
     def _required_id(self, request, name, kind):
+        """Return the validated id from query param ``name``; raise a 400 if it is missing."""
         value = request.query_params.get(name)
         if not value:
             raise QueryValidationError(f"{name} is required")
         return validate_id(value, kind)
 
     def _optional_id(self, request, name, kind):
+        """Return the validated id from query param ``name``, or None when absent."""
         value = request.query_params.get(name)
         return validate_id(value, kind) if value else None
 
 
 class CyberneticsDatabasesEndpoint(CyberneticsDataBrowseBaseEndpoint):
+    """List the databases (bases) visible to the project's configured token."""
+
     @allow_permission([ROLE.ADMIN, ROLE.MEMBER])
     def get(self, request, slug, project_id):
+        """Return the databases available through the project's integration."""
         integration, client = service.get_client(slug, project_id)
         return Response(service.list_databases(integration, client), status=status.HTTP_200_OK)
 
 
 class CyberneticsTablesEndpoint(CyberneticsDataBrowseBaseEndpoint):
+    """List the tables of one database."""
+
     @allow_permission([ROLE.ADMIN, ROLE.MEMBER])
     def get(self, request, slug, project_id, base_id):
+        """Return the tables in database ``base_id``."""
         validate_id(base_id, "base")
         integration, client = service.get_client(slug, project_id)
         return Response(service.list_tables(integration, client, base_id), status=status.HTTP_200_OK)
 
 
 class CyberneticsTableSchemaEndpoint(CyberneticsDataBrowseBaseEndpoint):
+    """Return a table's field schema."""
+
     @allow_permission([ROLE.ADMIN, ROLE.MEMBER])
     def get(self, request, slug, project_id, table_id):
+        """Return the schema of ``table_id``; requires ``base_id`` and accepts an optional ``view_id``."""
         validate_id(table_id, "table")
         base_id = self._required_id(request, "base_id", "base")
         view_id = self._optional_id(request, "view_id", "view")
@@ -68,8 +84,16 @@ class CyberneticsTableSchemaEndpoint(CyberneticsDataBrowseBaseEndpoint):
 
 
 class CyberneticsRecordsEndpoint(CyberneticsDataBrowseBaseEndpoint):
+    """Paginated, searchable, filterable record listing for a table."""
+
     @allow_permission([ROLE.ADMIN, ROLE.MEMBER])
     def get(self, request, slug, project_id, table_id):
+        """List records of ``table_id``.
+
+        Query params: ``base_id`` (required), ``view_id``, ``take`` (1..MAX_TAKE,
+        default 50), ``skip``, ``search`` + ``search_field``, ``filter`` (JSON),
+        ``order_by`` and ``with_total``. All inputs are parsed/validated before proxying.
+        """
         validate_id(table_id, "table")
         params = request.query_params
         base_id = self._required_id(request, "base_id", "base")
@@ -101,8 +125,11 @@ class CyberneticsRecordsEndpoint(CyberneticsDataBrowseBaseEndpoint):
 
 
 class CyberneticsRecordDetailEndpoint(CyberneticsDataBrowseBaseEndpoint):
+    """Single record detail."""
+
     @allow_permission([ROLE.ADMIN, ROLE.MEMBER])
     def get(self, request, slug, project_id, table_id, record_id):
+        """Return one record; ``cell_format`` is ``json`` (default) or ``text``."""
         validate_id(table_id, "table")
         validate_id(record_id, "record")
         base_id = self._required_id(request, "base_id", "base")

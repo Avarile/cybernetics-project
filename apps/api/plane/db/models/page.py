@@ -2,6 +2,14 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 # See the LICENSE file for details.
 
+"""Page (wiki/document) models.
+
+``Page`` is a workspace-level rich-text document that can be attached to one or
+more projects via ``ProjectPage``. ``PageLog`` records entities referenced in a
+page (mentions, embedded issues, links), ``PageLabel`` links labels, and
+``PageVersion`` stores historical snapshots of a page's content.
+"""
+
 import uuid
 
 from django.conf import settings
@@ -17,10 +25,20 @@ from .base import BaseModel
 
 
 def get_view_props():
+    """Default page view settings (normal, non-full-width layout)."""
     return {"full_width": False}
 
 
 class Page(BaseModel):
+    """A rich-text document owned by a user within a workspace.
+
+    Content is stored in several forms: ``description_binary`` (collaborative
+    editor document state), ``description_html``/``description_json``, and a
+    tag-free ``description_stripped`` used for search. ``access`` is 0 (public)
+    or 1 (private). Pages can nest via ``parent`` and belong to projects via
+    ``ProjectPage``.
+    """
+
     PRIVATE_ACCESS = 1
     PUBLIC_ACCESS = 0
     DEFAULT_SORT_ORDER = 65535
@@ -68,6 +86,7 @@ class Page(BaseModel):
         return f"{self.owned_by.email} <{self.name}>"
 
     def save(self, *args, **kwargs):
+        """Keep ``description_stripped`` in sync with ``description_html`` before saving."""
         # Strip the html tags using html parser
         self.description_stripped = (
             None
@@ -78,6 +97,12 @@ class Page(BaseModel):
 
 
 class PageLog(BaseModel):
+    """An entity referenced from a page's content (mention, embedded issue, link, etc.).
+
+    ``entity_name`` holds one of ``TYPE_CHOICES`` and ``entity_identifier`` the
+    referenced object's id; ``transaction`` is unique per page.
+    """
+
     TYPE_CHOICES = (
         ("to_do", "To Do"),
         ("issue", "issue"),
@@ -118,6 +143,8 @@ class PageLog(BaseModel):
 
 
 class PageLabel(BaseModel):
+    """Through table linking a page to a label."""
+
     label = models.ForeignKey("db.Label", on_delete=models.CASCADE, related_name="page_labels")
     page = models.ForeignKey("db.Page", on_delete=models.CASCADE, related_name="page_labels")
     workspace = models.ForeignKey("db.Workspace", on_delete=models.CASCADE, related_name="workspace_page_label")
@@ -133,6 +160,8 @@ class PageLabel(BaseModel):
 
 
 class ProjectPage(BaseModel):
+    """Through table attaching a workspace page to a project (unique among non-deleted rows)."""
+
     project = models.ForeignKey("db.Project", on_delete=models.CASCADE, related_name="project_pages")
     page = models.ForeignKey("db.Page", on_delete=models.CASCADE, related_name="project_pages")
     workspace = models.ForeignKey("db.Workspace", on_delete=models.CASCADE, related_name="project_pages")
@@ -156,6 +185,8 @@ class ProjectPage(BaseModel):
 
 
 class PageVersion(BaseModel):
+    """A historical snapshot of a page's content, used for version history/restore."""
+
     workspace = models.ForeignKey("db.Workspace", on_delete=models.CASCADE, related_name="page_versions")
     page = models.ForeignKey("db.Page", on_delete=models.CASCADE, related_name="page_versions")
     last_saved_at = models.DateTimeField(default=timezone.now)
@@ -173,6 +204,7 @@ class PageVersion(BaseModel):
         ordering = ("-created_at",)
 
     def save(self, *args, **kwargs):
+        """Keep ``description_stripped`` in sync with ``description_html`` before saving."""
         # Strip the html tags using html parser
         self.description_stripped = (
             None

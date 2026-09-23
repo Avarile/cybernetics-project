@@ -2,6 +2,8 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 # See the LICENSE file for details.
 
+"""Serializers for work item states (workflow columns) in the public API."""
+
 # Module imports
 from .base import BaseSerializer
 from plane.db.models import State, StateGroup
@@ -17,6 +19,11 @@ class StateSerializer(BaseSerializer):
     """
 
     def validate(self, data):
+        """Validate a state payload; creating/switching to a TRIAGE group state is rejected.
+
+        Side effect: when ``default`` is set, clears the default flag on all other
+        states of the project immediately (DB write during validation).
+        """
         # If the default is being provided then make all other states default False
         if data.get("default", False):
             State.objects.filter(project_id=self.context.get("project_id")).update(default=False)

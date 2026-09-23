@@ -2,6 +2,13 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 # See the LICENSE file for details.
 
+"""Serializers for pages (rich-text documents), page versions and binary description updates.
+
+Pages are workspace-level objects linked to projects through ``ProjectPage``;
+labels are stored in ``PageLabel``. Descriptions are kept in three forms:
+HTML, JSON and a binary (collaborative editor/Yjs-style) document.
+"""
+
 # Third party imports
 from rest_framework import serializers
 import base64
@@ -23,6 +30,12 @@ from plane.db.models import (
 
 
 class PageSerializer(BaseSerializer):
+    """Page serializer used for list/create/update.
+
+    ``labels`` (write-only) manages PageLabel rows; ``label_ids``/``project_ids``
+    and ``is_favorite`` are expected to be annotated by the view.
+    """
+
     is_favorite = serializers.BooleanField(read_only=True)
     labels = serializers.ListField(
         child=serializers.PrimaryKeyRelatedField(queryset=Label.objects.all()),
@@ -59,6 +72,11 @@ class PageSerializer(BaseSerializer):
         read_only_fields = ["workspace", "owned_by"]
 
     def create(self, validated_data):
+        """Create the page, link it to ``context["project_id"]`` and attach labels.
+
+        Descriptions and owner are taken from the serializer context
+        (``owned_by_id``, ``description_json``, ``description_binary``, ``description_html``).
+        """
         labels = validated_data.pop("labels", None)
         project_id = self.context["project_id"]
         owned_by_id = self.context["owned_by_id"]
@@ -106,6 +124,7 @@ class PageSerializer(BaseSerializer):
         return page
 
     def update(self, instance, validated_data):
+        """Update the page; ``labels`` when provided fully replaces the page's labels."""
         labels = validated_data.pop("labels", None)
         if labels is not None:
             PageLabel.objects.filter(page=instance).delete()
@@ -127,6 +146,8 @@ class PageSerializer(BaseSerializer):
 
 
 class PageDetailSerializer(PageSerializer):
+    """Page serializer including ``description_html`` (detail view)."""
+
     description_html = serializers.CharField()
 
     class Meta(PageSerializer.Meta):
@@ -134,6 +155,8 @@ class PageDetailSerializer(PageSerializer):
 
 
 class PageVersionSerializer(BaseSerializer):
+    """Page version metadata (without description content), used for version listings."""
+
     class Meta:
         model = PageVersion
         fields = [
@@ -151,6 +174,8 @@ class PageVersionSerializer(BaseSerializer):
 
 
 class PageVersionDetailSerializer(BaseSerializer):
+    """Page version including the stored description content (binary/HTML/JSON)."""
+
     class Meta:
         model = PageVersion
         fields = [
@@ -179,6 +204,7 @@ class PageBinaryUpdateSerializer(serializers.Serializer):
 
     def validate_description_binary(self, value):
         """Validate the base64-encoded binary data"""
+        # Client sends the binary document base64-encoded; the decoded bytes are stored
         if not value:
             return value
 

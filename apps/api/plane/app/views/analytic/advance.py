@@ -2,6 +2,15 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 # See the LICENSE file for details.
 
+"""Workspace-level "advance analytics" endpoints.
+
+Routed in ``plane/app/urls/analytic.py`` as ``advance-analytics/``,
+``advance-analytics-stats/`` and ``advance-analytics-charts/``. All endpoints are
+restricted to workspace admins/members and share the filter set built by
+``get_analytics_filters`` (workspace/project scoping plus optional
+``date_filter`` and ``project_ids`` query params).
+"""
+
 from rest_framework.response import Response
 from rest_framework import status
 from typing import Dict, List, Any
@@ -29,7 +38,14 @@ from plane.utils.date_utils import (
 
 
 class AdvanceAnalyticsBaseView(BaseAPIView):
+    """Base view that computes the shared analytics filters for a workspace request."""
+
     def initialize_workspace(self, slug: str, type: str) -> None:
+        """Store the workspace slug and build ``self.filters`` from the request's query params.
+
+        ``self.filters`` provides ``base_filters``, ``project_filters``,
+        ``analytics_date_range`` and ``chart_period_range``.
+        """
         self._workspace_slug = slug
         self.filters = get_analytics_filters(
             slug=slug,
@@ -41,7 +57,10 @@ class AdvanceAnalyticsBaseView(BaseAPIView):
 
 
 class AdvanceAnalyticsEndpoint(AdvanceAnalyticsBaseView):
+    """Headline counts for the analytics overview and work-items tabs (``?tab=overview|work-items``)."""
+
     def get_filtered_counts(self, queryset: QuerySet) -> Dict[str, int]:
+        """Return ``{"count": n}`` for ``queryset``, limited to the current date range when one is set."""
         def get_filtered_count() -> int:
             if self.filters["analytics_date_range"]:
                 return queryset.filter(
@@ -51,6 +70,7 @@ class AdvanceAnalyticsEndpoint(AdvanceAnalyticsBaseView):
             return queryset.count()
 
         def get_previous_count() -> int:
+        # Currently unused: the previous-period comparison is commented out in the result below
             if self.filters["analytics_date_range"] and self.filters["analytics_date_range"].get("previous"):
                 return queryset.filter(
                     created_at__gte=self.filters["analytics_date_range"]["previous"]["gte"],
@@ -64,6 +84,11 @@ class AdvanceAnalyticsEndpoint(AdvanceAnalyticsBaseView):
         }
 
     def get_overview_data(self) -> Dict[str, Dict[str, int]]:
+        """Counts of members by role, projects, work items, cycles and intake items.
+
+        When ``project_ids`` is given, member counts are taken from those projects'
+        memberships instead of the workspace membership.
+        """
         members_query = WorkspaceMember.objects.filter(
             workspace__slug=self._workspace_slug, is_active=True, member__is_bot=False
         )
@@ -85,12 +110,14 @@ class AdvanceAnalyticsEndpoint(AdvanceAnalyticsBaseView):
             "total_cycles": self.get_filtered_counts(Cycle.objects.filter(**self.filters["base_filters"])),
             "total_intake": self.get_filtered_counts(
                 Issue.objects.filter(**self.filters["base_filters"]).filter(
+                    # Intake statuses: -2 pending, -1 rejected, 0 snoozed, 1 accepted, 2 duplicate
                     issue_intake__status__in=["-2", "-1", "0", "1", "2"]  # TODO: Add description for reference.
                 )
             ),
         }
 
     def get_work_items_stats(self) -> Dict[str, Dict[str, int]]:
+        """Work item counts overall and per state group (started, backlog, unstarted, completed)."""
         base_queryset = Issue.issue_objects.filter(**self.filters["base_filters"])
 
         return {
@@ -103,6 +130,7 @@ class AdvanceAnalyticsEndpoint(AdvanceAnalyticsBaseView):
 
     @allow_permission([ROLE.ADMIN, ROLE.MEMBER], level="WORKSPACE")
     def get(self, request: HttpRequest, slug: str) -> Response:
+        """Dispatch on ``?tab=``; returns 400 for unknown tabs."""
         self.initialize_workspace(slug, type="analytics")
         tab = request.GET.get("tab", "overview")
 
@@ -120,7 +148,13 @@ class AdvanceAnalyticsEndpoint(AdvanceAnalyticsBaseView):
 
 
 class AdvanceAnalyticsStatsEndpoint(AdvanceAnalyticsBaseView):
+    """Per-project breakdown of work items by state group (``?type=work-items``)."""
+
     def get_project_issues_stats(self) -> QuerySet:
+        """Per-project work item counts by state group, limited to the chart period when set.
+
+        Not currently used by ``get``.
+        """
         # Get the base queryset with workspace and project filters
         base_queryset = Issue.issue_objects.filter(**self.filters["base_filters"])
 
@@ -142,6 +176,7 @@ class AdvanceAnalyticsStatsEndpoint(AdvanceAnalyticsBaseView):
         )
 
     def get_work_items_stats(self) -> Dict[str, Dict[str, int]]:
+        """Per-project work item counts by state group (no date restriction)."""
         base_queryset = Issue.issue_objects.filter(**self.filters["base_filters"])
         return (
             base_queryset.values("project_id", "project__name")
@@ -157,6 +192,7 @@ class AdvanceAnalyticsStatsEndpoint(AdvanceAnalyticsBaseView):
 
     @allow_permission([ROLE.ADMIN, ROLE.MEMBER], level="WORKSPACE")
     def get(self, request: HttpRequest, slug: str) -> Response:
+        """Dispatch on ``?type=``; only ``work-items`` is supported."""
         self.initialize_workspace(slug, type="chart")
         type = request.GET.get("type", "work-items")
 
@@ -170,7 +206,10 @@ class AdvanceAnalyticsStatsEndpoint(AdvanceAnalyticsBaseView):
 
 
 class AdvanceAnalyticsChartEndpoint(AdvanceAnalyticsBaseView):
+    """Chart data for workspace analytics (``?type=projects|custom-work-items|work-items``)."""
+
     def project_chart(self) -> List[Dict[str, Any]]:
+        """Totals per entity type (work items, cycles, modules, intake, members, pages, views) as chart rows."""
         # Get the base queryset with workspace and project filters
         base_queryset = Issue.issue_objects.filter(**self.filters["base_filters"])
         date_filter = {}
@@ -215,6 +254,11 @@ class AdvanceAnalyticsChartEndpoint(AdvanceAnalyticsBaseView):
         ]
 
     def work_item_completion_chart(self) -> Dict[str, Any]:
+        """Monthly created vs. completed work item counts.
+
+        Months run from the workspace creation month (or the chart period start) up
+        to the current month, with empty months filled with zeros.
+        """
         # Get the base queryset
         queryset = (
             Issue.issue_objects.filter(**self.filters["base_filters"])
@@ -284,6 +328,11 @@ class AdvanceAnalyticsChartEndpoint(AdvanceAnalyticsBaseView):
 
     @allow_permission([ROLE.ADMIN, ROLE.MEMBER], level="WORKSPACE")
     def get(self, request: HttpRequest, slug: str) -> Response:
+        """Dispatch on ``?type=``.
+
+        ``custom-work-items`` builds a chart grouped by ``x_axis`` (default PRIORITY)
+        and optional ``group_by`` via ``build_analytics_chart``.
+        """
         self.initialize_workspace(slug, type="chart")
         type = request.GET.get("type", "projects")
         group_by = request.GET.get("group_by", None)

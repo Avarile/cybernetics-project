@@ -56,7 +56,7 @@ def migrate_single_model_filters(
             conversion_errors += 1
             continue
 
-    # Bulk update all successfully converted records
+    # Bulk update all successfully converted records (only rich_filters is written; legacy filters are kept)
     if updated_records:
         model_class.objects.bulk_update(updated_records, ["rich_filters"], batch_size=1000)
         logger.info(f"Successfully updated {len(updated_records)} {model_name} records")
@@ -73,11 +73,12 @@ def migrate_models_filters_to_rich_filters(
 
     Args:
         models_to_migrate: Dict mapping model names to model classes
+        converter: Converter instance used for every model
 
     Returns:
         Dictionary mapping model names to (updated_count, error_count) tuples
     """
-    # Initialize the converter with default settings
+    # The converter is supplied by the caller (typically a data migration)
 
     logger.info("Starting filters to rich_filters migration for all models")
 
@@ -94,6 +95,7 @@ def migrate_models_filters_to_rich_filters(
             total_errors += error_count
 
         except Exception as e:
+            # A failure in one model is logged and counted, but does not abort the others
             logger.error(f"Failed to migrate {model_name}: {str(e)}")
             results[model_name] = (0, 1)
             total_errors += 1

@@ -22,6 +22,8 @@ from plane.api.rate_limit import ApiKeyRateThrottle
 from plane.db.models import APIToken, Issue, IssueAssignee, Project, ProjectMember, State, User
 from plane.mcp.asgi import with_mcp
 
+# Protocol version for "modern" (stateless) requests, which carry client info in ``_meta``
+# and routing hints in ``Mcp-Method``/``Mcp-Name`` headers instead of an initialize handshake.
 MODERN = "2026-07-28"
 META = {
     "io.modelcontextprotocol/protocolVersion": MODERN,
@@ -41,6 +43,7 @@ def token(create_user):
 
 @pytest.fixture
 def project(workspace, create_user):
+    """Project "WEB" with the test user as admin (role 20)."""
     project = Project.objects.create(name="Web", identifier="WEB", workspace=workspace, created_by=create_user)
     ProjectMember.objects.create(project=project, member=create_user, role=20, is_active=True)
     return project
@@ -48,11 +51,13 @@ def project(workspace, create_user):
 
 @pytest.fixture
 def todo_state(project):
+    """Default "Todo" state (unstarted group) for the project."""
     return State.objects.create(name="Todo", group="unstarted", project=project, default=True)
 
 
 @pytest.fixture
 def mcp_app(settings, mocker):
+    """The real Django ASGI app wrapped with the MCP router, with writes enabled."""
     settings.MCP_SERVER_ENABLED = True
     settings.MCP_READ_ONLY = False
     # Background work triggered by the real views
@@ -67,6 +72,7 @@ def mcp_app(settings, mocker):
 
 @asynccontextmanager
 async def connect(app):
+    """Run the MCP session manager and yield an httpx client bound to the ASGI app."""
     async with app.server.session_manager.run():
         transport = httpx.ASGITransport(app=app)
         async with httpx.AsyncClient(transport=transport, base_url="http://testserver") as client:
@@ -74,6 +80,7 @@ async def connect(app):
 
 
 async def call_tool(client, token, name, arguments=None):
+    """Send a modern-protocol ``tools/call`` request and return its JSON-RPC ``result``."""
     headers = {
         **BASE_HEADERS,
         "Authorization": f"Bearer {token}",
@@ -93,11 +100,14 @@ async def call_tool(client, token, name, arguments=None):
 
 
 def payload(result):
+    """Assert a tool call succeeded and decode its JSON text content."""
     assert result["isError"] is False, result["content"][0]["text"]
     return json.loads(result["content"][0]["text"])
 
 
 class TestTransport:
+    """HTTP transport rules: bearer auth, POST-only, legacy handshake and modern listing."""
+
     async def test_requires_token(self, mcp_app):
         async with connect(mcp_app) as client:
             response = await client.post("/api/mcp", headers=BASE_HEADERS, json={"jsonrpc": "2.0", "id": 1})
@@ -106,6 +116,7 @@ class TestTransport:
         assert response.headers["www-authenticate"] == 'Bearer realm="plane"'
 
     async def test_get_stream_is_not_offered(self, mcp_app, token):
+        """The server-to-client SSE stream (GET) is not supported; only POST is allowed."""
         headers = {"Authorization": f"Bearer {token}", "Accept": "text/event-stream"}
         async with connect(mcp_app) as client:
             response = await client.get("/api/mcp", headers=headers)
@@ -114,6 +125,7 @@ class TestTransport:
         assert response.headers["allow"] == "POST"
 
     async def test_legacy_initialize_and_list(self, mcp_app, token):
+        """Older clients can still initialize; the server is stateless, so no session ID is issued."""
         headers = {**BASE_HEADERS, "Authorization": f"Bearer {token}"}
         initialize = {
             "jsonrpc": "2.0",
@@ -149,6 +161,8 @@ class TestTransport:
 
 
 class TestTools:
+    """Tool calls executed through the loopback into the real ``/api/v1`` views."""
+
     async def test_get_current_user_uses_loopback(self, mcp_app, token, create_user):
         async with connect(mcp_app) as client:
             result = payload(await call_tool(client, token, "get_current_user"))
@@ -166,6 +180,7 @@ class TestTools:
     async def test_create_work_item_runs_public_api_side_effects(
         self, mcp_app, token, workspace, project, todo_state, create_user
     ):
+        """Creating via MCP triggers the same activity and request-log tasks as the public API."""
         from plane.api.views.issue import issue_activity, model_activity
         from plane.middleware.logger import process_logs
 
@@ -192,6 +207,7 @@ class TestTools:
         assert log_data["path"].endswith("/work-items/")
 
     async def test_get_work_item_by_key(self, mcp_app, token, workspace, project, todo_state):
+        """Work items can be looked up by their human key (case-insensitive, e.g. ``web-1``)."""
         issue = await sync_to_async(Issue.objects.create)(name="Fix it", project=project, state=todo_state)
 
         async with connect(mcp_app) as client:
@@ -205,6 +221,8 @@ class TestTools:
     async def test_list_work_items_filters_and_scopes_to_member_projects(
         self, mcp_app, token, workspace, project, todo_state, create_user
     ):
+        # Seed synchronously (ORM writes) and wrap with sync_to_async from the async test.
+        # "Secret" is assigned to the user but lives in a project they are not a member of.
         def seed():
             mine = Issue.objects.create(name="Mine", project=project, state=todo_state)
             Issue.objects.create(name="Unassigned", project=project, state=todo_state)
@@ -238,6 +256,7 @@ class TestTools:
     async def test_unassigned_filter_counts_items_whose_assignees_were_removed(
         self, mcp_app, token, workspace, project, todo_state, create_user
     ):
+        """``assignees: ["none"]`` matches items with only soft-deleted assignees too."""
         def seed():
             mine = Issue.objects.create(name="Mine", project=project, state=todo_state)
             IssueAssignee.objects.create(issue=mine, assignee=create_user, project=project, workspace=workspace)
@@ -265,6 +284,7 @@ class TestTools:
         assert mine_or_unassigned["total"] == 3
 
     async def test_permission_errors_are_tool_errors(self, mcp_app, token, workspace):
+        """A 403 from the underlying API is returned as ``isError`` in a 200 JSON-RPC result."""
         def foreign_project():
             other = User.objects.create(email="owner@plane.so", username="owner")
             return Project.objects.create(name="Private", identifier="PRV", workspace=workspace, created_by=other)
@@ -284,6 +304,7 @@ class TestTools:
         assert not await Issue.objects.filter(project=private).aexists()
 
     async def test_rate_limit_is_shared_with_public_api(self, mcp_app, token, workspace, mocker):
+        """MCP calls count against the same per-API-key throttle as direct ``/api/v1`` requests."""
         mocker.patch.object(ApiKeyRateThrottle, "rate", "1/minute")
 
         async with connect(mcp_app) as client:

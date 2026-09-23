@@ -3,6 +3,12 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 # See the LICENSE file for details.
 
+"""Django command-line entrypoint.
+
+Defaults to the production settings module; override with DJANGO_SETTINGS_MODULE
+(e.g. plane.settings.local, as bin/run-host.sh does).
+"""
+
 import os
 import sys
 

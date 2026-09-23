@@ -2,7 +2,12 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 # See the LICENSE file for details.
 
-"""Global Settings"""
+"""Global Settings
+
+Base Django settings shared by every environment. ``local.py``, ``production.py`` and
+``test.py`` import everything from here and override as needed. Almost every value is
+driven by environment variables so the same image can be configured per deployment.
+"""
 
 # Python imports
 import ipaddress
@@ -119,7 +124,7 @@ CYBERNETICS_DATA_TIMEOUT = float(os.environ.get("CYBERNETICS_DATA_TIMEOUT", "10"
 CYBERNETICS_DATA_REQUIRE_HTTPS = os.environ.get("CYBERNETICS_DATA_REQUIRE_HTTPS", "1") == "1"
 CYBERNETICS_DATA_PROXY_RATE = os.environ.get("CYBERNETICS_DATA_PROXY_RATE", "120/minute")
 
-# Allowed Hosts
+# Allowed Hosts (comma-separated; "*" by default)
 ALLOWED_HOSTS = os.environ.get("ALLOWED_HOSTS", "*").split(",")
 
 # Application definition
@@ -164,6 +169,7 @@ MIDDLEWARE = [
 ]
 
 # Rest Framework settings
+# Keys in DEFAULT_THROTTLE_RATES are the ``scope`` names referenced by throttle classes.
 REST_FRAMEWORK = {
     "DEFAULT_AUTHENTICATION_CLASSES": ("rest_framework.authentication.SessionAuthentication",),
     "DEFAULT_THROTTLE_CLASSES": ("rest_framework.throttling.AnonRateThrottle",),
@@ -222,6 +228,7 @@ cors_origins_raw = os.environ.get("CORS_ALLOWED_ORIGINS", "")
 cors_allowed_origins = [origin.strip() for origin in cors_origins_raw.split(",") if origin.strip()]
 if cors_allowed_origins:
     CORS_ALLOWED_ORIGINS = cors_allowed_origins
+    # Only mark cookies Secure when every configured origin is https
     secure_origins = False if [origin for origin in cors_allowed_origins if "http:" in origin] else True
 else:
     CORS_ALLOW_ALL_ORIGINS = True
@@ -280,6 +287,8 @@ if os.environ.get("ENABLE_READ_REPLICA", "0") == "1":
 REDIS_URL = os.environ.get("REDIS_URL")
 REDIS_SSL = REDIS_URL and "rediss" in REDIS_URL
 
+# Django cache backed by Redis (used by cache_response/invalidate_cache among others);
+# TLS connections skip certificate verification.
 if REDIS_SSL:
     CACHES = {
         "default": {
@@ -348,6 +357,8 @@ AWS_DEFAULT_ACL = "public-read"
 AWS_QUERYSTRING_AUTH = False
 AWS_S3_FILE_OVERWRITE = False
 AWS_S3_ENDPOINT_URL = os.environ.get("AWS_S3_ENDPOINT_URL", None) or os.environ.get("MINIO_ENDPOINT_URL", None)
+# With bundled MinIO, files are served through the web host at /<bucket>/ (proxied), so
+# generated URLs use the WEB_URL host and scheme instead of the internal MinIO endpoint.
 if AWS_S3_ENDPOINT_URL and USE_MINIO:
     parsed_url = urlparse(os.environ.get("WEB_URL", "http://localhost"))
     AWS_S3_CUSTOM_DOMAIN = f"{parsed_url.netloc}/{AWS_STORAGE_BUCKET_NAME}"
@@ -373,6 +384,7 @@ CELERY_RESULT_SERIALIZER = "json"
 CELERY_ACCEPT_CONTENT = ["application/json"]
 
 
+# Task modules Celery must import explicitly (not auto-discovered)
 CELERY_IMPORTS = (
     # scheduled tasks
     "plane.bgtasks.issue_automation_task",
@@ -403,7 +415,8 @@ ANALYTICS_BASE_API = os.environ.get("ANALYTICS_BASE_API", False)
 POSTHOG_API_KEY = os.environ.get("POSTHOG_API_KEY", False)
 POSTHOG_HOST = os.environ.get("POSTHOG_HOST", False)
 
-# Skip environment variable configuration
+# Skip environment variable configuration: when true (default), instance settings such as
+# SMTP/OAuth are read from the InstanceConfiguration table (see plane.license.utils.instance_value)
 SKIP_ENV_VAR = os.environ.get("SKIP_ENV_VAR", "1") == "1"
 
 DATA_UPLOAD_MAX_MEMORY_SIZE = int(os.environ.get("FILE_SIZE_LIMIT", 5242880))
@@ -411,13 +424,13 @@ DATA_UPLOAD_MAX_MEMORY_SIZE = int(os.environ.get("FILE_SIZE_LIMIT", 5242880))
 # Cookie Settings
 SESSION_COOKIE_SECURE = secure_origins
 SESSION_COOKIE_HTTPONLY = True
-SESSION_ENGINE = "plane.db.models.session"
+SESSION_ENGINE = "plane.db.models.session"  # custom DB-backed session store
 SESSION_COOKIE_AGE = int(os.environ.get("SESSION_COOKIE_AGE", 604800))
 SESSION_COOKIE_NAME = os.environ.get("SESSION_COOKIE_NAME", "session-id")
 SESSION_COOKIE_DOMAIN = os.environ.get("COOKIE_DOMAIN", None)
 SESSION_SAVE_EVERY_REQUEST = os.environ.get("SESSION_SAVE_EVERY_REQUEST", "0") == "1"
 
-# Admin Cookie
+# Admin Cookie (god-mode sessions use a separate cookie with a shorter lifetime)
 ADMIN_SESSION_COOKIE_NAME = "admin-session-id"
 ADMIN_SESSION_COOKIE_AGE = int(os.environ.get("ADMIN_SESSION_COOKIE_AGE", 3600))
 

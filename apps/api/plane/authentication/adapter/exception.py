@@ -2,6 +2,13 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 # See the LICENSE file for details.
 
+"""
+DRF exception handler for authentication endpoints.
+
+Normalizes auth errors: unauthenticated requests get HTTP 401 and throttled
+requests are converted into a ``RATE_LIMIT_EXCEEDED`` auth error with HTTP 429.
+"""
+
 # Third party imports
 from rest_framework.views import exception_handler
 from rest_framework.exceptions import NotAuthenticated
@@ -15,6 +22,7 @@ from plane.authentication.adapter.error import (
 
 
 def auth_exception_handler(exc, context):
+    """Wrap DRF's default handler to return 401 for NotAuthenticated and a coded 429 for Throttled."""
     # Call the default exception handler first, to get the standard error response.
     response = exception_handler(exc, context)
     # Check if an AuthenticationFailed exception is raised.

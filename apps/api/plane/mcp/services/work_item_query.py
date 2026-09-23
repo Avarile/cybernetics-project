@@ -46,6 +46,8 @@ LIST_FIELDS = [
 
 @dataclass
 class WorkItemQuery:
+    """Arguments of the ``list_work_items`` tool: filters, ordering and offset pagination."""
+
     workspace_slug: str
     project_id: Optional[str] = None
     assignees: list[str] = field(default_factory=list)
@@ -94,6 +96,12 @@ def assignee_filter(assignees: list[str], user_id: str) -> Q:
 
 
 def query_work_items(user_id: str, token: str, query: WorkItemQuery) -> dict:
+    """Return ``{"results", "total", "next_offset"}`` for work items matching ``query``.
+
+    Charges the caller's API rate limit, restricts to non-archived projects where the user is
+    an active member, applies filters/ordering, and adds ``key``/``state_name``/``state_group``
+    to each result. ``next_offset`` is None on the last page.
+    """
     charge_api_key_rate_limit(token)
 
     queryset = Issue.issue_objects.filter(
@@ -110,6 +118,7 @@ def query_work_items(user_id: str, token: str, query: WorkItemQuery) -> dict:
     if query.project_id:
         queryset = queryset.filter(project_id=query.project_id)
 
+    # distinct(): the project-member and filter joins can yield duplicate rows.
     queryset = queryset.select_related("project", "state").distinct()
     queryset, _ = order_issue_queryset(queryset, query.order_by)
 

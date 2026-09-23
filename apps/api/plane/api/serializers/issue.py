@@ -2,6 +2,14 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 # See the LICENSE file for details.
 
+"""Serializers for work items (issues) and related objects in the public API.
+
+Covers work items, labels, links, relations, comments, attachments and
+activity. Used by plane.api.views.issue and friends. Validators scope related
+objects (assignees, labels, state, parent, estimate point) to the project
+passed in serializer context (``project_id`` / ``workspace_id``).
+"""
+
 # Django imports
 from django.utils import timezone
 from lxml import html
@@ -52,6 +60,7 @@ class IssueSerializer(BaseSerializer):
     processing.
     """
 
+    # Write-only id lists; on read, to_representation() fills them from the join tables.
     assignees = serializers.ListField(
         child=serializers.PrimaryKeyRelatedField(queryset=User.objects.values_list("id", flat=True)),
         write_only=True,
@@ -73,6 +82,11 @@ class IssueSerializer(BaseSerializer):
         exclude = ["description_json", "description_stripped"]
 
     def validate(self, data):
+        """Validate dates, sanitize description HTML and scope related ids to the project.
+
+        Assignees/labels that do not belong to the project are silently dropped;
+        an invalid state, parent or estimate point raises a ValidationError.
+        """
         if (
             data.get("start_date", None) is not None
             and data.get("target_date", None) is not None
@@ -80,6 +94,7 @@ class IssueSerializer(BaseSerializer):
         ):
             raise serializers.ValidationError("Start date cannot exceed target date")
 
+        # Round-trip through lxml to normalize the HTML and reject unparsable markup.
         try:
             if data.get("description_html", None) is not None:
                 parsed = html.fromstring(data["description_html"])
@@ -104,6 +119,7 @@ class IssueSerializer(BaseSerializer):
                 raise serializers.ValidationError({"description_binary": "Invalid binary data"})
 
         # Validate assignees are from project
+        # role__gte=15 keeps Members and Admins only (Guests cannot be assignees).
         if data.get("assignees", []):
             data["assignees"] = ProjectMember.objects.filter(
                 project_id=self.context.get("project_id"),
@@ -149,6 +165,12 @@ class IssueSerializer(BaseSerializer):
         return data
 
     def create(self, validated_data):
+        """Create the work item plus its assignee and label rows.
+
+        Falls back to the project's default issue type, and to the project's
+        ``default_assignee_id`` (from context) when no assignees are given and that
+        user is still an active non-guest member. Duplicate join rows are ignored.
+        """
         assignees = validated_data.pop("assignees", None)
         labels = validated_data.pop("labels", None)
 
@@ -232,6 +254,7 @@ class IssueSerializer(BaseSerializer):
         return issue
 
     def update(self, instance, validated_data):
+        """Update the work item; replaces assignees/labels wholesale when they are provided."""
         assignees = validated_data.pop("assignees", None)
         labels = validated_data.pop("labels", None)
 
@@ -288,6 +311,7 @@ class IssueSerializer(BaseSerializer):
         return super().update(instance, validated_data)
 
     def to_representation(self, instance):
+        """Add assignee and label ids (or full objects when listed in ``expand``) to the output."""
         data = super().to_representation(instance)
         if "assignees" in self.fields:
             if "assignees" in self.expand:
@@ -411,6 +435,7 @@ class IssueLinkCreateSerializer(BaseSerializer):
         ]
 
     def validate_url(self, value):
+        """Require a well-formed http(s) URL."""
         # Check URL format
         validate_url = URLValidator()
         try:
@@ -447,6 +472,7 @@ class IssueLinkUpdateSerializer(IssueLinkCreateSerializer):
         read_only_fields = IssueLinkCreateSerializer.Meta.read_only_fields
 
     def update(self, instance, validated_data):
+        """Update the link, rejecting a URL already attached to the same work item."""
         if (
             IssueLink.objects.filter(url=validated_data.get("url"), issue_id=instance.issue_id)
             .exclude(pk=instance.id)
@@ -745,6 +771,7 @@ class IssueCommentSerializer(BaseSerializer):
         exclude = ["comment_stripped", "comment_json"]
 
     def validate(self, data):
+        """Sanitize ``comment_html``, rejecting content that fails validation."""
         if "comment_html" in data and data["comment_html"]:
             is_valid, error_msg, sanitized_html = validate_html_content(data["comment_html"])
             if not is_valid:
@@ -767,6 +794,8 @@ class IssueActivitySerializer(BaseSerializer):
         exclude = ["created_by", "updated_by"]
 
 
+# Not the same as cycle.CycleIssueSerializer / module.ModuleIssueSerializer, which are
+# the ones re-exported by plane.api.serializers.
 class CycleIssueSerializer(BaseSerializer):
     """
     Serializer for work items within cycles.
@@ -825,6 +854,10 @@ class IssueExpandSerializer(BaseSerializer):
     description = serializers.JSONField(source="description_json", read_only=True)
 
     def get_labels(self, obj):
+        """Return label ids, or label objects when ``labels`` is in context ``expand``.
+
+        Relies on ``label_issue`` being prefetched by the view.
+        """
         expand = self.context.get("expand", [])
         if "labels" in expand:
             # Use prefetched data
@@ -832,6 +865,7 @@ class IssueExpandSerializer(BaseSerializer):
         return [il.label_id for il in obj.label_issue.all()]
 
     def get_assignees(self, obj):
+        """Return assignee ids, or user objects when ``assignees`` is in context ``expand``."""
         expand = self.context.get("expand", [])
         if "assignees" in expand:
             return UserLiteSerializer([ia.assignee for ia in obj.issue_assignee.all()], many=True).data

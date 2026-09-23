@@ -2,6 +2,13 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 # See the LICENSE file for details.
 
+"""Serializers for projects in the public API.
+
+Used by plane.api.views.project. Validation enforces the identifier/name
+character rules, workspace membership of lead/default assignee and uniqueness
+of the project identifier within the workspace.
+"""
+
 # Third party imports
 import random
 from rest_framework import serializers
@@ -27,6 +34,7 @@ class ProjectCreateSerializer(BaseSerializer):
     and workspace association for new project initialization.
     """
 
+    # Palette/icon set used to generate a random project logo when none is supplied.
     PROJECT_ICON_DEFAULT_COLORS = [
         "#95999f",
         "#6d7b8a",
@@ -105,6 +113,7 @@ class ProjectCreateSerializer(BaseSerializer):
         ]
 
     def validate(self, data):
+        """Validate name/identifier characters and that lead/default assignee belong to the workspace."""
         project_name = data.get("name", None)
         project_identifier = data.get("identifier", None)
 
@@ -140,6 +149,11 @@ class ProjectCreateSerializer(BaseSerializer):
         return data
 
     def create(self, validated_data):
+        """Create the project in the context workspace.
+
+        Rejects an empty identifier or one already taken in the workspace (compared
+        upper-cased), and assigns a random icon/color when ``logo_props`` is missing.
+        """
         identifier = validated_data.get("identifier", "").strip().upper()
 
         if identifier == "":
@@ -180,6 +194,10 @@ class ProjectUpdateSerializer(ProjectCreateSerializer):
         read_only_fields = ProjectCreateSerializer.Meta.read_only_fields
 
     def update(self, instance, validated_data):
+        """Update the project after checking name/identifier characters.
+
+        The default state and estimate, if given, must belong to this project.
+        """
         project_name = validated_data.get("name", None)
         project_identifier = validated_data.get("identifier", None)
 
@@ -239,6 +257,7 @@ class ProjectSerializer(BaseSerializer):
         ]
 
     def validate(self, data):
+        """Validate names, workspace membership of lead/default assignee, and description HTML."""
         project_name = data.get("name", None)
         project_identifier = data.get("identifier", None)
 
@@ -281,6 +300,7 @@ class ProjectSerializer(BaseSerializer):
         return data
 
     def create(self, validated_data):
+        """Create the project and reserve its identifier via a ProjectIdentifier row."""
         identifier = validated_data.get("identifier", "").strip().upper()
         if identifier == "":
             raise serializers.ValidationError(detail="Project Identifier is required")

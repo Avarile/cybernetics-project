@@ -2,6 +2,13 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 # See the LICENSE file for details.
 
+"""Issue version history endpoints.
+
+``IssueVersionEndpoint`` exposes snapshots of an issue's fields over time and
+``WorkItemDescriptionVersionEndpoint`` exposes saved versions of an issue's
+description. Both return a single version by ``pk`` or a cursor-paginated list.
+"""
+
 # Third party imports
 from rest_framework import status
 from rest_framework.response import Response
@@ -25,7 +32,10 @@ from plane.utils.timezone_converter import user_timezone_converter
 
 
 class IssueVersionEndpoint(BaseAPIView):
+    """Read-only access to ``IssueVersion`` snapshots of an issue."""
+
     def process_paginated_result(self, fields, results, timezone):
+        """Project a page of results to ``fields`` and convert timestamps to the user's timezone."""
         paginated_data = results.values(*fields)
 
         datetime_fields = ["created_at", "updated_at"]
@@ -35,6 +45,7 @@ class IssueVersionEndpoint(BaseAPIView):
 
     @allow_permission(allowed_roles=[ROLE.ADMIN, ROLE.MEMBER, ROLE.GUEST])
     def get(self, request, slug, project_id, issue_id, pk=None):
+        """Return one version when ``pk`` is given, otherwise a paginated list (``cursor`` param)."""
         if pk:
             issue_version = IssueVersion.objects.get(
                 workspace__slug=slug, project_id=project_id, issue_id=issue_id, pk=pk
@@ -75,7 +86,10 @@ class IssueVersionEndpoint(BaseAPIView):
 
 
 class WorkItemDescriptionVersionEndpoint(BaseAPIView):
+    """Read-only access to ``IssueDescriptionVersion`` rows of a work item."""
+
     def process_paginated_result(self, fields, results, timezone):
+        """Project a page of results to ``fields`` and convert timestamps to the user's timezone."""
         paginated_data = results.values(*fields)
 
         datetime_fields = ["created_at", "updated_at"]
@@ -85,9 +99,13 @@ class WorkItemDescriptionVersionEndpoint(BaseAPIView):
 
     @allow_permission(allowed_roles=[ROLE.ADMIN, ROLE.MEMBER, ROLE.GUEST])
     def get(self, request, slug, project_id, work_item_id, pk=None):
+        """Return one description version when ``pk`` is given, otherwise a paginated
+        list (newest first). Guests may only view work items they created unless
+        the project enables ``guest_view_all_features``."""
         project = Project.objects.get(pk=project_id)
         issue = Issue.objects.get(workspace__slug=slug, project_id=project_id, pk=work_item_id)
 
+        # Guest restriction: guests can't see others' work items unless the project allows it
         if (
             ProjectMember.objects.filter(
                 workspace__slug=slug,

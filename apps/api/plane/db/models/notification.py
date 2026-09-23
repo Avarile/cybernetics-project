@@ -2,6 +2,13 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 # See the LICENSE file for details.
 
+"""Notification models.
+
+``Notification`` rows back the in-app inbox, ``UserNotificationPreference``
+stores which events a user wants emailed, and ``EmailNotificationLog`` queues
+per-change records that the email notification background task batches and sends.
+"""
+
 # Django imports
 from django.conf import settings
 from django.db import models
@@ -11,6 +18,13 @@ from .base import BaseModel
 
 
 class Notification(BaseModel):
+    """An in-app notification delivered to ``receiver`` about an entity (e.g. an issue).
+
+    ``entity_name``/``entity_identifier`` point at the source object generically;
+    ``read_at``, ``snoozed_till`` and ``archived_at`` drive the inbox state.
+    The composite indexes match the inbox list/filter queries per receiver+workspace.
+    """
+
     workspace = models.ForeignKey("db.Workspace", related_name="notifications", on_delete=models.CASCADE)
     project = models.ForeignKey("db.Project", related_name="notifications", on_delete=models.CASCADE, null=True)
     data = models.JSONField(null=True)
@@ -70,6 +84,7 @@ class Notification(BaseModel):
 
 
 def get_default_preference():
+    """Default email preferences: every notification category enabled."""
     return {
         "property_change": {"email": True},
         "state": {"email": True},
@@ -79,6 +94,8 @@ def get_default_preference():
 
 
 class UserNotificationPreference(BaseModel):
+    """Which notification events a user wants emailed (optionally scoped to a workspace/project)."""
+
     # user it is related to
     user = models.ForeignKey(
         settings.AUTH_USER_MODEL,
@@ -119,6 +136,12 @@ class UserNotificationPreference(BaseModel):
 
 
 class EmailNotificationLog(BaseModel):
+    """A pending/sent email notification entry for a single entity change.
+
+    ``processed_at`` marks entries picked up by the batching task and
+    ``sent_at`` marks when the email actually went out.
+    """
+
     # receiver
     receiver = models.ForeignKey(
         settings.AUTH_USER_MODEL,

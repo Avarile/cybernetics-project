@@ -2,6 +2,8 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 # See the LICENSE file for details.
 
+"""Public API routes for project labels (/api/v1/)."""
+
 from django.urls import path
 
 from plane.api.views import LabelListCreateAPIEndpoint, LabelDetailAPIEndpoint

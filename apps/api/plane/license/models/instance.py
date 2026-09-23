@@ -2,6 +2,12 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 # See the LICENSE file for details.
 
+"""Models describing the self-hosted instance itself.
+
+A deployment has a single Instance row, the InstanceAdmin users who can access god mode,
+and InstanceConfiguration key/value settings that override environment defaults.
+"""
+
 # Python imports
 from enum import Enum
 
@@ -12,14 +18,21 @@ from django.conf import settings
 # Module imports
 from plane.db.models import BaseModel
 
-ROLE_CHOICES = ((20, "Admin"),)
+ROLE_CHOICES = ((20, "Admin"),)  # InstanceAdminPermission accepts role >= 15
 
 
 class InstanceEdition(Enum):
+    """Supported Plane editions (only the community edition here)."""
+
     PLANE_COMMUNITY = "PLANE_COMMUNITY"
 
 
 class Instance(BaseModel):
+    """The (singleton) registered instance: identity, version info, setup and telemetry flags.
+
+    Created by ``manage.py register_instance``; code fetches it with ``Instance.objects.first()``.
+    """
+
     # General information
     instance_name = models.CharField(max_length=255)
     whitelist_emails = models.TextField(blank=True, null=True)
@@ -51,6 +64,8 @@ class Instance(BaseModel):
 
 
 class InstanceAdmin(BaseModel):
+    """Grants a user god-mode (instance admin) access; one row per (instance, user)."""
+
     user = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         on_delete=models.SET_NULL,
@@ -70,6 +85,11 @@ class InstanceAdmin(BaseModel):
 
 
 class InstanceConfiguration(BaseModel):
+    """Instance-wide setting stored as a key/value pair (e.g. SMTP, OAuth credentials, feature flags).
+
+    When ``is_encrypted`` is True, ``value`` holds ciphertext produced by ``encrypt_data``.
+    """
+
     # The instance configuration variables
     key = models.CharField(max_length=100, unique=True)
     value = models.TextField(null=True, blank=True, default=None)

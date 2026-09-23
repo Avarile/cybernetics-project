@@ -2,6 +2,12 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 # See the LICENSE file for details.
 
+"""Serializers for cycles (sprints) in the public API.
+
+Used by plane.api.views.cycle for cycle CRUD, cycle work-item assignment and
+transferring work items between cycles.
+"""
+
 # Third party imports
 import pytz
 from rest_framework import serializers
@@ -28,6 +34,7 @@ class CycleCreateSerializer(BaseSerializer):
     )
 
     def __init__(self, *args, **kwargs):
+        """Interpret start/end dates in the project's timezone when a project is in context."""
         super().__init__(*args, **kwargs)
         project = self.context.get("project")
         if project and project.timezone:
@@ -59,7 +66,13 @@ class CycleCreateSerializer(BaseSerializer):
         ]
 
     def validate(self, data):
+        """Validate project/cycle settings and date range, then normalize dates to UTC.
+
+        Requires the project to exist with cycles enabled. Defaults ``owned_by`` to the
+        requesting user.
+        """
         project_id = (
+        # project_id may come from view context, the payload, or the instance being updated.
             self.context.get("project_id")
             or self.initial_data.get("project_id")
             or (self.instance.project_id if self.instance and hasattr(self.instance, "project_id") else None)
@@ -80,6 +93,8 @@ class CycleCreateSerializer(BaseSerializer):
         ):
             raise serializers.ValidationError("Start date cannot exceed end date")
 
+        # Re-anchor both dates to local midnight in the project's timezone and store as UTC
+        # (see convert_to_utc for the start/end-date adjustment).
         if data.get("start_date", None) is not None and data.get("end_date", None) is not None:
             data["start_date"] = convert_to_utc(
                 date=str(data.get("start_date").date()),

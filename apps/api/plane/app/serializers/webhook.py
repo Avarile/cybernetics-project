@@ -2,6 +2,12 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 # See the LICENSE file for details.
 
+"""Serializers for workspace webhooks and their delivery logs.
+
+Webhook URLs are validated against SSRF rules (allowed IPs/hosts) and a list of
+disallowed domains that includes the Plane host itself, to prevent loops.
+"""
+
 # Python imports
 import logging
 from urllib.parse import urlparse
@@ -22,6 +28,8 @@ logger = logging.getLogger(__name__)
 
 
 class WebhookSerializer(DynamicBaseSerializer):
+    """Webhook configuration; the URL is validated on create and when changed on update."""
+
     url = serializers.URLField(validators=[validate_schema, validate_domain])
 
     def _validate_webhook_url(self, url):
@@ -55,11 +63,13 @@ class WebhookSerializer(DynamicBaseSerializer):
             raise serializers.ValidationError({"url": "URL domain or its subdomain is not allowed."})
 
     def create(self, validated_data):
+        """Validate the URL and create the webhook."""
         url = validated_data.get("url", None)
         self._validate_webhook_url(url)
         return Webhook.objects.create(**validated_data)
 
     def update(self, instance, validated_data):
+        """Re-validate the URL only if it is being changed, then update."""
         url = validated_data.get("url", None)
         if url:
             self._validate_webhook_url(url)
@@ -72,6 +82,8 @@ class WebhookSerializer(DynamicBaseSerializer):
 
 
 class WebhookLogSerializer(DynamicBaseSerializer):
+    """Webhook delivery log entry (request/response details for one delivery)."""
+
     class Meta:
         model = WebhookLog
         fields = "__all__"

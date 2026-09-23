@@ -2,6 +2,15 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 # See the LICENSE file for details.
 
+"""
+Celery tasks implementing soft-delete cascading and periodic hard deletion.
+
+Models in Plane are soft-deleted by setting ``deleted_at``. ``soft_delete_related_objects``
+mimics Django's ``on_delete`` behaviour for soft deletes, and ``hard_delete``
+(scheduled via Celery beat) permanently removes rows soft-deleted more than
+``HARD_DELETE_AFTER_DAYS`` ago.
+"""
+
 # Django imports
 from django.utils import timezone
 from django.apps import apps
@@ -29,6 +38,7 @@ def soft_delete_related_objects(app_label, model_name, instance_pk, using=None):
         return
 
     # Get all related fields that are reverse relationships
+    # Reverse relations only (FKs/one-to-ones defined on other models pointing at this one).
     all_related = [
         f for f in instance._meta.get_fields() if (f.one_to_many or f.one_to_one) and f.auto_created and not f.concrete
     ]
@@ -72,6 +82,7 @@ def soft_delete_related_objects(app_label, model_name, instance_pk, using=None):
                                 related_obj.deleted_at = timezone.now()
                                 related_obj.save()
                                 # Recursively handle related objects
+                                # Called synchronously (not .delay) so the whole cascade happens in this task.
                                 soft_delete_related_objects(
                                     related_obj._meta.app_label,
                                     related_obj._meta.model_name,
@@ -80,6 +91,7 @@ def soft_delete_related_objects(app_label, model_name, instance_pk, using=None):
                                 )
                 else:
                     # Handle other relationships
+                    # Calling the related manager with manager="objects" iterates only non-soft-deleted rows.
                     related_queryset = getattr(instance, related_name)(manager="objects").all()
 
                     for related_obj in related_queryset:
@@ -107,11 +119,17 @@ def soft_delete_related_objects(app_label, model_name, instance_pk, using=None):
 
 # @shared_task
 def restore_related_objects(app_label, model_name, instance_pk, using=None):
+    """Placeholder for restoring soft-deleted related objects; not implemented (and not registered as a task)."""
     pass
 
 
 @shared_task
 def hard_delete():
+    """Permanently delete rows whose ``deleted_at`` is older than ``HARD_DELETE_AFTER_DAYS``.
+
+    Core models are purged explicitly first (so DB cascades run in a predictable
+    order), then every remaining model with a ``deleted_at`` field.
+    """
     from plane.db.models import (
         Workspace,
         Project,

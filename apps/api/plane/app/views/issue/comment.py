@@ -2,6 +2,12 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 # See the LICENSE file for details.
 
+"""Work item comments and comment reactions.
+
+Comment create/update/delete queue issue activity (feeds + notifications)
+and, for create/update, webhook ``issue_comment`` events.
+"""
+
 # Python imports
 import json
 
@@ -26,6 +32,8 @@ from plane.bgtasks.webhook_task import model_activity
 
 
 class IssueCommentViewSet(BaseViewSet):
+    """Create, edit and delete comments on a work item."""
+
     serializer_class = IssueCommentSerializer
     model = IssueComment
     webhook_event = "issue_comment"
@@ -33,6 +41,10 @@ class IssueCommentViewSet(BaseViewSet):
     filterset_fields = ["issue__id", "workspace__id"]
 
     def get_queryset(self):
+        """Comments of the URL's work item, limited to active members of non-archived projects.
+
+        ``is_member`` flags whether the requesting user is an active project member.
+        """
         return self.filter_queryset(
             super()
             .get_queryset()
@@ -62,6 +74,7 @@ class IssueCommentViewSet(BaseViewSet):
 
     @allow_permission([ROLE.ADMIN, ROLE.MEMBER, ROLE.GUEST])
     def create(self, request, slug, project_id, issue_id):
+        """Add a comment; guests may only comment on their own work items unless ``guest_view_all_features``."""
         project = Project.objects.get(pk=project_id)
         issue = Issue.objects.get(pk=issue_id)
         if (
@@ -108,6 +121,7 @@ class IssueCommentViewSet(BaseViewSet):
 
     @allow_permission(allowed_roles=[ROLE.ADMIN], creator=True, model=IssueComment)
     def partial_update(self, request, slug, project_id, issue_id, pk):
+        """Edit a comment (admin or author); ``edited_at`` is set only when ``comment_html`` changes."""
         issue_comment = IssueComment.objects.get(workspace__slug=slug, project_id=project_id, issue_id=issue_id, pk=pk)
         requested_data = json.dumps(self.request.data, cls=DjangoJSONEncoder)
         current_instance = json.dumps(IssueCommentSerializer(issue_comment).data, cls=DjangoJSONEncoder)
@@ -143,6 +157,7 @@ class IssueCommentViewSet(BaseViewSet):
 
     @allow_permission(allowed_roles=[ROLE.ADMIN], creator=True, model=IssueComment)
     def destroy(self, request, slug, project_id, issue_id, pk):
+        """Delete a comment (admin or author) and log the activity."""
         issue_comment = IssueComment.objects.get(workspace__slug=slug, project_id=project_id, issue_id=issue_id, pk=pk)
         current_instance = json.dumps(IssueCommentSerializer(issue_comment).data, cls=DjangoJSONEncoder)
         issue_comment.delete()
@@ -161,10 +176,13 @@ class IssueCommentViewSet(BaseViewSet):
 
 
 class CommentReactionViewSet(BaseViewSet):
+    """Add/remove emoji reactions on a comment."""
+
     serializer_class = CommentReactionSerializer
     model = CommentReaction
 
     def get_queryset(self):
+        """Reactions of the URL's comment, limited to active members of non-archived projects."""
         return (
             super()
             .get_queryset()
@@ -182,6 +200,7 @@ class CommentReactionViewSet(BaseViewSet):
 
     @allow_permission([ROLE.ADMIN, ROLE.MEMBER, ROLE.GUEST])
     def create(self, request, slug, project_id, comment_id):
+        """Add the current user's reaction; duplicates (unique constraint) return 400."""
         try:
             serializer = CommentReactionSerializer(data=request.data)
             if serializer.is_valid():
@@ -211,6 +230,7 @@ class CommentReactionViewSet(BaseViewSet):
 
     @allow_permission([ROLE.ADMIN, ROLE.MEMBER, ROLE.GUEST])
     def destroy(self, request, slug, project_id, comment_id, reaction_code):
+        """Remove the current user's reaction identified by ``reaction_code``."""
         comment_reaction = CommentReaction.objects.get(
             workspace__slug=slug,
             project_id=project_id,

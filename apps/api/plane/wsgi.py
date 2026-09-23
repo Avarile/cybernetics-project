@@ -7,6 +7,7 @@ WSGI config for plane project.
 
 It exposes the WSGI callable as a module-level variable named ``application``.
 
+Defaults to production settings unless DJANGO_SETTINGS_MODULE is already set.
 """
 
 import os

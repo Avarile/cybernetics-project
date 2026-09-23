@@ -2,6 +2,14 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 # See the LICENSE file for details.
 
+"""Module models.
+
+A ``Module`` groups related work items inside a project (e.g. a feature or
+epic-like body of work) with its own lead, members, dates and status.
+``ModuleIssue`` links work items, ``ModuleMember`` links users, ``ModuleLink``
+stores external links, and ``ModuleUserProperties`` holds per-user view settings.
+"""
+
 # Django imports
 from django.conf import settings
 from django.db import models
@@ -12,6 +20,7 @@ from .project import ProjectBaseModel
 
 
 def get_default_filters():
+    """Default (empty) work item filters for a user's module view."""
     return {
         "priority": None,
         "state": None,
@@ -26,6 +35,7 @@ def get_default_filters():
 
 
 def get_default_display_filters():
+    """Default grouping/ordering/layout settings for a user's module view."""
     return {
         "group_by": None,
         "order_by": "-created_at",
@@ -38,6 +48,7 @@ def get_default_display_filters():
 
 
 def get_default_display_properties():
+    """Default set of work item properties shown in a user's module view."""
     return {
         "assignee": True,
         "attachment_count": True,
@@ -56,6 +67,8 @@ def get_default_display_properties():
 
 
 class ModuleStatus(models.TextChoices):
+    """Allowed module statuses (mirrors the literal choices on ``Module.status``)."""
+
     BACKLOG = "backlog"
     PLANNED = "planned"
     IN_PROGRESS = "in-progress"
@@ -65,7 +78,12 @@ class ModuleStatus(models.TextChoices):
 
 
 class Module(ProjectBaseModel):
-    name = models.CharField(max_length=255, verbose_name="Module Name")
+    """A named grouping of work items within a project, with lead, members and dates.
+
+    Names are unique per project among non-deleted modules.
+    """
+
+    name =models.CharField(max_length=255, verbose_name="Module Name")
     description = models.TextField(verbose_name="Module Description", blank=True)
     description_text = models.JSONField(verbose_name="Module Description RT", blank=True, null=True)
     description_html = models.JSONField(verbose_name="Module Description HTML", blank=True, null=True)
@@ -113,6 +131,7 @@ class Module(ProjectBaseModel):
         ordering = ("-created_at",)
 
     def save(self, *args, **kwargs):
+        """On create, place the new module before existing ones in sort order."""
         if self._state.adding:
             smallest_sort_order = Module.objects.filter(project=self.project).aggregate(
                 smallest=models.Min("sort_order")
@@ -128,6 +147,8 @@ class Module(ProjectBaseModel):
 
 
 class ModuleMember(ProjectBaseModel):
+    """Through table linking a user as a member of a module."""
+
     module = models.ForeignKey("db.Module", on_delete=models.CASCADE)
     member = models.ForeignKey("db.User", on_delete=models.CASCADE)
 
@@ -150,6 +171,8 @@ class ModuleMember(ProjectBaseModel):
 
 
 class ModuleIssue(ProjectBaseModel):
+    """Join table linking a work item to a module (unique among non-deleted rows)."""
+
     module = models.ForeignKey("db.Module", on_delete=models.CASCADE, related_name="issue_module")
     issue = models.ForeignKey("db.Issue", on_delete=models.CASCADE, related_name="issue_module")
 
@@ -172,6 +195,8 @@ class ModuleIssue(ProjectBaseModel):
 
 
 class ModuleLink(ProjectBaseModel):
+    """An external URL attached to a module, with optional fetched ``metadata``."""
+
     title = models.CharField(max_length=255, blank=True, null=True)
     url = models.URLField()
     module = models.ForeignKey(Module, on_delete=models.CASCADE, related_name="link_module")
@@ -188,6 +213,8 @@ class ModuleLink(ProjectBaseModel):
 
 
 class ModuleUserProperties(ProjectBaseModel):
+    """Per-user saved filters and display settings for a module's work item view."""
+
     module = models.ForeignKey("db.Module", on_delete=models.CASCADE, related_name="module_user_properties")
     user = models.ForeignKey(
         settings.AUTH_USER_MODEL,

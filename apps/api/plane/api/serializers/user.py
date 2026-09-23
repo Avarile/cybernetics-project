@@ -2,6 +2,8 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 # See the LICENSE file for details.
 
+"""Lightweight user serializer used for nested/expanded user references in API responses."""
+
 from rest_framework import serializers
 
 # Module imports

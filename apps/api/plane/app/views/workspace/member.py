@@ -2,6 +2,13 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 # See the LICENSE file for details.
 
+"""Workspace membership views.
+
+List/retrieve/update/remove workspace members, leave a workspace, store the member's view
+settings, fetch the current user's membership, and map project memberships across the workspace.
+Roles: 20 = Admin, 15 = Member, 5 = Guest.
+"""
+
 # Django imports
 from django.db.models import Count, Q, OuterRef, Subquery, IntegerField
 from django.utils import timezone
@@ -28,6 +35,8 @@ from .. import BaseViewSet
 
 
 class WorkSpaceMemberViewSet(BaseViewSet):
+    """Manage members of a workspace."""
+
     serializer_class = WorkspaceMemberAdminSerializer
     model = WorkspaceMember
 
@@ -35,6 +44,7 @@ class WorkSpaceMemberViewSet(BaseViewSet):
     use_read_replica = True
 
     def get_queryset(self):
+        """All membership rows of the workspace in the URL, with member and avatar preloaded."""
         return self.filter_queryset(
             super()
             .get_queryset()
@@ -44,6 +54,7 @@ class WorkSpaceMemberViewSet(BaseViewSet):
 
     @allow_permission(allowed_roles=[ROLE.ADMIN, ROLE.MEMBER, ROLE.GUEST], level="WORKSPACE")
     def list(self, request, slug):
+        """List workspace members; non-guests get the admin serializer (more member details) than guests."""
         workspace_member = WorkspaceMember.objects.get(member=request.user, workspace__slug=slug, is_active=True)
 
         # Get all active workspace members
@@ -56,6 +67,7 @@ class WorkSpaceMemberViewSet(BaseViewSet):
 
     @allow_permission(allowed_roles=[ROLE.ADMIN, ROLE.MEMBER, ROLE.GUEST], level="WORKSPACE")
     def retrieve(self, request, slug, pk):
+        """Return one workspace member, using the richer serializer for non-guest requesters."""
         workspace_member = WorkspaceMember.objects.get(member=request.user, workspace__slug=slug, is_active=True)
 
         try:
@@ -75,6 +87,10 @@ class WorkSpaceMemberViewSet(BaseViewSet):
 
     @allow_permission(allowed_roles=[ROLE.ADMIN], level="WORKSPACE")
     def partial_update(self, request, slug, pk):
+        """Change a member's role (admins only; cannot change own role).
+
+        Demoting to Guest also downgrades all of the user's project memberships to Guest.
+        """
         workspace_member = WorkspaceMember.objects.get(
             pk=pk, workspace__slug=slug, member__is_bot=False, is_active=True
         )
@@ -97,6 +113,11 @@ class WorkSpaceMemberViewSet(BaseViewSet):
 
     @allow_permission(allowed_roles=[ROLE.ADMIN], level="WORKSPACE")
     def destroy(self, request, slug, pk):
+        """Deactivate (soft-remove) a member from the workspace and all its projects.
+
+        Blocks self-removal, removing a higher-role member, and removing a user who is the
+        sole admin of a single-member project.
+        """
         # Check the user role who is deleting the user
         workspace_member = WorkspaceMember.objects.get(
             workspace__slug=slug, pk=pk, member__is_bot=False, is_active=True
@@ -125,6 +146,8 @@ class WorkSpaceMemberViewSet(BaseViewSet):
                 member_with_role=Count(
                     "project_projectmember",
                     filter=Q(
+                        # Note: this compares against the WorkspaceMember pk rather than the
+                        # user id (workspace_member.member_id).
                         project_projectmember__member_id=workspace_member.id,
                         project_projectmember__role=20,
                     ),
@@ -159,6 +182,10 @@ class WorkSpaceMemberViewSet(BaseViewSet):
     @invalidate_cache(path="api/users/me/workspaces/", user=False, multiple=True)
     @allow_permission(allowed_roles=[ROLE.ADMIN, ROLE.MEMBER, ROLE.GUEST], level="WORKSPACE")
     def leave(self, request, slug):
+        """Let the current user leave the workspace (deactivates workspace and project memberships).
+
+        Refused if they are the workspace's only admin or the sole admin of a single-member project.
+        """
         workspace_member = WorkspaceMember.objects.get(workspace__slug=slug, member=request.user, is_active=True)
 
         # Check if the leaving user is the only admin of the workspace
@@ -206,7 +233,10 @@ class WorkSpaceMemberViewSet(BaseViewSet):
 
 
 class WorkspaceMemberUserViewsEndpoint(BaseAPIView):
+    """Persist the current user's workspace-level view preferences (`view_props`)."""
+
     def post(self, request, slug):
+        """Overwrite the requester's `view_props` on their workspace membership."""
         workspace_member = WorkspaceMember.objects.get(workspace__slug=slug, member=request.user, is_active=True)
         workspace_member.view_props = request.data.get("view_props", {})
         workspace_member.save()
@@ -215,9 +245,12 @@ class WorkspaceMemberUserViewsEndpoint(BaseAPIView):
 
 
 class WorkspaceMemberUserEndpoint(BaseAPIView):
+    """Return the current user's own workspace membership."""
+
     use_read_replica = True
 
     def get(self, request, slug):
+        """Return the requester's membership annotated with their draft issue count in the workspace."""
         draft_issue_count = (
             DraftIssue.objects.filter(created_by=request.user, workspace_id=OuterRef("workspace_id"))
             .values("workspace_id")
@@ -235,12 +268,15 @@ class WorkspaceMemberUserEndpoint(BaseAPIView):
 
 
 class WorkspaceProjectMemberEndpoint(BaseAPIView):
+    """Project memberships for every project the current user belongs to."""
+
     serializer_class = ProjectMemberRoleSerializer
     model = ProjectMember
 
     permission_classes = [WorkspaceEntityPermission]
 
     def get(self, request, slug):
+        """Return `{project_id: [project members]}` for projects where the requester is an active member."""
         # Fetch all project IDs where the user is involved
         project_ids = (
             ProjectMember.objects.filter(member=request.user, is_active=True)

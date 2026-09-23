@@ -2,6 +2,14 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 # See the LICENSE file for details.
 
+"""
+Magic-code (passwordless) auth views for the web app.
+
+Routes: ``POST /auth/magic-generate/`` (JSON API, issues and emails a code),
+``POST /auth/magic-sign-in/`` and ``POST /auth/magic-sign-up/`` (form POSTs
+that verify the code, create a session and redirect).
+"""
+
 # Django imports
 from django.core.validators import validate_email
 from django.http import HttpResponseRedirect
@@ -34,11 +42,17 @@ from plane.utils.path_validator import get_safe_redirect_url
 
 
 class MagicGenerateEndpoint(APIView):
+    """Generate a magic code for an email and send it in the background."""
+
     permission_classes = [AllowAny]
 
     throttle_classes = [AuthenticationThrottle]
 
     def post(self, request):
+        """Issue a code via ``MagicCodeProvider.initiate`` and queue the ``magic_link`` email task.
+
+        Returns ``{"key": "magic_<email>"}`` or 400 with an auth error.
+        """
         # Check if instance is configured
         instance = Instance.objects.first()
         if instance is None or not instance.is_setup_done:
@@ -62,7 +76,13 @@ class MagicGenerateEndpoint(APIView):
 
 
 class MagicSignInEndpoint(View):
+    """Sign in an existing user with an emailed magic code."""
+
     def post(self, request):
+        """Verify the code for ``magic_<email>``, log the user in and redirect.
+
+        Plain Django view, so the auth throttle is applied manually.
+        """
         # set the referer as session to redirect after login
         code = request.POST.get("code", "").strip()
         email = request.POST.get("email", "").strip().lower()
@@ -120,6 +140,7 @@ class MagicSignInEndpoint(View):
             profile, _ = Profile.objects.get_or_create(user=user)
             # Login the user and record his device info
             user_login(request=request, user=user, is_app=True)
+            # Onboarded users without a real password always land on the app home, ignoring ``next_path``.
             if user.is_password_autoset and profile.is_onboarded:
                 # Redirect to the home page
                 path = "/"
@@ -145,7 +166,10 @@ class MagicSignInEndpoint(View):
 
 
 class MagicSignUpEndpoint(View):
+    """Create a new account using an emailed magic code."""
+
     def post(self, request):
+        """Verify the code, create the user (random password, email verified), log in and redirect."""
         # set the referer as session to redirect after login
         code = request.POST.get("code", "").strip()
         email = request.POST.get("email", "").strip().lower()

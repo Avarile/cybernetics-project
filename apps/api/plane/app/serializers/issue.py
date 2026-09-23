@@ -2,6 +2,14 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 # See the LICENSE file for details.
 
+"""Serializers for issues (work items) and their related objects in the ``plane.app`` API.
+
+Includes the issue create/update serializer (which manages assignee and label
+links), list/detail read serializers, and serializers for activities,
+comments, labels, links, attachments, reactions, votes, relations,
+subscribers and issue/description version history.
+"""
+
 # Django imports
 from django.utils import timezone
 from django.core.validators import URLValidator
@@ -50,6 +58,7 @@ from plane.utils.content_validator import (
 
 
 class IssueFlatSerializer(BaseSerializer):
+    """Issue with only its own scalar fields (no nested relations)."""
     ## Contain only flat fields
 
     class Meta:
@@ -69,6 +78,8 @@ class IssueFlatSerializer(BaseSerializer):
 
 
 class IssueProjectLiteSerializer(BaseSerializer):
+    """Minimal issue representation with nested project details."""
+
     project_detail = ProjectLiteSerializer(source="project", read_only=True)
 
     class Meta:
@@ -80,6 +91,15 @@ class IssueProjectLiteSerializer(BaseSerializer):
 ##TODO: Find a better way to write this serializer
 ## Find a better approach to save manytomany?
 class IssueCreateSerializer(BaseSerializer):
+    """Create/update serializer for issues.
+
+    Validates that state, parent, estimate point, assignees and labels belong to
+    ``context["project_id"]``, sanitizes description content and manages the
+    IssueAssignee/IssueLabel link rows. Context must include ``project_id``,
+    ``workspace_id`` and ``default_assignee_id`` on create; set
+    ``allow_triage_state`` to accept intake triage states.
+    """
+
     # ids
     state_id = serializers.PrimaryKeyRelatedField(
         source="state", queryset=State.all_state_objects.all(), required=False, allow_null=True
@@ -114,6 +134,7 @@ class IssueCreateSerializer(BaseSerializer):
         ]
 
     def to_representation(self, instance):
+        """Echo back the submitted ``assignee_ids``/``label_ids`` from the raw request data."""
         data = super().to_representation(instance)
         assignee_ids = self.initial_data.get("assignee_ids")
         data["assignee_ids"] = assignee_ids if assignee_ids else []
@@ -122,6 +143,7 @@ class IssueCreateSerializer(BaseSerializer):
         return data
 
     def validate(self, attrs):
+        """Validate dates, sanitize description content and scope related ids to the project."""
         allow_triage = self.context.get("allow_triage_state", False)
         state_manager = State.triage_objects if allow_triage else State.objects
 
@@ -147,6 +169,7 @@ class IssueCreateSerializer(BaseSerializer):
                 raise serializers.ValidationError({"description_binary": "Invalid binary data"})
 
         # Validate assignees are from project
+        # Silently drop assignees who are not active project members with role >= MEMBER (15)
         if attrs.get("assignee_ids", []):
             attrs["assignee_ids"] = ProjectMember.objects.filter(
                 project_id=self.context["project_id"],
@@ -156,6 +179,7 @@ class IssueCreateSerializer(BaseSerializer):
             ).values_list("member_id", flat=True)
 
         # Validate labels are from project
+        # Silently drop labels that don't belong to the project
         if attrs.get("label_ids"):
             label_ids = [label.id for label in attrs["label_ids"]]
             attrs["label_ids"] = list(
@@ -197,6 +221,12 @@ class IssueCreateSerializer(BaseSerializer):
         return attrs
 
     def create(self, validated_data):
+        """Create the issue plus its assignee and label links.
+
+        When no assignees are given, falls back to the project's default assignee
+        if they are an active member with role >= MEMBER. Duplicate-link
+        IntegrityErrors are ignored.
+        """
         assignees = validated_data.pop("assignee_ids", None)
         labels = validated_data.pop("label_ids", None)
 
@@ -274,6 +304,7 @@ class IssueCreateSerializer(BaseSerializer):
         return issue
 
     def update(self, instance, validated_data):
+        """Update the issue; ``assignee_ids``/``label_ids`` when provided fully replace the existing links."""
         assignees = validated_data.pop("assignee_ids", None)
         labels = validated_data.pop("label_ids", None)
 
@@ -331,6 +362,8 @@ class IssueCreateSerializer(BaseSerializer):
 
 
 class IssueActivitySerializer(BaseSerializer):
+    """Issue activity log entry with actor/issue/project/workspace details and optional intake source info."""
+
     actor_detail = UserLiteSerializer(read_only=True, source="actor")
     issue_detail = IssueFlatSerializer(read_only=True, source="issue")
     project_detail = ProjectLiteSerializer(read_only=True, source="project")
@@ -338,6 +371,7 @@ class IssueActivitySerializer(BaseSerializer):
     source_data = serializers.SerializerMethodField()
 
     def get_source_data(self, obj):
+        """Return intake source info (source, email, extra) when the view prefetched ``issue.source_data``."""
         if hasattr(obj, "issue") and hasattr(obj.issue, "source_data") and obj.issue.source_data:
             return {
                 "source": obj.issue.source_data[0].source,
@@ -352,6 +386,8 @@ class IssueActivitySerializer(BaseSerializer):
 
 
 class ProjectUserPropertySerializer(BaseSerializer):
+    """Per-user, per-project display preferences (filters, display properties)."""
+
     class Meta:
         model = ProjectUserProperty
         fields = "__all__"
@@ -359,6 +395,8 @@ class ProjectUserPropertySerializer(BaseSerializer):
 
 
 class LabelSerializer(BaseSerializer):
+    """Project label; label names must be unique (case-insensitive) within a project."""
+
     class Meta:
         model = Label
         fields = [
@@ -373,6 +411,7 @@ class LabelSerializer(BaseSerializer):
         read_only_fields = ["workspace", "project"]
 
     def validate_name(self, value):
+        """Reject a name that already exists (case-insensitive) in ``context["project_id"]``, excluding self."""
         project_id = self.context.get("project_id")
 
         label = Label.objects.filter(project_id=project_id, name__iexact=value)
@@ -387,12 +426,16 @@ class LabelSerializer(BaseSerializer):
 
 
 class LabelLiteSerializer(BaseSerializer):
+    """Minimal label representation (id, name, color)."""
+
     class Meta:
         model = Label
         fields = ["id", "name", "color"]
 
 
 class IssueLabelSerializer(BaseSerializer):
+    """Issue-label link row."""
+
     class Meta:
         model = IssueLabel
         fields = "__all__"
@@ -400,6 +443,8 @@ class IssueLabelSerializer(BaseSerializer):
 
 
 class IssueRelationSerializer(BaseSerializer):
+    """Outgoing relation of an issue, flattened to the *related* issue's fields plus ``relation_type``."""
+
     id = serializers.UUIDField(source="related_issue.id", read_only=True)
     project_id = serializers.PrimaryKeyRelatedField(source="related_issue.project_id", read_only=True)
     sequence_id = serializers.IntegerField(source="related_issue.sequence_id", read_only=True)
@@ -440,6 +485,8 @@ class IssueRelationSerializer(BaseSerializer):
 
 
 class RelatedIssueSerializer(BaseSerializer):
+    """Incoming relation of an issue, flattened to the *source* issue's fields plus ``relation_type``."""
+
     id = serializers.UUIDField(source="issue.id", read_only=True)
     project_id = serializers.PrimaryKeyRelatedField(source="issue.project_id", read_only=True)
     sequence_id = serializers.IntegerField(source="issue.sequence_id", read_only=True)
@@ -480,6 +527,8 @@ class RelatedIssueSerializer(BaseSerializer):
 
 
 class IssueAssigneeSerializer(BaseSerializer):
+    """Issue-assignee link row with the assignee's user details."""
+
     assignee_details = UserLiteSerializer(read_only=True, source="assignee")
 
     class Meta:
@@ -488,6 +537,8 @@ class IssueAssigneeSerializer(BaseSerializer):
 
 
 class CycleBaseSerializer(BaseSerializer):
+    """Plain cycle serializer used when nesting cycle details under issues."""
+
     class Meta:
         model = Cycle
         fields = "__all__"
@@ -502,6 +553,8 @@ class CycleBaseSerializer(BaseSerializer):
 
 
 class IssueCycleDetailSerializer(BaseSerializer):
+    """Cycle-issue link with nested cycle details."""
+
     cycle_detail = CycleBaseSerializer(read_only=True, source="cycle")
 
     class Meta:
@@ -518,6 +571,8 @@ class IssueCycleDetailSerializer(BaseSerializer):
 
 
 class ModuleBaseSerializer(BaseSerializer):
+    """Plain module serializer used when nesting module details under issues."""
+
     class Meta:
         model = Module
         fields = "__all__"
@@ -532,6 +587,8 @@ class ModuleBaseSerializer(BaseSerializer):
 
 
 class IssueModuleDetailSerializer(BaseSerializer):
+    """Module-issue link with nested module details."""
+
     module_detail = ModuleBaseSerializer(read_only=True, source="module")
 
     class Meta:
@@ -548,6 +605,8 @@ class IssueModuleDetailSerializer(BaseSerializer):
 
 
 class IssueLinkSerializer(BaseSerializer):
+    """External link attached to an issue; URLs are normalized and must be unique per issue."""
+
     created_by_detail = UserLiteSerializer(read_only=True, source="created_by")
 
     class Meta:
@@ -564,6 +623,7 @@ class IssueLinkSerializer(BaseSerializer):
         ]
 
     def to_internal_value(self, data):
+        """Prefix ``http://`` to URLs without a scheme before field validation."""
         # Modify the URL before validation by appending http:// if missing
         url = data.get("url", "")
         if url and not url.startswith(("http://", "https://")):
@@ -572,6 +632,7 @@ class IssueLinkSerializer(BaseSerializer):
         return super().to_internal_value(data)
 
     def validate_url(self, value):
+        """Validate URL syntax with Django's URLValidator."""
         # Use Django's built-in URLValidator for validation
         url_validator = URLValidator()
         try:
@@ -583,11 +644,13 @@ class IssueLinkSerializer(BaseSerializer):
 
     # Validation if url already exists
     def create(self, validated_data):
+        """Create the link, rejecting a URL that already exists on the same issue."""
         if IssueLink.objects.filter(url=validated_data.get("url"), issue_id=validated_data.get("issue_id")).exists():
             raise serializers.ValidationError({"error": "URL already exists for this Issue"})
         return IssueLink.objects.create(**validated_data)
 
     def update(self, instance, validated_data):
+        """Update the link, rejecting a URL that already exists on another link of the same issue."""
         if (
             IssueLink.objects.filter(url=validated_data.get("url"), issue_id=instance.issue_id)
             .exclude(pk=instance.id)
@@ -599,6 +662,8 @@ class IssueLinkSerializer(BaseSerializer):
 
 
 class IssueLinkLiteSerializer(BaseSerializer):
+    """Minimal read-only issue link representation."""
+
     class Meta:
         model = IssueLink
         fields = [
@@ -614,6 +679,8 @@ class IssueLinkLiteSerializer(BaseSerializer):
 
 
 class IssueAttachmentSerializer(BaseSerializer):
+    """Issue attachment (FileAsset) with the computed ``asset_url``."""
+
     asset_url = serializers.CharField(read_only=True)
 
     class Meta:
@@ -631,6 +698,8 @@ class IssueAttachmentSerializer(BaseSerializer):
 
 
 class IssueAttachmentLiteSerializer(DynamicBaseSerializer):
+    """Minimal read-only attachment representation used for expansion/nesting."""
+
     class Meta:
         model = FileAsset
         fields = [
@@ -647,6 +716,8 @@ class IssueAttachmentLiteSerializer(DynamicBaseSerializer):
 
 
 class IssueReactionSerializer(BaseSerializer):
+    """Emoji reaction on an issue with the actor's details."""
+
     actor_detail = UserLiteSerializer(read_only=True, source="actor")
 
     class Meta:
@@ -656,6 +727,8 @@ class IssueReactionSerializer(BaseSerializer):
 
 
 class IssueReactionLiteSerializer(DynamicBaseSerializer):
+    """Minimal issue reaction with the actor's display name."""
+
     display_name = serializers.CharField(source="actor.display_name", read_only=True)
 
     class Meta:
@@ -664,6 +737,8 @@ class IssueReactionLiteSerializer(DynamicBaseSerializer):
 
 
 class CommentReactionSerializer(BaseSerializer):
+    """Emoji reaction on a comment with the actor's display name."""
+
     display_name = serializers.CharField(source="actor.display_name", read_only=True)
 
     class Meta:
@@ -686,6 +761,8 @@ class CommentReactionSerializer(BaseSerializer):
 
 
 class IssueVoteSerializer(BaseSerializer):
+    """Read-only vote on an issue (used by the public/deploy board)."""
+
     actor_detail = UserLiteSerializer(read_only=True, source="actor")
 
     class Meta:
@@ -695,6 +772,8 @@ class IssueVoteSerializer(BaseSerializer):
 
 
 class IssueCommentSerializer(BaseSerializer):
+    """Issue comment with actor/issue/project details and reactions; comment HTML is sanitized."""
+
     actor_detail = UserLiteSerializer(read_only=True, source="actor")
     issue_detail = IssueFlatSerializer(read_only=True, source="issue")
     project_detail = ProjectLiteSerializer(read_only=True, source="project")
@@ -716,6 +795,7 @@ class IssueCommentSerializer(BaseSerializer):
         ]
 
     def validate(self, attrs):
+        """Sanitize ``comment_html`` and reject invalid HTML."""
         if "comment_html" in attrs and attrs["comment_html"]:
             is_valid, error_msg, sanitized_html = validate_html_content(attrs["comment_html"])
             if not is_valid:
@@ -726,6 +806,8 @@ class IssueCommentSerializer(BaseSerializer):
 
 
 class IssueStateFlatSerializer(BaseSerializer):
+    """Minimal issue with state and project details."""
+
     state_detail = StateLiteSerializer(read_only=True, source="state")
     project_detail = ProjectLiteSerializer(read_only=True, source="project")
 
@@ -736,6 +818,8 @@ class IssueStateFlatSerializer(BaseSerializer):
 
 # Issue Serializer with state details
 class IssueStateSerializer(DynamicBaseSerializer):
+    """Full issue model with nested label/state/project/assignee details and annotated counts."""
+
     label_details = LabelLiteSerializer(read_only=True, source="labels", many=True)
     state_detail = StateLiteSerializer(read_only=True, source="state")
     project_detail = ProjectLiteSerializer(read_only=True, source="project")
@@ -750,6 +834,8 @@ class IssueStateSerializer(DynamicBaseSerializer):
 
 
 class IssueIntakeSerializer(DynamicBaseSerializer):
+    """Minimal issue representation used for intake listings."""
+
     label_ids = serializers.ListField(child=serializers.UUIDField(), required=False)
 
     class Meta:
@@ -768,6 +854,12 @@ class IssueIntakeSerializer(DynamicBaseSerializer):
 
 
 class IssueSerializer(DynamicBaseSerializer):
+    """Read-only list representation of an issue using ids for relations.
+
+    Relation ids and counts (``cycle_id``, ``module_ids``, ``label_ids``,
+    ``assignee_ids``, ``*_count``) are expected to be annotated by the view.
+    """
+
     # ids
     cycle_id = serializers.PrimaryKeyRelatedField(read_only=True)
     module_ids = serializers.ListField(child=serializers.UUIDField(), required=False)
@@ -813,6 +905,7 @@ class IssueSerializer(DynamicBaseSerializer):
         read_only_fields = fields
 
     def validate(self, data):
+        """Ensure a provided ``state_id`` belongs to ``context["project_id"]``."""
         if (
             data.get("state_id")
             and not State.objects.filter(project_id=self.context.get("project_id"), pk=data.get("state_id")).exists()
@@ -822,6 +915,13 @@ class IssueSerializer(DynamicBaseSerializer):
 
 
 class IssueListDetailSerializer(serializers.Serializer):
+    """Hand-written, fast list serializer for issues (avoids DRF field machinery).
+
+    Reads relations from prefetched ``issue_module``/``label_issue``/``issue_assignee``
+    and expects ``cycle_id`` and ``*_count`` to be annotated. Supports
+    ``expand=["issue_relation", "issue_related"]``.
+    """
+
     def __init__(self, *args, **kwargs):
         # Extract expand parameter and store it as instance variable
         self.expand = kwargs.pop("expand", []) or []
@@ -830,15 +930,19 @@ class IssueListDetailSerializer(serializers.Serializer):
         super().__init__(*args, **kwargs)
 
     def get_module_ids(self, obj):
+        """Module ids from the prefetched ``issue_module`` relation."""
         return [module.module_id for module in obj.issue_module.all()]
 
     def get_label_ids(self, obj):
+        """Label ids from the prefetched ``label_issue`` relation."""
         return [label.label_id for label in obj.label_issue.all()]
 
     def get_assignee_ids(self, obj):
+        """Assignee ids from the prefetched ``issue_assignee`` relation."""
         return [assignee.assignee_id for assignee in obj.issue_assignee.all()]
 
     def to_representation(self, instance):
+        """Build the issue dict directly from model attributes, adding expanded relations if requested."""
         data = {
             # Basic fields
             "id": instance.id,
@@ -925,6 +1029,8 @@ class IssueListDetailSerializer(serializers.Serializer):
 
 
 class IssueLiteSerializer(DynamicBaseSerializer):
+    """Minimal issue reference (id, sequence_id, project_id)."""
+
     class Meta:
         model = Issue
         fields = ["id", "sequence_id", "project_id"]
@@ -932,6 +1038,8 @@ class IssueLiteSerializer(DynamicBaseSerializer):
 
 
 class IssueDetailSerializer(IssueSerializer):
+    """Issue detail: the list representation plus description HTML, subscription and intake flags."""
+
     description_html = serializers.CharField()
     is_subscribed = serializers.BooleanField(read_only=True)
     is_intake = serializers.BooleanField(read_only=True)
@@ -946,6 +1054,8 @@ class IssueDetailSerializer(IssueSerializer):
 
 
 class IssuePublicSerializer(BaseSerializer):
+    """Issue representation for public (deploy board) views, with reactions and votes."""
+
     project_detail = ProjectLiteSerializer(read_only=True, source="project")
     state_detail = StateLiteSerializer(read_only=True, source="state")
     reactions = IssueReactionSerializer(read_only=True, many=True, source="issue_reactions")
@@ -972,6 +1082,8 @@ class IssuePublicSerializer(BaseSerializer):
 
 
 class IssueSubscriberSerializer(BaseSerializer):
+    """Issue subscriber (user who receives notifications for the issue)."""
+
     class Meta:
         model = IssueSubscriber
         fields = "__all__"
@@ -979,6 +1091,8 @@ class IssueSubscriberSerializer(BaseSerializer):
 
 
 class IssueVersionDetailSerializer(BaseSerializer):
+    """Snapshot of an issue's properties at a point in time (issue version history)."""
+
     class Meta:
         model = IssueVersion
         fields = [
@@ -1018,6 +1132,8 @@ class IssueVersionDetailSerializer(BaseSerializer):
 
 
 class IssueDescriptionVersionDetailSerializer(BaseSerializer):
+    """Snapshot of an issue's description at a point in time (description version history)."""
+
     class Meta:
         model = IssueDescriptionVersion
         fields = [

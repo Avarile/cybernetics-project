@@ -2,6 +2,12 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 # See the LICENSE file for details.
 
+"""URL routes for the instance-admin ("god mode") API, mounted under ``/api/instances/``.
+
+Covers instance info, admin accounts and auth, instance configuration, email checks and
+instance-wide workspace management.
+"""
+
 from django.urls import path
 
 from plane.license.api.views import (
@@ -34,6 +40,7 @@ urlpatterns = [
         InstanceAdminSignOutEndpoint.as_view(),
         name="instance-admins",
     ),
+    # DELETE a single instance admin by InstanceAdmin id.
     path("admins/<uuid:pk>/", InstanceAdminEndpoint.as_view(), name="instance-admins"),
     path(
         "configurations/",

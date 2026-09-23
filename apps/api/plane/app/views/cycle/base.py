@@ -2,6 +2,14 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 # See the LICENSE file for details.
 
+"""Core cycle (sprint) endpoints for a project.
+
+Includes cycle CRUD with progress annotations, date-overlap checks,
+favorites, transferring unfinished work items to another cycle, per-user
+cycle display properties, and progress/analytics (burndown) data. Cycle
+dates are stored in UTC and converted using the project's timezone.
+"""
+
 # Python imports
 import json
 import pytz
@@ -62,11 +70,19 @@ from plane.utils.timezone_converter import convert_to_utc, user_timezone_convert
 
 
 class CycleViewSet(BaseViewSet):
+    """CRUD for cycles in a project; emits webhook ``cycle`` events on create/update."""
+
     serializer_class = CycleSerializer
     model = Cycle
     webhook_event = "cycle"
 
     def get_queryset(self):
+        """Cycles of the project visible to the user (active member, non-archived project).
+
+        Annotated with favorite flag, total/completed/cancelled issue counts,
+        computed ``status`` (CURRENT/UPCOMING/COMPLETED/DRAFT, evaluated against the
+        current time in the project's timezone) and assignee ids.
+        """
         favorite_subquery = UserFavorite.objects.filter(
             user=self.request.user,
             entity_identifier=OuterRef("pk"),
@@ -182,6 +198,11 @@ class CycleViewSet(BaseViewSet):
 
     @allow_permission([ROLE.ADMIN, ROLE.MEMBER, ROLE.GUEST])
     def list(self, request, slug, project_id):
+        """List non-archived cycles (any project role).
+
+        ``cycle_view=current`` returns only the currently running cycle, falling back
+        to all cycles if there is none. Dates are converted to the project timezone.
+        """
         queryset = self.get_queryset().filter(archived_at__isnull=True)
         cycle_view = request.GET.get("cycle_view", "all")
 
@@ -269,6 +290,10 @@ class CycleViewSet(BaseViewSet):
 
     @allow_permission([ROLE.ADMIN, ROLE.MEMBER])
     def create(self, request, slug, project_id):
+        """Create a cycle; start and end date must be both set or both empty (draft cycle).
+
+        Triggers a webhook ``model_activity`` task.
+        """
         if (request.data.get("start_date", None) is None and request.data.get("end_date", None) is None) or (
             request.data.get("start_date", None) is not None and request.data.get("end_date", None) is not None
         ):
@@ -334,6 +359,11 @@ class CycleViewSet(BaseViewSet):
 
     @allow_permission([ROLE.ADMIN, ROLE.MEMBER])
     def partial_update(self, request, slug, project_id, pk):
+        """Update a cycle.
+
+        Archived cycles cannot be edited, and completed cycles only allow
+        ``sort_order`` changes. Triggers a webhook ``model_activity`` task.
+        """
         queryset = self.get_queryset().filter(workspace__slug=slug, project_id=project_id, pk=pk)
         cycle = queryset.first()
         if cycle.archived_at:
@@ -409,6 +439,7 @@ class CycleViewSet(BaseViewSet):
 
     @allow_permission([ROLE.ADMIN, ROLE.MEMBER])
     def retrieve(self, request, slug, project_id, pk):
+        """Return a single non-archived cycle with sub-issue count; records a recent visit."""
         queryset = self.get_queryset().filter(archived_at__isnull=True).filter(pk=pk)
         data = (
             self.get_queryset()
@@ -476,6 +507,11 @@ class CycleViewSet(BaseViewSet):
 
     @allow_permission([ROLE.ADMIN], creator=True, model=Cycle)
     def destroy(self, request, slug, project_id, pk):
+        """Delete a cycle (project admin or creator).
+
+        Logs a ``cycle.activity.deleted`` activity for its work items and removes the
+        cycle from favorites and recent visits.
+        """
         cycle = Cycle.objects.get(workspace__slug=slug, project_id=project_id, pk=pk)
 
         cycle_issues = list(CycleIssue.objects.filter(cycle_id=self.kwargs.get("pk")).values_list("issue", flat=True))
@@ -518,8 +554,15 @@ class CycleViewSet(BaseViewSet):
 
 
 class CycleDateCheckEndpoint(BaseAPIView):
+    """Check whether a date range overlaps an existing cycle in the project."""
+
     @allow_permission([ROLE.ADMIN, ROLE.MEMBER])
     def post(self, request, slug, project_id):
+        """Return ``status: False`` if ``start_date``..``end_date`` intersects another cycle.
+
+        ``cycle_id`` (optional) excludes the cycle being edited. Dates are converted
+        from the project timezone to UTC before comparing.
+        """
         start_date = request.data.get("start_date", False)
         end_date = request.data.get("end_date", False)
         cycle_id = request.data.get("cycle_id")
@@ -557,9 +600,12 @@ class CycleDateCheckEndpoint(BaseAPIView):
 
 
 class CycleFavoriteViewSet(BaseViewSet):
+    """Add/remove a cycle from the current user's favorites."""
+
     model = UserFavorite
 
     def get_queryset(self):
+        """Favorites of the current user in the workspace."""
         return self.filter_queryset(
             super()
             .get_queryset()
@@ -570,6 +616,7 @@ class CycleFavoriteViewSet(BaseViewSet):
 
     @allow_permission([ROLE.ADMIN, ROLE.MEMBER])
     def create(self, request, slug, project_id):
+        """Mark the cycle given in ``cycle`` as a favorite for the current user."""
         _ = UserFavorite.objects.create(
             project_id=project_id,
             user=request.user,
@@ -580,6 +627,7 @@ class CycleFavoriteViewSet(BaseViewSet):
 
     @allow_permission([ROLE.ADMIN, ROLE.MEMBER])
     def destroy(self, request, slug, project_id, cycle_id):
+        """Remove the cycle from the current user's favorites (hard delete)."""
         cycle_favorite = UserFavorite.objects.get(
             project=project_id,
             entity_type="cycle",
@@ -592,8 +640,14 @@ class CycleFavoriteViewSet(BaseViewSet):
 
 
 class TransferCycleIssueEndpoint(BaseAPIView):
+    """Move the unfinished work items of a cycle into another cycle."""
+
     @allow_permission([ROLE.ADMIN, ROLE.MEMBER])
     def post(self, request, slug, project_id, cycle_id):
+        """Transfer pending work items to ``new_cycle_id`` via ``transfer_cycle_issues``.
+
+        That helper also stores a progress snapshot on the source cycle.
+        """
         new_cycle_id = request.data.get("new_cycle_id", False)
 
         if not new_cycle_id:
@@ -623,8 +677,11 @@ class TransferCycleIssueEndpoint(BaseAPIView):
 
 
 class CycleUserPropertiesEndpoint(BaseAPIView):
+    """Per-user display settings (filters, display properties) for a cycle."""
+
     @allow_permission([ROLE.ADMIN, ROLE.MEMBER, ROLE.GUEST])
     def patch(self, request, slug, project_id, cycle_id):
+        """Update the current user's filters / display settings for the cycle."""
         cycle_properties = CycleUserProperties.objects.get(
             user=request.user,
             cycle_id=cycle_id,
@@ -645,6 +702,7 @@ class CycleUserPropertiesEndpoint(BaseAPIView):
 
     @allow_permission([ROLE.ADMIN, ROLE.MEMBER, ROLE.GUEST])
     def get(self, request, slug, project_id, cycle_id):
+        """Return (creating if needed) the current user's display settings for the cycle."""
         cycle_properties, _ = CycleUserProperties.objects.get_or_create(
             user=request.user,
             project_id=project_id,
@@ -656,8 +714,16 @@ class CycleUserPropertiesEndpoint(BaseAPIView):
 
 
 class CycleProgressEndpoint(BaseAPIView):
+    """Progress summary for a cycle (issue counts and estimate points per state group)."""
+
     @allow_permission([ROLE.ADMIN, ROLE.MEMBER, ROLE.GUEST])
     def get(self, request, slug, project_id, cycle_id):
+        """Return progress counters for the cycle.
+
+        Issue counts come from ``progress_snapshot`` when present (cycle whose work
+        was transferred), otherwise they are computed live. Estimate points are
+        always computed live for "points" estimates.
+        """
         cycle = Cycle.objects.filter(workspace__slug=slug, project_id=project_id, id=cycle_id).first()
         if not cycle:
             return Response({"error": "Cycle not found"}, status=status.HTTP_404_NOT_FOUND)
@@ -784,8 +850,15 @@ class CycleProgressEndpoint(BaseAPIView):
 
 
 class CycleAnalyticsEndpoint(BaseAPIView):
+    """Assignee/label distribution and burndown chart for a cycle."""
+
     @allow_permission([ROLE.ADMIN, ROLE.MEMBER, ROLE.GUEST])
     def get(self, request, slug, project_id, cycle_id):
+        """Return cycle analytics for ``type=issues`` (default) or ``type=points``.
+
+        Requires the cycle to have both start and end dates. Uses the stored
+        ``progress_snapshot`` distribution when available.
+        """
         analytic_type = request.GET.get("type", "issues")
         cycle = (
             Cycle.objects.filter(workspace__slug=slug, project_id=project_id, id=cycle_id)

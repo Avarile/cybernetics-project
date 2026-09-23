@@ -2,6 +2,12 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 # See the LICENSE file for details.
 
+"""Serializers for modules (feature groupings of work items) in the public API.
+
+Used by plane.api.views.module for module CRUD, module membership, links and
+module work-item assignment.
+"""
+
 # Third party imports
 from rest_framework import serializers
 
@@ -58,6 +64,10 @@ class ModuleCreateSerializer(BaseSerializer):
         ]
 
     def validate(self, data):
+        """Require a project with modules enabled and a valid date range.
+
+        Members not belonging to the project are silently dropped.
+        """
         project_id = self.context.get("project_id")
         if not project_id:
             raise serializers.ValidationError("Project ID is required")
@@ -81,6 +91,11 @@ class ModuleCreateSerializer(BaseSerializer):
         return data
 
     def create(self, validated_data):
+        """Create the module and its ModuleMember rows.
+
+        Rejects a duplicate module name in the project, returning the existing module id
+        with code ``MODULE_NAME_ALREADY_EXISTS``.
+        """
         members = validated_data.pop("members", None)
 
         project_id = self.context["project_id"]
@@ -138,6 +153,10 @@ class ModuleUpdateSerializer(ModuleCreateSerializer):
         read_only_fields = ModuleCreateSerializer.Meta.read_only_fields
 
     def update(self, instance, validated_data):
+        """Update the module; replaces all members when ``members`` is provided.
+
+        Rejects renaming to a name already used by another module in the project.
+        """
         members = validated_data.pop("members", None)
         module_name = validated_data.get("name")
         if module_name:
@@ -201,6 +220,7 @@ class ModuleSerializer(BaseSerializer):
         ]
 
     def to_representation(self, instance):
+        """Add the module's member ids to the output (``members`` is write-only)."""
         data = super().to_representation(instance)
         data["members"] = [str(member.id) for member in instance.members.all()]
         return data
@@ -253,6 +273,7 @@ class ModuleLinkSerializer(BaseSerializer):
 
     # Validation if url already exists
     def create(self, validated_data):
+        """Create the link, rejecting a URL already attached to the same module."""
         if ModuleLink.objects.filter(url=validated_data.get("url"), module_id=validated_data.get("module_id")).exists():
             raise serializers.ValidationError({"error": "URL already exists for this Issue"})
         return ModuleLink.objects.create(**validated_data)

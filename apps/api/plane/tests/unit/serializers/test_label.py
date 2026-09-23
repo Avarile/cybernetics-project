@@ -2,6 +2,8 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 # See the LICENSE file for details.
 
+"""Unit tests for LabelSerializer creation and duplicate-name validation within a project."""
+
 import pytest
 from plane.app.serializers import LabelSerializer
 from plane.db.models import Project, Label

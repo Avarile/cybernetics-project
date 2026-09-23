@@ -2,6 +2,12 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 # See the LICENSE file for details.
 
+"""
+Converts accepted workspace/project invitations into memberships after login.
+
+Called from ``post_user_auth_workflow`` for every successful sign-in/sign-up.
+"""
+
 # Django imports
 from django.utils import timezone
 
@@ -35,6 +41,7 @@ def process_workspace_project_invitations(user):
         ignore_conflicts=True,
     )
 
+    # Bust the cached workspace member list and emit a "user joined workspace" analytics event.
     for workspace_member_invite in workspace_member_invites:
         invalidate_cache_directly(
             path=f"/api/workspaces/{str(workspace_member_invite.workspace.slug)}/members/",
@@ -59,6 +66,8 @@ def process_workspace_project_invitations(user):
     project_member_invites = ProjectMemberInvite.objects.filter(email=user.email, accepted=True)
 
     # Add user to workspace
+    # Project invites also grant workspace membership. Roles: 5 = guest, 15 = member; any other
+    # invite role (e.g. admin) is downgraded to member.
     WorkspaceMember.objects.bulk_create(
         [
             WorkspaceMember(
@@ -86,6 +95,7 @@ def process_workspace_project_invitations(user):
         ignore_conflicts=True,
     )
 
+    # Invites are consumed once the memberships exist.
     # Delete all the invites
     workspace_member_invites.delete()
     project_member_invites.delete()

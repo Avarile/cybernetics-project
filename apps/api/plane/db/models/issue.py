@@ -2,6 +2,16 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 # See the LICENSE file for details.
 
+"""Work item ("issue") models.
+
+Defines ``Issue`` and everything hanging off it: relations/blockers, assignees,
+labels, mentions, links, attachments, comments, reactions, votes, subscribers,
+the activity log (``IssueActivity``), per-project sequence numbers
+(``IssueSequence``) and version history (``IssueVersion`` /
+``IssueDescriptionVersion``). Also provides the default filter/display
+settings reused by other per-user view property models.
+"""
+
 # Python import
 from uuid import uuid4
 
@@ -27,6 +37,7 @@ from .state import StateGroup
 
 
 def get_default_properties():
+    """Default set of visible work item properties (all enabled)."""
     return {
         "assignee": True,
         "start_date": True,
@@ -45,6 +56,7 @@ def get_default_properties():
 
 
 def get_default_filters():
+    """Default (empty) work item filters for saved per-user view settings."""
     return {
         "priority": None,
         "state": None,
@@ -59,6 +71,7 @@ def get_default_filters():
 
 
 def get_default_display_filters():
+    """Default grouping/ordering/layout for saved per-user view settings."""
     return {
         "group_by": None,
         "order_by": "-created_at",
@@ -71,6 +84,7 @@ def get_default_display_filters():
 
 
 def get_default_display_properties():
+    """Default set of work item properties shown in saved per-user view settings."""
     return {
         "assignee": True,
         "attachment_count": True,
@@ -90,6 +104,12 @@ def get_default_display_properties():
 
 # TODO: Handle identifiers for Bulk Inserts - nk
 class IssueManager(SoftDeletionManager):
+    """Manager (``Issue.issue_objects``) returning only "live" work items.
+
+    Excludes soft-deleted, triage/intake, archived, draft work items and those
+    in archived projects. Use ``Issue.objects`` to bypass these filters.
+    """
+
     def get_queryset(self):
         return (
             super()
@@ -102,6 +122,13 @@ class IssueManager(SoftDeletionManager):
 
 
 class Issue(ChangeTrackerMixin, ProjectBaseModel):
+    """A work item within a project.
+
+    ``sequence_id`` is the per-project number shown as ``<IDENTIFIER>-<n>``.
+    ``state_id`` changes are tracked (via ``ChangeTrackerMixin``) so that
+    ``completed_at`` is only recomputed when the state actually changes.
+    """
+
     TRACKED_FIELDS = ["state_id"]
 
     PRIORITY_CHOICES = (
@@ -178,6 +205,13 @@ class Issue(ChangeTrackerMixin, ProjectBaseModel):
         ordering = ("-created_at",)
 
     def save(self, *args, **kwargs):
+        """Save the work item, assigning defaults and a sequence id on create.
+
+        On create, under a per-project Postgres advisory lock, it allocates the
+        next ``sequence_id``, appends the item to the end of its state's sort
+        order, saves, and records an ``IssueSequence`` row. On every save it
+        refreshes ``description_stripped``.
+        """
         self._ensure_default_state()
         kwargs = self._sync_completed_at(kwargs)
 
@@ -193,6 +227,7 @@ class Issue(ChangeTrackerMixin, ProjectBaseModel):
                     cursor.execute("SELECT pg_advisory_xact_lock(%s)", [lock_key])
 
                 # Get the last sequence for the project
+                # (IssueSequence rows survive issue deletion, so numbers are never reused)
                 last_sequence = IssueSequence.objects.filter(project=self.project).aggregate(
                     largest=models.Max("sequence")
                 )["largest"]
@@ -226,7 +261,10 @@ class Issue(ChangeTrackerMixin, ProjectBaseModel):
         return f"{self.name} <{self.project.name}>"
 
     def _ensure_default_state(self):
-        """Assign a default state when none is set."""
+        """Assign a default state when none is set.
+
+        Prefers the project's non-triage state flagged ``default``, else any non-triage state.
+        """
         if self.state is not None:
             return
         try:
@@ -249,6 +287,7 @@ class Issue(ChangeTrackerMixin, ProjectBaseModel):
         else:
             self.completed_at = None
 
+        # If the caller restricted update_fields, make sure completed_at is persisted too
         update_fields = kwargs.get("update_fields")
         if update_fields is not None:
             kwargs["update_fields"] = list(set(update_fields) | {"completed_at"})
@@ -256,6 +295,8 @@ class Issue(ChangeTrackerMixin, ProjectBaseModel):
 
 
 class IssueBlocker(ProjectBaseModel):
+    """Legacy blocker link between two work items (see ``IssueRelation`` for typed relations)."""
+
     block = models.ForeignKey(Issue, related_name="blocker_issues", on_delete=models.CASCADE)
     blocked_by = models.ForeignKey(Issue, related_name="blocked_issues", on_delete=models.CASCADE)
 
@@ -270,6 +311,8 @@ class IssueBlocker(ProjectBaseModel):
 
 
 class IssueRelationChoices(models.TextChoices):
+    """Stored relation types for ``IssueRelation`` (the "forward" direction of each pair)."""
+
     DUPLICATE = "duplicate", "Duplicate"
     RELATES_TO = "relates_to", "Relates To"
     BLOCKED_BY = "blocked_by", "Blocked By"
@@ -290,11 +333,19 @@ IssueRelationChoices._RELATION_PAIRS = (
 )
 
 # Generate reverse mapping from pairs
+# e.g. "blocked_by" -> "blocking": the label to show when viewing the relation
+# from the related issue's side.
 IssueRelationChoices._REVERSE_MAPPING = {forward: reverse for forward, reverse in IssueRelationChoices._RELATION_PAIRS}
 
 
 class IssueRelation(ProjectBaseModel):
-    issue = models.ForeignKey(Issue, related_name="issue_relation", on_delete=models.CASCADE)
+    """A typed, directed relation between two work items (only one row per pair is stored).
+
+    ``relation_type`` is one of ``IssueRelationChoices``; the reverse label is
+    derived via ``IssueRelationChoices._REVERSE_MAPPING``.
+    """
+
+    issue =models.ForeignKey(Issue, related_name="issue_relation", on_delete=models.CASCADE)
     related_issue = models.ForeignKey(Issue, related_name="issue_related", on_delete=models.CASCADE)
     relation_type = models.CharField(
         max_length=20,
@@ -321,6 +372,8 @@ class IssueRelation(ProjectBaseModel):
 
 
 class IssueMention(ProjectBaseModel):
+    """A user mentioned in a work item (unique per issue/user among non-deleted rows)."""
+
     issue = models.ForeignKey(Issue, on_delete=models.CASCADE, related_name="issue_mention")
     mention = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="issue_mention")
 
@@ -343,6 +396,8 @@ class IssueMention(ProjectBaseModel):
 
 
 class IssueAssignee(ProjectBaseModel):
+    """Through table for ``Issue.assignees``."""
+
     issue = models.ForeignKey(Issue, on_delete=models.CASCADE, related_name="issue_assignee")
     assignee = models.ForeignKey(
         settings.AUTH_USER_MODEL,
@@ -369,6 +424,8 @@ class IssueAssignee(ProjectBaseModel):
 
 
 class IssueLink(ProjectBaseModel):
+    """An external URL attached to a work item, with optional fetched ``metadata``."""
+
     title = models.CharField(max_length=255, null=True, blank=True)
     url = models.TextField()
     issue = models.ForeignKey("db.Issue", on_delete=models.CASCADE, related_name="issue_link")
@@ -385,17 +442,21 @@ class IssueLink(ProjectBaseModel):
 
 
 def get_upload_path(instance, filename):
+    """Storage path ``<workspace_id>/<random hex>-<sanitized filename>`` for attachments."""
     filename = sanitize_filename(filename) or uuid4().hex
     return f"{instance.workspace.id}/{uuid4().hex}-{filename}"
 
 
 def file_size(value):
+    """Validator rejecting files larger than ``settings.FILE_SIZE_LIMIT``."""
     # File limit check is only for cloud hosted
     if value.size > settings.FILE_SIZE_LIMIT:
         raise ValidationError("File too large. Size should not exceed 5 MB.")
 
 
 class IssueAttachment(ProjectBaseModel):
+    """Legacy file attachment stored directly via ``FileField`` on a work item."""
+
     attributes = models.JSONField(default=dict)
     asset = models.FileField(upload_to=get_upload_path, validators=[file_size])
     issue = models.ForeignKey("db.Issue", on_delete=models.CASCADE, related_name="issue_attachment")
@@ -413,7 +474,14 @@ class IssueAttachment(ProjectBaseModel):
 
 
 class IssueActivity(ProjectBaseModel):
-    issue = models.ForeignKey(Issue, on_delete=models.DO_NOTHING, null=True, related_name="issue_activity")
+    """One entry in a work item's activity/history feed.
+
+    Records ``verb`` (e.g. created/updated), the changed ``field`` with
+    old/new values (and old/new related-object ids), and the ``actor``.
+    ``DO_NOTHING`` on the FKs keeps history rows when the issue/comment is removed.
+    """
+
+    issue =models.ForeignKey(Issue, on_delete=models.DO_NOTHING, null=True, related_name="issue_activity")
     verb = models.CharField(max_length=255, verbose_name="Action", default="created")
     field = models.CharField(max_length=255, verbose_name="Field Name", blank=True, null=True)
     old_value = models.TextField(verbose_name="Old Value", blank=True, null=True)
@@ -449,6 +517,12 @@ class IssueActivity(ProjectBaseModel):
 
 
 class IssueComment(ChangeTrackerMixin, ProjectBaseModel):
+    """A comment on a work item (supports threading via ``parent``).
+
+    Comment content is mirrored into a linked ``Description`` row; the content
+    fields are change-tracked so the mirror is only updated when they change.
+    """
+
     comment_stripped = models.TextField(verbose_name="Comment", blank=True)
     comment_json = models.JSONField(blank=True, default=dict)
     comment_html = models.TextField(blank=True, default="<p></p>")
@@ -541,6 +615,8 @@ class IssueComment(ChangeTrackerMixin, ProjectBaseModel):
 
 
 class IssueLabel(ProjectBaseModel):
+    """Through table for ``Issue.labels``."""
+
     issue = models.ForeignKey("db.Issue", on_delete=models.CASCADE, related_name="label_issue")
     label = models.ForeignKey("db.Label", on_delete=models.CASCADE, related_name="label_issue")
 
@@ -555,6 +631,8 @@ class IssueLabel(ProjectBaseModel):
 
 
 class IssueSequence(ProjectBaseModel):
+    """Record of every sequence number allocated in a project; used to compute the next ``sequence_id``."""
+
     issue = models.ForeignKey(
         Issue,
         on_delete=models.SET_NULL,
@@ -572,6 +650,8 @@ class IssueSequence(ProjectBaseModel):
 
 
 class IssueSubscriber(ProjectBaseModel):
+    """A user subscribed to notifications for a work item."""
+
     issue = models.ForeignKey(Issue, on_delete=models.CASCADE, related_name="issue_subscribers")
     subscriber = models.ForeignKey(
         settings.AUTH_USER_MODEL,
@@ -598,6 +678,8 @@ class IssueSubscriber(ProjectBaseModel):
 
 
 class IssueReaction(ProjectBaseModel):
+    """An emoji reaction by a user on a work item (one per issue/user/reaction)."""
+
     actor = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         on_delete=models.CASCADE,
@@ -625,6 +707,8 @@ class IssueReaction(ProjectBaseModel):
 
 
 class CommentReaction(ProjectBaseModel):
+    """An emoji reaction by a user on a work item comment (one per comment/user/reaction)."""
+
     actor = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         on_delete=models.CASCADE,
@@ -652,6 +736,8 @@ class CommentReaction(ProjectBaseModel):
 
 
 class IssueVote(ProjectBaseModel):
+    """An up (1) or down (-1) vote by a user on a work item; one vote per user per issue."""
+
     issue = models.ForeignKey(Issue, on_delete=models.CASCADE, related_name="votes")
     actor = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="votes")
     vote = models.IntegerField(choices=((-1, "DOWNVOTE"), (1, "UPVOTE")), default=1)
@@ -675,6 +761,12 @@ class IssueVote(ProjectBaseModel):
 
 
 class IssueVersion(ProjectBaseModel):
+    """A snapshot of a work item's fields at a point in time (version history).
+
+    Related objects are stored as plain UUIDs / UUID arrays so the snapshot is
+    unaffected by later changes to those objects.
+    """
+
     PRIORITY_CHOICES = (
         ("urgent", "Urgent"),
         ("high", "High"),
@@ -735,6 +827,10 @@ class IssueVersion(ProjectBaseModel):
 
     @classmethod
     def log_issue_version(cls, issue, user):
+        """Create a version snapshot of ``issue`` owned by ``user``.
+
+        Returns True on success; logs the exception and returns False on failure.
+        """
         try:
             """
             Log the issue version
@@ -780,6 +876,8 @@ class IssueVersion(ProjectBaseModel):
 
 
 class IssueDescriptionVersion(ProjectBaseModel):
+    """A snapshot of a work item's description content (description history)."""
+
     issue = models.ForeignKey("db.Issue", on_delete=models.CASCADE, related_name="description_versions")
     description_binary = models.BinaryField(null=True)
     description_html = models.TextField(blank=True, default="<p></p>")
@@ -799,6 +897,10 @@ class IssueDescriptionVersion(ProjectBaseModel):
 
     @classmethod
     def log_issue_description_version(cls, issue, user):
+        """Snapshot ``issue``'s current description; ``user`` is the owner's id.
+
+        Returns True on success; logs the exception and returns False on failure.
+        """
         try:
             """
             Log the issue description version

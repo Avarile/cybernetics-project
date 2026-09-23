@@ -2,6 +2,8 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 # See the LICENSE file for details.
 
+"""URL routes for external services: Unsplash image search and the AI (GPT) assistant."""
+
 from django.urls import path
 
 

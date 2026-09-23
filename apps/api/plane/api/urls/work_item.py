@@ -2,6 +2,13 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 # See the LICENSE file for details.
 
+"""Public API routes for work items and their sub-resources (/api/v1/).
+
+Each route exists twice: the legacy ``issues/`` paths and the newer
+``work-items/`` paths, both mapped to the same views. Relations are only
+exposed under ``work-items/``.
+"""
+
 from django.urls import path
 
 from plane.api.views import (

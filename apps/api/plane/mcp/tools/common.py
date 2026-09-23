@@ -2,6 +2,8 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 # See the LICENSE file for details.
 
+"""Shared helpers for MCP tools: public API path builders and request payload/param helpers."""
+
 # Python imports
 from typing import Any, Optional
 from uuid import UUID
@@ -11,14 +13,17 @@ WORK_ITEM_LIST_FIELDS = "id,sequence_id,name,state,priority,assignees,labels,par
 
 
 def project_path(workspace_slug: str, project_id: UUID) -> str:
+    """Relative ``/api/v1`` path of a project."""
     return f"workspaces/{workspace_slug}/projects/{project_id}"
 
 
 def work_item_path(workspace_slug: str, project_id: UUID, work_item_id: UUID) -> str:
+    """Relative ``/api/v1`` path of a work item."""
     return f"{project_path(workspace_slug, project_id)}/work-items/{work_item_id}"
 
 
 def page_params(cursor: Optional[str], per_page: int, **extra: Any) -> dict:
+    """Cursor-pagination query params, plus any extra params."""
     return {"cursor": cursor, "per_page": per_page, **extra}
 
 

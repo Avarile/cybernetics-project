@@ -2,6 +2,12 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 # See the LICENSE file for details.
 
+"""Shared error handling for the Cybernetics-Data views.
+
+Converts upstream client errors, throttling and query validation failures
+into the app's standard ``error`` / ``error_code`` / ``error_message`` body.
+"""
+
 # Third party imports
 from rest_framework import status
 from rest_framework.exceptions import Throttled
@@ -37,6 +43,7 @@ class CyberneticsDataErrorMixin:
     """
 
     def handle_exception(self, exc):
+        """Translate Cybernetics-Data, throttle and validation exceptions; defer everything else to DRF."""
         if isinstance(exc, CyberneticsDataError):
             return error_response(exc.code, exc.message, exc.http_status)
         if isinstance(exc, Throttled):

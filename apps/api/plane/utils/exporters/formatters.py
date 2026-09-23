@@ -2,6 +2,13 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 # See the LICENSE file for details.
 
+"""Output formatters (CSV, JSON, XLSX) used by ``Exporter``.
+
+Each formatter takes already-serialized record dicts plus an ``ExportSchema`` class
+(for column order and header labels) and returns ``(filename_with_extension, content)``.
+CSV/XLSX cells are passed through ``sanitize_csv_row`` to block formula injection.
+"""
+
 import csv
 import io
 import json
@@ -49,7 +56,7 @@ class BaseFormatter:
         if not hasattr(schema_class, "_declared_fields"):
             raise ValueError(f"Schema class {schema_class.__name__} must have _declared_fields attribute")
 
-        # Get order and labels from schema
+        # Get order and labels from schema; unlabeled fields fall back to a title-cased field name
         field_order = list(schema_class._declared_fields.keys())
         field_labels = {
             name: field.label if field.label else name.replace("_", " ").title()
@@ -92,6 +99,7 @@ class CSVFormatter(BaseFormatter):
         return buf.getvalue()
 
     def format(self, filename, records, schema_class, options: Dict[str, Any] | None = None) -> tuple[str, str]:
+        """Render records as a fully quoted CSV with a header row; empty input yields an empty file."""
         if not records:
             return (f"{filename}.csv", "")
 
@@ -127,6 +135,7 @@ class JSONFormatter(BaseFormatter):
         return {field_labels[field]: record.get(field) for field in field_order if field in record}
 
     def format(self, filename, records, schema_class, options: Dict[str, Any] | None = None) -> tuple[str, str]:
+        """Render records as a JSON array of objects keyed by field label."""
         if not records:
             return (f"{filename}.json", "[]")
 
@@ -182,6 +191,7 @@ class XLSXFormatter(BaseFormatter):
         return out.getvalue()
 
     def format(self, filename, records, schema_class, options: Dict[str, Any] | None = None) -> tuple[str, bytes]:
+        """Render records as a single-sheet XLSX workbook (bytes) with a header row."""
         if not records:
             # Create empty workbook
             content = self._create_xlsx_file([])

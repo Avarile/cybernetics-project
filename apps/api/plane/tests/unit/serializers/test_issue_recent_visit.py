@@ -2,6 +2,8 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 # See the LICENSE file for details.
 
+"""Unit tests for IssueRecentVisitSerializer (issue summary shown in recent visits)."""
+
 import pytest
 
 from plane.db.models import (

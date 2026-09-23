@@ -2,10 +2,18 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 # See the LICENSE file for details.
 
+"""Decides where the frontend should send a user right after they log in."""
+
 from plane.db.models import Profile, Workspace, WorkspaceMemberInvite
 
 
 def get_redirection_path(user):
+    """Return the post-login path for ``user``.
+
+    Order: "onboarding" if not onboarded, else the last active workspace slug, else
+    the oldest workspace they belong to, else "invitations" if they have pending
+    invites, else "create-workspace".
+    """
     # Handle redirections
     profile, _ = Profile.objects.get_or_create(user=user)
 

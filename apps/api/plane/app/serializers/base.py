@@ -2,19 +2,36 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 # See the LICENSE file for details.
 
+"""Base serializer classes shared by all ``plane.app`` serializers.
+
+``DynamicBaseSerializer`` adds ``expand`` support: related fields listed in
+``expand`` are serialized as nested objects (via the Lite serializers) instead
+of plain ids.
+"""
+
 from rest_framework import serializers
 
 
 class BaseSerializer(serializers.ModelSerializer):
+    """ModelSerializer with a read-only ``id`` primary key field."""
+
     id = serializers.PrimaryKeyRelatedField(read_only=True)
 
 
 class DynamicBaseSerializer(BaseSerializer):
+    """Serializer supporting ``expand=[...]`` to inline related objects.
+
+    Accepts optional ``fields`` and ``expand`` kwargs. Expandable relation names
+    (user, project, state, assignees, labels, ...) are mapped to Lite
+    serializers in ``_filter_fields`` and ``to_representation``.
+    """
+
     def __init__(self, *args, **kwargs):
         # If 'fields' is provided in the arguments, remove it and store it separately.
         # This is done so as not to pass this custom argument up to the superclass.
         fields = kwargs.pop("fields", [])
         self.expand = kwargs.pop("expand", []) or []
+        # NOTE: the popped "fields" value is discarded; the expand list is what gets passed to _filter_fields
         fields = self.expand
 
         # Call the initialization of the superclass.
@@ -52,6 +69,8 @@ class DynamicBaseSerializer(BaseSerializer):
             elif isinstance(item, dict):
                 allowed.append(list(item.keys())[0])
 
+        # Add a nested serializer field for each requested relation that isn't already declared
+        # (fields are only added here, never removed)
         for field in allowed:
             if field not in self.fields:
                 from . import (
@@ -120,6 +139,10 @@ class DynamicBaseSerializer(BaseSerializer):
         return self.fields
 
     def to_representation(self, instance):
+        """Serialize the instance, replacing expanded relation ids with nested serialized objects.
+
+        Also attaches ``issue_attachments`` (ISSUE_ATTACHMENT FileAssets of the issue) when requested.
+        """
         response = super().to_representation(instance)
 
         # Ensure 'expand' is iterable before processing

@@ -2,6 +2,14 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 # See the LICENSE file for details.
 
+"""Celery task that seeds a newly created workspace with demo/onboarding content.
+
+Reads JSON fixtures from ``settings.SEED_DIR/data`` (projects, states, labels,
+cycles, modules, issues, views, pages) and creates them under a dedicated
+per-workspace bot user. Seed files reference each other by small integer IDs,
+which are translated to real UUIDs via the ``*_map`` dicts returned by each step.
+"""
+
 # Python imports
 import os
 import json
@@ -82,6 +90,7 @@ def create_project_and_member(workspace: Workspace, bot_user: User) -> Dict[int,
         A mapping of seed project IDs to actual project IDs
     """
     project_seeds = read_seed_file("projects.json")
+    # Project identifier (issue key prefix) = first 5 alphanumeric chars of the workspace name
     project_identifier = "".join(ch for ch in workspace.name if ch.isalnum())[:5]
 
     # Create members
@@ -112,7 +121,7 @@ def create_project_and_member(workspace: Workspace, bot_user: User) -> Dict[int,
         )
         project.save(created_by_id=bot_user.id, disable_auto_set_user=True)
 
-        # Create project members
+        # Create project members (every workspace member joins with their workspace role)
         ProjectMember.objects.bulk_create(
             [
                 ProjectMember(
@@ -273,6 +282,7 @@ def create_project_issues(
         for field in required_fields:
             if field not in issue_seed:
                 logger.error(f"Task: workspace_seed_task -> Required field '{field}' missing in issue seed")
+                # NOTE: this only skips the inner field loop; the pops below will raise KeyError
                 continue
 
         # get the values
@@ -410,6 +420,8 @@ def create_cycles(workspace: Workspace, project_map: Dict[int, uuid.UUID], bot_u
         project_id = cycle_seed.pop("project_id")
         type = cycle_seed.pop("type")
 
+        # Seed cycles only carry a type; dates are computed relative to now so the
+        # demo always has an active cycle and one following it.
         if type == "CURRENT":
             start_date = timezone.now()
             end_date = start_date + timedelta(days=14)
@@ -458,6 +470,7 @@ def create_modules(workspace: Workspace, project_map: Dict[int, uuid.UUID], bot_
         module_id = module_seed.pop("id")
         project_id = module_seed.pop("project_id")
 
+        # Stagger module start dates by 2 days each, 14-day duration
         start_date = timezone.now() + timedelta(days=index * 2)
         end_date = start_date + timedelta(days=14)
 
@@ -536,7 +549,7 @@ def workspace_seed(workspace_id: uuid.UUID) -> None:
         WorkspaceMember.objects.create(
             workspace=workspace,
             member=bot_user,
-            role=20,
+            role=20,  # Admin
             company_role="",
         )
 

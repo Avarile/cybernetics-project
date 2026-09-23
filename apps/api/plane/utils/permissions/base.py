@@ -2,6 +2,14 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 # See the LICENSE file for details.
 
+"""
+Role enum and the ``allow_permission`` decorator for role-based access checks.
+
+The decorator wraps DRF view methods and checks the requesting user's
+WorkspaceMember/ProjectMember role (looked up from the ``slug`` and
+``project_id`` URL kwargs) before running the view, returning 403 otherwise.
+"""
+
 from plane.db.models import WorkspaceMember, ProjectMember
 from functools import wraps
 from rest_framework.response import Response
@@ -11,12 +19,24 @@ from enum import Enum
 
 
 class ROLE(Enum):
+    """Membership role values as stored in WorkspaceMember/ProjectMember ``role``."""
+
     ADMIN = 20
     MEMBER = 15
     GUEST = 5
 
 
 def allow_permission(allowed_roles, level="PROJECT", creator=False, model=None):
+    """
+    Decorator factory restricting a view method to members with given roles.
+
+    ``allowed_roles`` may contain ROLE members or raw ints. ``level`` is
+    "WORKSPACE" (checks WorkspaceMember by ``slug``) or anything else for
+    project level (checks ProjectMember by ``slug`` + ``project_id``). With
+    ``creator=True`` and a ``model``, the creator of the object ``kwargs["pk"]``
+    is allowed regardless of role. Returns a 403 Response when access is denied.
+    """
+
     def decorator(view_func):
         @wraps(view_func)
         def _wrapped_view(instance, request, *args, **kwargs):

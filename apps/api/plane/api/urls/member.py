@@ -2,6 +2,11 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 # See the LICENSE file for details.
 
+"""Public API routes for project and workspace members (/api/v1/).
+
+``members/`` and ``project-members/`` are aliases for the same project member views.
+"""
+
 from django.urls import path
 
 from plane.api.views import (

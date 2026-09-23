@@ -2,6 +2,12 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 # See the LICENSE file for details.
 
+"""MCP tools for work item comments, activity history, links and relations.
+
+Note: each tool function's docstring is sent to MCP clients as the tool description,
+so edit those docstrings as user-facing text.
+"""
+
 # Python imports
 from typing import Annotated, Optional
 from uuid import UUID
@@ -83,6 +89,7 @@ async def add_work_item_relation(
 
 
 def register(tool) -> None:
+    """Register this module's tools."""
     tool(read_only=True, title="List work item comments")(list_work_item_comments)
     tool(read_only=False, title="Add work item comment")(add_work_item_comment)
     tool(read_only=True, title="List work item activities")(list_work_item_activities)

@@ -2,6 +2,8 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 # See the LICENSE file for details.
 
+"""Public endpoint returning basic metadata of a published project (``/api/public/anchor/<anchor>/meta/``)."""
+
 # third party
 from rest_framework.permissions import AllowAny
 from rest_framework import status
@@ -14,6 +16,8 @@ from plane.space.serializer.project import ProjectLiteSerializer
 
 
 class ProjectMetaDataEndpoint(BaseAPIView):
+    """Return lite project details for a project DeployBoard ``anchor``; 404 if not published."""
+
     permission_classes = [AllowAny]
 
     def get(self, request, anchor):

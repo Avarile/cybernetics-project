@@ -2,6 +2,9 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 # See the LICENSE file for details.
 
+"""URL routes for search: workspace-wide global search, issue search within a project, and entity search
+(e.g. for mentions/pickers)."""
+
 from django.urls import path
 
 

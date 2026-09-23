@@ -2,6 +2,13 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 # See the LICENSE file for details.
 
+"""
+Periodic Celery task that expires old issue-export download links.
+
+Export ZIPs (see ``export_task``) get a 7-day presigned URL; after 8 days the
+S3/MinIO object is deleted and ``ExporterHistory.url`` is cleared.
+"""
+
 # Python imports
 import boto3
 from datetime import timedelta
@@ -21,6 +28,7 @@ from plane.db.models import ExporterHistory
 
 @shared_task
 def delete_old_s3_link():
+    """Delete export files older than 8 days from object storage and null their ``ExporterHistory.url``."""
     # Get a list of keys and IDs to process
     expired_exporter_history = ExporterHistory.objects.filter(
         Q(url__isnull=False) & Q(created_at__lte=timezone.now() - timedelta(days=8))

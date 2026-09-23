@@ -2,6 +2,12 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 # See the LICENSE file for details.
 
+"""S3-compatible file storage backend (``STORAGES["default"]``).
+
+Wraps boto3 to issue presigned upload (POST) and download (GET) URLs, read object
+metadata, copy, upload and delete objects. Works against AWS S3 or the bundled MinIO.
+"""
+
 # Python imports
 import os
 import uuid
@@ -17,12 +23,23 @@ from storages.backends.s3boto3 import S3Boto3Storage
 
 
 class S3Storage(S3Boto3Storage):
+    """Default Django storage backend for uploaded assets, plus presigned-URL helpers used by asset views.
+
+    Credentials, bucket, region and endpoint come from environment variables.
+    """
+
     def url(self, name, parameters=None, expire=None, http_method=None):
+        """Return ``name`` unchanged: asset URLs are built by the views (presigned/redirect endpoints), not by storage."""
         return name
 
     """S3 storage class to generate presigned URLs for S3 objects"""
 
     def __init__(self, request=None):
+        """Build the boto3 S3 client.
+
+        With ``USE_MINIO=1`` and a ``request``, the client targets the request's own host so presigned
+        URLs are reachable by the browser through the proxy (MinIO is served behind the web host).
+        """
         # Get the AWS credentials and bucket name from the environment
         self.aws_access_key_id = os.environ.get("AWS_ACCESS_KEY_ID")
         # Use the AWS_SECRET_ACCESS_KEY environment variable for the secret key
@@ -75,6 +92,7 @@ class S3Storage(S3Boto3Storage):
         ]
 
         # Add condition for the object name (key)
+        # A "${filename}" key lets the browser choose the file name; restrict it to the given prefix instead of an exact key.
         if object_name.startswith("${filename}"):
             conditions.append(["starts-with", "$key", object_name[: -len("${filename}")]])
         else:
@@ -101,6 +119,7 @@ class S3Storage(S3Boto3Storage):
     def _get_content_disposition(self, disposition, filename=None):
         """Helper method to generate Content-Disposition header value"""
         if filename is None:
+            # No filename given: use a random one so the header is always well-formed.
             filename = uuid.uuid4().hex
 
         if filename:
@@ -178,6 +197,7 @@ class S3Storage(S3Boto3Storage):
     ) -> bool:
         """Upload a file directly to S3"""
         try:
+            # Note: ``extra_args`` defaults to a shared mutable dict, so ContentType set here persists across calls that omit it.
             if content_type:
                 extra_args["ContentType"] = content_type
 

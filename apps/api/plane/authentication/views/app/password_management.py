@@ -2,6 +2,14 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 # See the LICENSE file for details.
 
+"""
+Forgot/reset password views for the web app.
+
+Routes: ``POST /auth/forgot-password/`` emails a reset link (via the
+``forgot_password`` Celery task) and ``POST /auth/reset-password/<uidb64>/<token>/``
+sets the new password using Django's ``PasswordResetTokenGenerator``.
+"""
+
 # Python imports
 import os
 from urllib.parse import urlencode, urljoin
@@ -36,6 +44,7 @@ from plane.authentication.rate_limit import AuthenticationThrottle
 
 
 def generate_password_token(user):
+    """Return ``(uidb64, token)`` for a password reset link for ``user``."""
     uidb64 = urlsafe_base64_encode(smart_bytes(user.id))
     token = PasswordResetTokenGenerator().make_token(user)
 
@@ -43,11 +52,14 @@ def generate_password_token(user):
 
 
 class ForgotPasswordEndpoint(APIView):
+    """Public, throttled endpoint that sends a password reset email."""
+
     permission_classes = [AllowAny]
 
     throttle_classes = [AuthenticationThrottle]
 
     def post(self, request):
+        """Send a reset link if SMTP is configured and the user exists; otherwise return 400 with an auth error."""
         email = request.data.get("email")
 
         # Check instance configuration
@@ -97,7 +109,13 @@ class ForgotPasswordEndpoint(APIView):
 
 
 class ResetPasswordEndpoint(View):
+    """Form POST target of the reset-password page."""
+
     def post(self, request, uidb64, token):
+        """Validate the uid/token and new password strength, save the password and redirect to sign-in.
+
+        Errors redirect back to ``accounts/reset-password`` with auth error params.
+        """
         try:
             # Decode the id from the uidb64
             try:

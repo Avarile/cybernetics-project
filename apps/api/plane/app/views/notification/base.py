@@ -2,6 +2,13 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 # See the LICENSE file for details.
 
+"""In-app notification API (workspace inbox).
+
+Lists the current user's issue notifications with snoozed/archived/read/
+mentioned/type filters, updates snooze state, marks read/unread, archives,
+returns unread counts, bulk marks as read, and reads/updates the user's
+notification preferences. All queries are scoped to ``receiver = request.user``.
+"""
 # Django imports
 from django.db.models import Exists, OuterRef, Q, Case, When, BooleanField
 from django.utils import timezone
@@ -31,10 +38,12 @@ from ..base import BaseAPIView, BaseViewSet
 
 
 class NotificationViewSet(BaseViewSet, BasePaginator):
+    """Notifications received by the current user in a workspace."""
     model = Notification
     serializer_class = NotificationSerializer
 
     def get_queryset(self):
+        """Notifications in the workspace addressed to the current user."""
         return (
             super()
             .get_queryset()
@@ -47,6 +56,12 @@ class NotificationViewSet(BaseViewSet, BasePaginator):
 
     @allow_permission(allowed_roles=[ROLE.ADMIN, ROLE.MEMBER, ROLE.GUEST], level="WORKSPACE")
     def list(self, request, slug):
+        """List the user's issue notifications with query-param filters.
+
+        Query params: ``snoozed``/``archived`` ("true"/"false"), ``read``,
+        ``mentioned``, and ``type`` (comma-separated: subscribed, assigned,
+        created). Paginates only when both ``per_page`` and ``cursor`` are given.
+        """
         # Get query parameters
         snoozed = request.GET.get("snoozed", "false")
         archived = request.GET.get("archived", "false")
@@ -55,6 +70,8 @@ class NotificationViewSet(BaseViewSet, BasePaginator):
         mentioned = request.GET.get("mentioned", False)
         q_filters = Q()
 
+        # Issues still in intake triage (intake status 0, 2 or -2), used to
+        # flag notifications that point at intake issues.
         intake_issue = Issue.objects.filter(
             pk=OuterRef("entity_identifier"),
             issue_intake__status__in=[0, 2, -2],
@@ -67,6 +84,7 @@ class NotificationViewSet(BaseViewSet, BasePaginator):
             .annotate(is_inbox_issue=Exists(intake_issue))
             .annotate(is_intake_issue=Exists(intake_issue))
             .annotate(
+                # Mention notifications are identified by their sender string.
                 is_mentioned_notification=Case(
                     When(sender__icontains="mentioned", then=True),
                     default=False,
@@ -105,6 +123,8 @@ class NotificationViewSet(BaseViewSet, BasePaginator):
 
         type = type.split(",")
         # Subscribed issues
+        # Each selected type ORs its issue ids into q_filters.
+        # "subscribed" excludes issues the user created or is assigned to.
         if "subscribed" in type:
             issue_ids = (
                 IssueSubscriber.objects.filter(workspace__slug=slug, subscriber_id=request.user.id)
@@ -124,6 +144,7 @@ class NotificationViewSet(BaseViewSet, BasePaginator):
 
         # Created issues
         if "created" in type:
+            # Workspace guests (role < 15) get no "created" notifications.
             if WorkspaceMember.objects.filter(
                 workspace__slug=slug, member=request.user, role__lt=15, is_active=True
             ).exists():
@@ -155,6 +176,7 @@ class NotificationViewSet(BaseViewSet, BasePaginator):
 
     @allow_permission(allowed_roles=[ROLE.ADMIN, ROLE.MEMBER, ROLE.GUEST], level="WORKSPACE")
     def partial_update(self, request, slug, pk):
+        """Update a notification's snooze time (``snoozed_till``) only."""
         notification = Notification.objects.get(workspace__slug=slug, pk=pk, receiver=request.user)
         # Only read_at and snoozed_till can be updated
         notification_data = {"snoozed_till": request.data.get("snoozed_till", None)}
@@ -167,6 +189,7 @@ class NotificationViewSet(BaseViewSet, BasePaginator):
 
     @allow_permission(allowed_roles=[ROLE.ADMIN, ROLE.MEMBER, ROLE.GUEST], level="WORKSPACE")
     def mark_read(self, request, slug, pk):
+        """Mark one of the user's notifications as read."""
         notification = Notification.objects.get(receiver=request.user, workspace__slug=slug, pk=pk)
         notification.read_at = timezone.now()
         notification.save()
@@ -175,6 +198,7 @@ class NotificationViewSet(BaseViewSet, BasePaginator):
 
     @allow_permission(allowed_roles=[ROLE.ADMIN, ROLE.MEMBER, ROLE.GUEST], level="WORKSPACE")
     def mark_unread(self, request, slug, pk):
+        """Mark one of the user's notifications as unread."""
         notification = Notification.objects.get(receiver=request.user, workspace__slug=slug, pk=pk)
         notification.read_at = None
         notification.save()
@@ -183,6 +207,7 @@ class NotificationViewSet(BaseViewSet, BasePaginator):
 
     @allow_permission(allowed_roles=[ROLE.ADMIN, ROLE.MEMBER, ROLE.GUEST], level="WORKSPACE")
     def archive(self, request, slug, pk):
+        """Archive one of the user's notifications."""
         notification = Notification.objects.get(receiver=request.user, workspace__slug=slug, pk=pk)
         notification.archived_at = timezone.now()
         notification.save()
@@ -191,6 +216,7 @@ class NotificationViewSet(BaseViewSet, BasePaginator):
 
     @allow_permission(allowed_roles=[ROLE.ADMIN, ROLE.MEMBER, ROLE.GUEST], level="WORKSPACE")
     def unarchive(self, request, slug, pk):
+        """Unarchive one of the user's notifications."""
         notification = Notification.objects.get(receiver=request.user, workspace__slug=slug, pk=pk)
         notification.archived_at = None
         notification.save()
@@ -199,10 +225,12 @@ class NotificationViewSet(BaseViewSet, BasePaginator):
 
 
 class UnreadNotificationEndpoint(BaseAPIView):
+    """Unread notification counts (non-mention and mention) for the user."""
     use_read_replica = True
 
     @allow_permission(allowed_roles=[ROLE.ADMIN, ROLE.MEMBER, ROLE.GUEST], level="WORKSPACE")
     def get(self, request, slug):
+        """Return counts of unread, unarchived, unsnoozed notifications split by mention."""
         # Watching Issues Count
         unread_notifications_count = (
             Notification.objects.filter(
@@ -235,8 +263,13 @@ class UnreadNotificationEndpoint(BaseAPIView):
 
 
 class MarkAllReadNotificationViewSet(BaseViewSet):
+    """Bulk "mark all as read" for the current user's notifications."""
     @allow_permission(allowed_roles=[ROLE.ADMIN, ROLE.MEMBER, ROLE.GUEST], level="WORKSPACE")
     def create(self, request, slug):
+        """Set ``read_at`` on all unread notifications matching the body filters.
+
+        Body: ``snoozed``, ``archived`` and ``type`` (watching/assigned/created).
+        """
         snoozed = request.data.get("snoozed", False)
         archived = request.data.get("archived", False)
         type = request.data.get("type", "all")
@@ -275,6 +308,7 @@ class MarkAllReadNotificationViewSet(BaseViewSet):
 
         # Created issues
         if type == "created":
+            # Workspace guests (role < 15) have nothing to mark for "created".
             if WorkspaceMember.objects.filter(
                 workspace__slug=slug, member=request.user, role__lt=15, is_active=True
             ).exists():
@@ -294,17 +328,20 @@ class MarkAllReadNotificationViewSet(BaseViewSet):
 
 
 class UserNotificationPreferenceEndpoint(BaseAPIView):
+    """Read and update the current user's notification preferences."""
     model = UserNotificationPreference
     serializer_class = UserNotificationPreferenceSerializer
 
     # request the object
     def get(self, request):
+        """Return the user's notification preference record."""
         user_notification_preference = UserNotificationPreference.objects.get(user=request.user)
         serializer = UserNotificationPreferenceSerializer(user_notification_preference)
         return Response(serializer.data, status=status.HTTP_200_OK)
 
     # update the object
     def patch(self, request):
+        """Partially update the user's notification preferences."""
         user_notification_preference = UserNotificationPreference.objects.get(user=request.user)
         serializer = UserNotificationPreferenceSerializer(user_notification_preference, data=request.data, partial=True)
         if serializer.is_valid():

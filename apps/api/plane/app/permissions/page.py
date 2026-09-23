@@ -2,6 +2,13 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 # See the LICENSE file for details.
 
+"""DRF permission class for project page endpoints.
+
+Combines project membership role, page ownership and page access
+(public/private) to decide whether the request is allowed. The ``_``-prefixed
+hooks are designed to be overridden (e.g. by feature-flagged editions).
+"""
+
 from plane.db.models import ProjectMember, Page
 from plane.app.permissions import ROLE
 
@@ -39,6 +46,7 @@ class ProjectPagePermission(BasePermission):
             return False
 
         if page_id:
+            # Raises Page.DoesNotExist if the page is not in this workspace
             page = Page.objects.get(id=page_id, workspace__slug=slug)
 
             # Allow access if the user is the owner of the page
@@ -85,9 +93,10 @@ class ProjectPagePermission(BasePermission):
         return False
 
     def _check_project_action_access(self, request, role):
+        """Map the HTTP method to the project roles allowed to perform it on public pages."""
         method = request.method
 
-        # Only admins can create (POST) pages
+        # Only admins and members can create (POST) pages
         if method == "POST":
             if role in [ADMIN, MEMBER]:
                 return True

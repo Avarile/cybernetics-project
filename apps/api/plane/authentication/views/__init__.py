@@ -2,6 +2,13 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 # See the LICENSE file for details.
 
+"""
+Re-exports all authentication endpoints used by ``plane.authentication.urls``.
+
+``app.*`` views serve the main web app; ``space.*`` views serve the public
+"space" (published project) frontend.
+"""
+
 from .common import ChangePasswordEndpoint, CSRFTokenEndpoint, SetUserPasswordEndpoint
 
 from .app.check import EmailCheckEndpoint

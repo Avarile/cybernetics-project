@@ -2,6 +2,15 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 # See the LICENSE file for details.
 
+"""
+GitHub OAuth2 provider.
+
+Reads GITHUB_CLIENT_ID/GITHUB_CLIENT_SECRET (and optional GITHUB_ORGANIZATION_ID)
+from instance config or env. When an organization is configured, the
+``read:org`` scope is requested and only members of that org may log in.
+Used by the ``/auth/github/`` (app) and ``/auth/spaces/github/`` (space) views.
+"""
+
 # Python imports
 import os
 from datetime import datetime
@@ -21,6 +30,8 @@ from plane.license.utils.instance_value import get_configuration_value
 
 
 class GitHubOAuthProvider(OauthAdapter):
+    """OAuth2 adapter for github.com, with optional organization-membership restriction."""
+
     token_url = "https://github.com/login/oauth/access_token"
     userinfo_url = "https://api.github.com/user"
     org_membership_url = "https://api.github.com/orgs"
@@ -31,6 +42,7 @@ class GitHubOAuthProvider(OauthAdapter):
     organization_scope = "read:org"
 
     def __init__(self, request, code=None, state=None, callback=None):
+        """Validate GitHub config and build the authorize URL; ``state`` is verified in the callback view."""
         GITHUB_CLIENT_ID, GITHUB_CLIENT_SECRET, GITHUB_ORGANIZATION_ID = get_configuration_value([
             {
                 "key": "GITHUB_CLIENT_ID",
@@ -82,6 +94,7 @@ class GitHubOAuthProvider(OauthAdapter):
         )
 
     def set_token_data(self):
+        """Exchange the authorization code for an access token and store it."""
         data = {
             "client_id": self.client_id,
             "client_secret": self.client_secret,
@@ -106,6 +119,7 @@ class GitHubOAuthProvider(OauthAdapter):
         })
 
     def __get_email(self, headers):
+        """Return the user's primary email from the GitHub emails API (the profile often omits it)."""
         try:
             # Github does not provide email in user response
             emails_url = "https://api.github.com/user/emails"
@@ -135,6 +149,7 @@ class GitHubOAuthProvider(OauthAdapter):
             )
 
     def is_user_in_organization(self, github_username):
+        """Return True if ``github_username`` is a member of the configured GitHub organization."""
         headers = {"Authorization": f"Bearer {self.token_data.get('access_token')}"}
         response = requests.get(
             f"{self.org_membership_url}/{self.organization_id}/memberships/{github_username}",
@@ -143,6 +158,7 @@ class GitHubOAuthProvider(OauthAdapter):
         return response.status_code == 200  # 200 means the user is a member
 
     def set_user_data(self):
+        """Load the GitHub profile into ``user_data``; raise GITHUB_USER_NOT_IN_ORG if the org check fails."""
         user_info_response = self.get_user_response()
         headers = {
             "Authorization": f"Bearer {self.token_data.get('access_token')}",

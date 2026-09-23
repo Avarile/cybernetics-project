@@ -2,6 +2,11 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 # See the LICENSE file for details.
 
+"""Shared pytest fixtures for the API test suite: API clients (anonymous, API-key and
+session authenticated), users, API tokens, a workspace with its owner as admin, and a
+live server.
+"""
+
 import pytest
 from rest_framework.test import APIClient
 from pytest_django.fixtures import django_db_setup
@@ -135,6 +140,7 @@ def workspace(create_user):
         slug="test-workspace",
     )
 
+    # Role 20 = workspace admin
     WorkspaceMember.objects.create(workspace=created_workspace, member=create_user, role=20)
 
     return created_workspace

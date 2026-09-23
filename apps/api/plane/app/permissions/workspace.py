@@ -2,6 +2,13 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 # See the LICENSE file for details.
 
+"""DRF permission classes for workspace-scoped endpoints.
+
+Classes read ``view.workspace_slug`` (from URL kwargs) and check the user's
+active WorkspaceMember role. Note that in this codebase "owner" and "admin"
+both map to the Admin role (20).
+"""
+
 # Third Party imports
 from rest_framework.permissions import BasePermission, SAFE_METHODS
 
@@ -17,6 +24,12 @@ Guest = 5
 
 # TODO: Move the below logic to python match - python v3.10
 class WorkSpaceBasePermission(BasePermission):
+    """Permission for the workspace resource itself.
+
+    Any authenticated user may create or read (list is filtered by the queryset),
+    admin/member may update, and only admins may delete.
+    """
+
     def has_permission(self, request, view):
         # allow anyone to create a workspace
         if request.user.is_anonymous:
@@ -49,6 +62,8 @@ class WorkSpaceBasePermission(BasePermission):
 
 
 class WorkspaceOwnerPermission(BasePermission):
+    """Allow only workspace admins (role 20)."""
+
     def has_permission(self, request, view):
         if request.user.is_anonymous:
             return False
@@ -59,6 +74,8 @@ class WorkspaceOwnerPermission(BasePermission):
 
 
 class WorkSpaceAdminPermission(BasePermission):
+    """Allow workspace admins and members (excludes guests)."""
+
     def has_permission(self, request, view):
         if request.user.is_anonymous:
             return False
@@ -72,6 +89,8 @@ class WorkSpaceAdminPermission(BasePermission):
 
 
 class WorkspaceEntityPermission(BasePermission):
+    """Permission for workspace-level entities: any member may read, admin/member may write."""
+
     def has_permission(self, request, view):
         if request.user.is_anonymous:
             return False
@@ -91,6 +110,8 @@ class WorkspaceEntityPermission(BasePermission):
 
 
 class WorkspaceViewerPermission(BasePermission):
+    """Allow any active workspace member (read-only style access check)."""
+
     def has_permission(self, request, view):
         if request.user.is_anonymous:
             return False
@@ -101,6 +122,8 @@ class WorkspaceViewerPermission(BasePermission):
 
 
 class WorkspaceUserPermission(BasePermission):
+    """Allow any active workspace member regardless of role."""
+
     def has_permission(self, request, view):
         if request.user.is_anonymous:
             return False

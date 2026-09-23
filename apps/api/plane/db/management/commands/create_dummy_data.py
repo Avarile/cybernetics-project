@@ -2,6 +2,13 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 # See the LICENSE file for details.
 
+"""Management command ``create_dummy_data``: interactively seed a workspace with fake data.
+
+Prompts for a new workspace, its owner and members, then for each project the
+number of issues/cycles/modules/pages/intake issues, and hands the work to
+``plane.bgtasks.dummy_data_task.create_dummy_data``. Intended for local/dev use.
+"""
+
 # Django imports
 from typing import Any
 from django.core.management.base import BaseCommand, CommandError
@@ -11,9 +18,15 @@ from plane.db.models import User, Workspace, WorkspaceMember
 
 
 class Command(BaseCommand):
+    """Create a workspace with members and generate dummy project data."""
+
     help = "Create dump issues, cycles etc. for a project in a given workspace"
 
     def handle(self, *args: Any, **options: Any) -> str | None:
+        """Collect input from stdin, create the workspace + members, then generate data per project.
+
+        Any exception is caught and printed, so the command never exits non-zero.
+        """
         try:
             workspace_name = input("Workspace Name: ")
             workspace_slug = input("Workspace slug: ")
@@ -35,7 +48,7 @@ class Command(BaseCommand):
             members = members.split(",") if members != "" else []
             # Create workspace
             workspace = Workspace.objects.create(slug=workspace_slug, name=workspace_name, owner=user)
-            # Create workspace member
+            # Create workspace member (role 20 = Admin); invited members are added as admins too
             WorkspaceMember.objects.create(workspace=workspace, role=20, member=user)
             user_ids = User.objects.filter(email__in=members)
 
@@ -54,6 +67,7 @@ class Command(BaseCommand):
                 pages_count = int(input("Number of pages to be created: "))
                 intake_issue_count = int(input("Number of intake issues to be created: "))
 
+                # Imported lazily to avoid loading the task module (and its deps) at command import time
                 from plane.bgtasks.dummy_data_task import create_dummy_data
 
                 create_dummy_data(

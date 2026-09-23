@@ -2,6 +2,12 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 # See the LICENSE file for details.
 
+"""Serializers for workspaces and workspace-scoped user data.
+
+Covers workspaces, members and invitations, themes, per-user workspace
+properties/preferences, quick links, recent visits, home widgets and stickies.
+"""
+
 # Third party imports
 from rest_framework import serializers
 
@@ -41,11 +47,14 @@ import re
 
 
 class WorkSpaceSerializer(DynamicBaseSerializer):
+    """Workspace serializer with annotated member count, logo URL and the requester's role."""
+
     total_members = serializers.IntegerField(read_only=True)
     logo_url = serializers.CharField(read_only=True)
     role = serializers.IntegerField(read_only=True)
 
     def validate_name(self, value):
+        """Reject names containing URLs or without any letter/digit."""
         # Check if the name contains a URL
         if contains_url(value):
             raise serializers.ValidationError("Name must not contain URLs")
@@ -59,6 +68,7 @@ class WorkSpaceSerializer(DynamicBaseSerializer):
         return value
 
     def validate_slug(self, value):
+        """Reject reserved slugs and slugs with characters other than letters, digits, ``-`` and ``_``."""
         # Check if the slug is restricted
         if value in RESTRICTED_WORKSPACE_SLUGS:
             raise serializers.ValidationError("Slug is not valid")
@@ -84,6 +94,8 @@ class WorkSpaceSerializer(DynamicBaseSerializer):
 
 
 class WorkspaceLiteSerializer(BaseSerializer):
+    """Minimal read-only workspace representation used for nesting."""
+
     class Meta:
         model = Workspace
         fields = ["name", "slug", "id", "logo_url"]
@@ -91,6 +103,8 @@ class WorkspaceLiteSerializer(BaseSerializer):
 
 
 class WorkSpaceMemberSerializer(DynamicBaseSerializer):
+    """Workspace membership with the member's public user details."""
+
     member = UserLiteSerializer(read_only=True)
 
     class Meta:
@@ -99,6 +113,8 @@ class WorkSpaceMemberSerializer(DynamicBaseSerializer):
 
 
 class WorkspaceMemberMeSerializer(BaseSerializer):
+    """The requesting user's own workspace membership, with their annotated draft issue count."""
+
     draft_issue_count = serializers.IntegerField(read_only=True)
 
     class Meta:
@@ -107,6 +123,8 @@ class WorkspaceMemberMeSerializer(BaseSerializer):
 
 
 class WorkspaceMemberAdminSerializer(DynamicBaseSerializer):
+    """Workspace membership with admin-level member details (e.g. email)."""
+
     member = UserAdminLiteSerializer(read_only=True)
 
     class Meta:
@@ -115,10 +133,13 @@ class WorkspaceMemberAdminSerializer(DynamicBaseSerializer):
 
 
 class WorkSpaceMemberInviteSerializer(BaseSerializer):
+    """Workspace invitation (authenticated/admin use) including the acceptance link with token."""
+
     workspace = WorkspaceLiteSerializer(read_only=True)
     invite_link = serializers.SerializerMethodField()
 
     def get_invite_link(self, obj):
+        """Relative frontend URL the invitee opens to accept the invitation."""
         return f"/workspace-invitations/?invitation_id={obj.id}&slug={obj.workspace.slug}&token={obj.token}"
 
     class Meta:
@@ -165,6 +186,8 @@ class WorkSpaceMemberInvitePublicSerializer(BaseSerializer):
 
 
 class WorkspaceThemeSerializer(BaseSerializer):
+    """Workspace theme created by a user."""
+
     class Meta:
         model = WorkspaceTheme
         fields = "__all__"
@@ -172,6 +195,8 @@ class WorkspaceThemeSerializer(BaseSerializer):
 
 
 class WorkspaceUserPropertiesSerializer(BaseSerializer):
+    """Per-user workspace display properties (filters, display settings)."""
+
     class Meta:
         model = WorkspaceUserProperties
         fields = "__all__"
@@ -179,12 +204,15 @@ class WorkspaceUserPropertiesSerializer(BaseSerializer):
 
 
 class WorkspaceUserLinkSerializer(BaseSerializer):
+    """User's quick link in a workspace; URLs are normalized and unique per workspace and owner."""
+
     class Meta:
         model = WorkspaceUserLink
         fields = "__all__"
         read_only_fields = ["workspace", "owner"]
 
     def to_internal_value(self, data):
+        """Prefix ``http://`` to URLs without a scheme before field validation."""
         url = data.get("url", "")
         if url and not url.startswith(("http://", "https://")):
             data["url"] = "http://" + url
@@ -192,6 +220,7 @@ class WorkspaceUserLinkSerializer(BaseSerializer):
         return super().to_internal_value(data)
 
     def validate_url(self, value):
+        """Validate URL syntax with Django's URLValidator."""
         url_validator = URLValidator()
         try:
             url_validator(value)
@@ -232,6 +261,8 @@ class WorkspaceUserLinkSerializer(BaseSerializer):
 
 
 class IssueRecentVisitSerializer(serializers.ModelSerializer):
+    """Issue summary for the "recently visited" list."""
+
     project_identifier = serializers.SerializerMethodField()
     assignees = serializers.SerializerMethodField()
 
@@ -250,14 +281,18 @@ class IssueRecentVisitSerializer(serializers.ModelSerializer):
         ]
 
     def get_project_identifier(self, obj):
+        """Identifier of the issue's project (e.g. used to build ``PROJ-123``)."""
         project = obj.project
         return project.identifier if project else None
 
     def get_assignees(self, obj):
+        """Ids of the issue's current (non-deleted) assignees."""
         return list(obj.assignees.filter(issue_assignee__deleted_at__isnull=True).values_list("id", flat=True))
 
 
 class ProjectRecentVisitSerializer(serializers.ModelSerializer):
+    """Project summary for the "recently visited" list."""
+
     project_members = serializers.SerializerMethodField()
 
     class Meta:
@@ -265,6 +300,7 @@ class ProjectRecentVisitSerializer(serializers.ModelSerializer):
         fields = ["id", "name", "logo_props", "project_members", "identifier"]
 
     def get_project_members(self, obj):
+        """Ids of active, non-bot project members."""
         members = ProjectMember.objects.filter(project_id=obj.id, member__is_bot=False, is_active=True).values_list(
             "member", flat=True
         )
@@ -273,6 +309,8 @@ class ProjectRecentVisitSerializer(serializers.ModelSerializer):
 
 
 class PageRecentVisitSerializer(serializers.ModelSerializer):
+    """Page summary for the "recently visited" list."""
+
     project_id = serializers.SerializerMethodField()
     project_identifier = serializers.SerializerMethodField()
 
@@ -288,15 +326,18 @@ class PageRecentVisitSerializer(serializers.ModelSerializer):
         ]
 
     def get_project_id(self, obj):
+        """Use an annotated ``project_id`` if present, else the first linked project's id."""
         return obj.project_id if hasattr(obj, "project_id") else obj.projects.values_list("id", flat=True).first()
 
     def get_project_identifier(self, obj):
+        """Identifier of the first project the page is linked to."""
         project = obj.projects.first()
 
         return project.identifier if project else None
 
 
 def get_entity_model_and_serializer(entity_type):
+    """Map a recent-visit ``entity_name`` to ``(model, serializer)``; unknown names return ``(None, None)``."""
     entity_map = {
         "issue": (Issue, IssueRecentVisitSerializer),
         "page": (Page, PageRecentVisitSerializer),
@@ -306,6 +347,8 @@ def get_entity_model_and_serializer(entity_type):
 
 
 class WorkspaceRecentVisitSerializer(BaseSerializer):
+    """A user's recent visit with the visited entity embedded as ``entity_data``."""
+
     entity_data = serializers.SerializerMethodField()
 
     class Meta:
@@ -314,6 +357,10 @@ class WorkspaceRecentVisitSerializer(BaseSerializer):
         read_only_fields = ["workspace", "owner", "created_by", "updated_by"]
 
     def get_entity_data(self, obj):
+        """Load and serialize the visited entity; None if the type is unsupported or it was deleted.
+
+        Note: performs one query per visit.
+        """
         entity_name = obj.entity_name
         entity_identifier = obj.entity_identifier
 
@@ -330,6 +377,8 @@ class WorkspaceRecentVisitSerializer(BaseSerializer):
 
 
 class WorkspaceHomePreferenceSerializer(BaseSerializer):
+    """Per-user toggle/order of a workspace home page widget."""
+
     class Meta:
         model = WorkspaceHomePreference
         fields = ["key", "is_enabled", "sort_order"]
@@ -337,6 +386,8 @@ class WorkspaceHomePreferenceSerializer(BaseSerializer):
 
 
 class StickySerializer(BaseSerializer):
+    """Personal sticky note in a workspace; descriptions are sanitized."""
+
     class Meta:
         model = Sticky
         fields = "__all__"
@@ -344,6 +395,7 @@ class StickySerializer(BaseSerializer):
         extra_kwargs = {"name": {"required": False}}
 
     def validate(self, data):
+        """Sanitize ``description_html`` and validate ``description_binary``."""
         # Validate description content for security
         if "description_html" in data and data["description_html"]:
             is_valid, error_msg, sanitized_html = validate_html_content(data["description_html"])
@@ -362,6 +414,8 @@ class StickySerializer(BaseSerializer):
 
 
 class WorkspaceUserPreferenceSerializer(BaseSerializer):
+    """Per-user pin/order preference for workspace sidebar items."""
+
     class Meta:
         model = WorkspaceUserPreference
         fields = ["key", "is_pinned", "sort_order"]

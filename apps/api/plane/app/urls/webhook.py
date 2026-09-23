@@ -2,6 +2,8 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 # See the LICENSE file for details.
 
+"""URL routes for workspace webhooks: CRUD, secret regeneration and delivery logs."""
+
 from django.urls import path
 
 from plane.app.views import (

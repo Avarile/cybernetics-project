@@ -2,6 +2,12 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 # See the LICENSE file for details.
 
+"""Django models of the ``db`` app.
+
+Re-exports every model so the rest of the code base can import them as
+``from plane.db.models import Issue, Project, ...``.
+"""
+
 from .analytic import AnalyticView
 from .api import APIActivityLog, APIToken
 from .asset import FileAsset

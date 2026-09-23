@@ -2,6 +2,13 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 # See the LICENSE file for details.
 
+"""Cycle (sprint) models.
+
+A ``Cycle`` is a time-boxed iteration within a project; ``CycleIssue`` links
+work items to cycles and ``CycleUserProperties`` stores each user's saved
+filter/display preferences for a cycle's work item views.
+"""
+
 # Python imports
 import pytz
 
@@ -14,6 +21,7 @@ from .project import ProjectBaseModel
 
 
 def get_default_filters():
+    """Default (empty) work item filters for a user's cycle view."""
     return {
         "priority": None,
         "state": None,
@@ -28,6 +36,7 @@ def get_default_filters():
 
 
 def get_default_display_filters():
+    """Default grouping/ordering/layout settings for a user's cycle view."""
     return {
         "group_by": None,
         "order_by": "-created_at",
@@ -40,6 +49,7 @@ def get_default_display_filters():
 
 
 def get_default_display_properties():
+    """Default set of work item properties shown in a user's cycle view."""
     return {
         "assignee": True,
         "attachment_count": True,
@@ -58,7 +68,13 @@ def get_default_display_properties():
 
 
 class Cycle(ProjectBaseModel):
-    name = models.CharField(max_length=255, verbose_name="Cycle Name")
+    """A time-boxed iteration (sprint) of work items within a project.
+
+    ``progress_snapshot`` stores frozen progress stats (typically captured when
+    the cycle completes); ``archived_at`` marks an archived cycle.
+    """
+
+    name =models.CharField(max_length=255, verbose_name="Cycle Name")
     description = models.TextField(verbose_name="Cycle Description", blank=True)
     start_date = models.DateTimeField(verbose_name="Start Date", blank=True, null=True)
     end_date = models.DateTimeField(verbose_name="End Date", blank=True, null=True)
@@ -86,6 +102,7 @@ class Cycle(ProjectBaseModel):
         ordering = ("-created_at",)
 
     def save(self, *args, **kwargs):
+        """On create, place the new cycle before existing ones in sort order."""
         if self._state.adding:
             smallest_sort_order = Cycle.objects.filter(project=self.project).aggregate(
                 smallest=models.Min("sort_order")
@@ -104,6 +121,9 @@ class Cycle(ProjectBaseModel):
 class CycleIssue(ProjectBaseModel):
     """
     Cycle Issues
+
+    Join table linking a work item to a cycle. The partial unique constraint
+    allows re-adding an issue after a soft-deleted link.
     """
 
     issue = models.ForeignKey("db.Issue", on_delete=models.CASCADE, related_name="issue_cycle")
@@ -128,6 +148,8 @@ class CycleIssue(ProjectBaseModel):
 
 
 class CycleUserProperties(ProjectBaseModel):
+    """Per-user saved filters and display settings for a cycle's work item view."""
+
     cycle = models.ForeignKey("db.Cycle", on_delete=models.CASCADE, related_name="cycle_user_properties")
     user = models.ForeignKey(
         settings.AUTH_USER_MODEL,

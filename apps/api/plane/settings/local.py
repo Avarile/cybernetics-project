@@ -2,7 +2,11 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 # See the LICENSE file for details.
 
-"""Development settings"""
+"""Development settings
+
+Used when DJANGO_SETTINGS_MODULE=plane.settings.local: enables DEBUG and the debug toolbar,
+prints emails to the console, stores media locally and logs JSON to the console.
+"""
 
 import os
 
@@ -19,6 +23,7 @@ DEBUG_TOOLBAR_PATCH_SETTINGS = False
 # Only show emails in console don't send it to smtp
 EMAIL_BACKEND = os.environ.get("EMAIL_BACKEND", "django.core.mail.backends.console.EmailBackend")
 
+# Plain (non-TLS) Redis cache for local development
 CACHES = {
     "default": {
         "BACKEND": "django_redis.cache.RedisCache",

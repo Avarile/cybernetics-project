@@ -2,6 +2,11 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 # See the LICENSE file for details.
 
+"""Public API viewset for workspace member invitations (routes in plane/api/urls/invite.py).
+
+Restricted to active workspace Admins via WorkspaceOwnerPermission.
+"""
+
 # Third party imports
 from rest_framework.response import Response
 from rest_framework import status
@@ -34,9 +39,11 @@ class WorkspaceInvitationsViewset(BaseViewSet):
     ]
 
     def get_queryset(self):
+        """Invites of the workspace identified by the URL slug."""
         return self.filter_queryset(super().get_queryset().filter(workspace__slug=self.kwargs.get("slug")))
 
     def get_object(self):
+        """Fetch a single invite of the workspace by ``pk``."""
         return self.get_queryset().get(pk=self.kwargs.get("pk"))
 
     @extend_schema(
@@ -53,6 +60,7 @@ class WorkspaceInvitationsViewset(BaseViewSet):
         ],
     )
     def list(self, request, slug):
+        """List all invites of the workspace."""
         workspace_member_invites = self.get_queryset()
         serializer = WorkspaceInviteSerializer(workspace_member_invites, many=True)
         return Response(serializer.data, status=status.HTTP_200_OK)
@@ -73,6 +81,7 @@ class WorkspaceInvitationsViewset(BaseViewSet):
         ],
     )
     def retrieve(self, request, slug, pk):
+        """Return a single invite."""
         workspace_member_invite = self.get_object()
         serializer = WorkspaceInviteSerializer(workspace_member_invite)
         return Response(serializer.data, status=status.HTTP_200_OK)
@@ -87,6 +96,7 @@ class WorkspaceInvitationsViewset(BaseViewSet):
         ],
     )
     def create(self, request, slug):
+        """Create an invite in the workspace (duplicate emails are rejected by the serializer)."""
         workspace = Workspace.objects.get(slug=slug)
         serializer = WorkspaceInviteSerializer(data=request.data, context={"slug": slug})
         serializer.is_valid(raise_exception=True)
@@ -110,6 +120,7 @@ class WorkspaceInvitationsViewset(BaseViewSet):
         ],
     )
     def partial_update(self, request, slug, pk):
+        """Update an invite's role; changing the email is not allowed."""
         workspace_member_invite = self.get_object()
         if request.data.get("email"):
             return Response(
@@ -139,6 +150,7 @@ class WorkspaceInvitationsViewset(BaseViewSet):
         ],
     )
     def destroy(self, request, slug, pk):
+        """Delete an invite that has not yet been accepted or responded to."""
         workspace_member_invite = self.get_object()
         if workspace_member_invite.accepted:
             return Response(

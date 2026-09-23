@@ -2,6 +2,14 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 # See the LICENSE file for details.
 
+"""Public API (``plane.api``) endpoints for project modules.
+
+Covers module list/create, retrieve/update/delete, adding/removing work items
+to/from a module, and archiving/unarchiving modules. Mutations emit webhook
+events (``model_activity``) and issue activity records (``issue_activity``)
+via Celery background tasks.
+"""
+
 # Python imports
 import json
 
@@ -84,6 +92,10 @@ class ModuleListCreateAPIEndpoint(BaseAPIView):
     use_read_replica = True
 
     def get_queryset(self):
+        """Modules of the project annotated with work item counts per state group.
+
+        Counts exclude archived/draft issues and soft-deleted module links.
+        """
         return (
             Module.objects.filter(project_id=self.kwargs.get("project_id"))
             .filter(workspace__slug=self.kwargs.get("slug"))
@@ -196,12 +208,14 @@ class ModuleListCreateAPIEndpoint(BaseAPIView):
         Create a new project module with specified name, description, and timeline.
         Automatically assigns the creator as module lead and tracks activity.
         """
+        # Project must exist in this workspace (raises DoesNotExist otherwise)
         project = Project.objects.get(pk=project_id, workspace__slug=slug)
         serializer = ModuleCreateSerializer(
             data=request.data,
             context={"project_id": project_id, "workspace_id": project.workspace_id},
         )
         if serializer.is_valid():
+            # Reject duplicates coming from an external integration (same external_source + external_id)
             if (
                 request.data.get("external_id")
                 and request.data.get("external_source")
@@ -236,6 +250,7 @@ class ModuleListCreateAPIEndpoint(BaseAPIView):
                 slug=slug,
                 origin=base_host(request=request, is_app=True),
             )
+            # Re-fetch the saved module and serialize it with the full ModuleSerializer
             module = Module.objects.get(pk=serializer.instance.id)
             serializer = ModuleSerializer(module)
             return Response(serializer.data, status=status.HTTP_201_CREATED)
@@ -268,6 +283,7 @@ class ModuleListCreateAPIEndpoint(BaseAPIView):
         Retrieve all modules in a project or get details of a specific module.
         Returns paginated results with module statistics and member information.
         """
+        # Archived modules are served by ModuleArchiveUnarchiveAPIEndpoint
         return self.paginate(
             request=request,
             queryset=(self.get_queryset().filter(archived_at__isnull=True)),
@@ -287,6 +303,7 @@ class ModuleDetailAPIEndpoint(BaseAPIView):
     use_read_replica = True
 
     def get_queryset(self):
+        """Same annotated module queryset as ModuleListCreateAPIEndpoint.get_queryset."""
         return (
             Module.objects.filter(project_id=self.kwargs.get("project_id"))
             .filter(workspace__slug=self.kwargs.get("slug"))
@@ -408,6 +425,7 @@ class ModuleDetailAPIEndpoint(BaseAPIView):
         """
         module = Module.objects.get(pk=pk, project_id=project_id, workspace__slug=slug)
 
+        # Snapshot the module before changes so the webhook task can diff old vs new
         current_instance = json.dumps(ModuleSerializer(module).data, cls=DjangoJSONEncoder)
 
         if module.archived_at:
@@ -417,6 +435,7 @@ class ModuleDetailAPIEndpoint(BaseAPIView):
             )
         serializer = ModuleUpdateSerializer(module, data=request.data, context={"project_id": project_id}, partial=True)
         if serializer.is_valid():
+            # When external_id changes, make sure it doesn't collide with another module's external mapping
             if (
                 request.data.get("external_id")
                 and (module.external_id != request.data.get("external_id"))
@@ -495,6 +514,7 @@ class ModuleDetailAPIEndpoint(BaseAPIView):
         Only admins or the module creator can perform this action.
         """
         module = Module.objects.get(workspace__slug=slug, project_id=project_id, pk=pk)
+        # role=20 is the project Admin role
         if module.created_by_id != request.user.id and (
             not ProjectMember.objects.filter(
                 workspace__slug=slug,
@@ -510,6 +530,7 @@ class ModuleDetailAPIEndpoint(BaseAPIView):
             )
 
         module_issues = list(ModuleIssue.objects.filter(module_id=pk).values_list("issue", flat=True))
+        # Record a "module deleted" activity on every issue that was linked to the module
         issue_activity.delay(
             type="module.activity.deleted",
             requested_data=json.dumps(
@@ -544,6 +565,10 @@ class ModuleIssueListCreateAPIEndpoint(BaseAPIView):
     use_read_replica = True
 
     def get_queryset(self):
+        """Module-issue links for a module, annotated with sub-issue counts.
+
+        Limited to projects the user is an active member of and that are not archived.
+        """
         return (
             ModuleIssue.objects.annotate(
                 sub_issues_count=Issue.issue_objects.filter(parent=OuterRef("issue"))
@@ -598,7 +623,10 @@ class ModuleIssueListCreateAPIEndpoint(BaseAPIView):
         Retrieve all work items assigned to a module with detailed information.
         Returns paginated results including assignees, labels, and attachments.
         """
+        # Only allowlisted ordering fields are accepted from the query string
         order_by = sanitize_order_by(request.GET.get("order_by", "created_at"), ISSUE_ORDER_BY_ALLOWLIST, "created_at")
+        # Issues linked to this module, annotated with sub-issue, link and attachment counts;
+        # bridge_id exposes the ModuleIssue row id
         issues = (
             Issue.issue_objects.filter(issue_module__module_id=module_id, issue_module__deleted_at__isnull=True)
             .annotate(
@@ -666,15 +694,18 @@ class ModuleIssueListCreateAPIEndpoint(BaseAPIView):
         Assign multiple work items to a module or move them from another module.
         Automatically handles bulk creation and updates with activity tracking.
         """
+        # Body: {"issues": [<issue_id>, ...]}
         issues = request.data.get("issues", [])
         if not len(issues):
             return Response({"error": "Issues are required"}, status=status.HTTP_400_BAD_REQUEST)
         module = Module.objects.get(workspace__slug=slug, project_id=project_id, pk=module_id)
 
+        # Keep only issue ids that actually belong to this project
         issues = Issue.objects.filter(workspace__slug=slug, project_id=project_id, pk__in=issues).values_list(
             "id", flat=True
         )
 
+        # Existing module links for these issues (in any module)
         module_issues = list(ModuleIssue.objects.filter(issue_id__in=issues))
 
         update_module_issue_activity = []
@@ -682,10 +713,13 @@ class ModuleIssueListCreateAPIEndpoint(BaseAPIView):
         record_to_create = []
 
         for issue in issues:
+            # NOTE: this compares str(issue_id) against the UUID values of ``issues`` and does not filter by the
+            # current ``issue``; verify this matching before relying on the "move from another module" branch.
             module_issue = [module_issue for module_issue in module_issues if str(module_issue.issue_id) in issues]
 
             if len(module_issue):
                 if module_issue[0].module_id != module_id:
+                    # Issue is linked to a different module: move it and record the transition
                     update_module_issue_activity.append(
                         {
                             "old_module_id": str(module_issue[0].module_id),
@@ -707,6 +741,7 @@ class ModuleIssueListCreateAPIEndpoint(BaseAPIView):
                     )
                 )
 
+        # ignore_conflicts avoids failing on an existing (module, issue) link
         ModuleIssue.objects.bulk_create(record_to_create, batch_size=10, ignore_conflicts=True)
 
         ModuleIssue.objects.bulk_update(records_to_update, ["module"], batch_size=10)
@@ -750,6 +785,7 @@ class ModuleIssueDetailAPIEndpoint(BaseAPIView):
     permission_classes = [ProjectEntityPermission]
 
     def get_queryset(self):
+        """Module-issue links for a module (same scoping as ModuleIssueListCreateAPIEndpoint)."""
         return (
             ModuleIssue.objects.annotate(
                 sub_issues_count=Issue.issue_objects.filter(parent=OuterRef("issue"))
@@ -805,6 +841,7 @@ class ModuleIssueDetailAPIEndpoint(BaseAPIView):
         Returns paginated results including assignees, labels, and attachments.
         """
         order_by = sanitize_order_by(request.GET.get("order_by", "created_at"), ISSUE_ORDER_BY_ALLOWLIST, "created_at")
+        # Same annotated issue query as the list endpoint, narrowed to a single issue
         issues = (
             Issue.issue_objects.filter(
                 issue_module__module_id=module_id,
@@ -890,10 +927,13 @@ class ModuleIssueDetailAPIEndpoint(BaseAPIView):
 
 
 class ModuleArchiveUnarchiveAPIEndpoint(BaseAPIView):
+    """List archived modules, archive a module (POST) and unarchive it (DELETE)."""
+
     permission_classes = [ProjectEntityPermission]
     use_read_replica = True
 
     def get_queryset(self):
+        """Archived modules of the project with the same work item count annotations as the list endpoint."""
         return (
             Module.objects.filter(project_id=self.kwargs.get("project_id"))
             .filter(workspace__slug=self.kwargs.get("slug"))
@@ -1046,6 +1086,7 @@ class ModuleArchiveUnarchiveAPIEndpoint(BaseAPIView):
             )
         module.archived_at = timezone.now()
         module.save()
+        # Archived modules are removed from users' favorites
         UserFavorite.objects.filter(
             entity_type="module",
             entity_identifier=pk,

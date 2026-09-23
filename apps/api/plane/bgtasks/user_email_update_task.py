@@ -2,6 +2,12 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 # See the LICENSE file for details.
 
+"""Celery tasks for the "change my email address" flow.
+
+Sends a verification code to the new address and, once the change succeeds, a
+confirmation email. SMTP settings come from the instance configuration.
+"""
+
 # Python imports
 import logging
 
@@ -20,6 +26,7 @@ from plane.utils.exception_logger import log_exception
 
 @shared_task
 def send_email_update_magic_code(email, token):
+    """Email the verification ``token`` to the new address ``email`` (reuses the magic sign-in template)."""
     try:
         (
             EMAIL_HOST,

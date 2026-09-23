@@ -2,6 +2,13 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 # See the LICENSE file for details.
 
+"""Export job history.
+
+Each ``ExporterHistory`` row tracks one asynchronous export of work items (or
+worklogs) to JSON/CSV/XLSX, which is processed by a background task and made
+available for download via ``url``/``key``.
+"""
+
 import uuid
 
 # Python imports
@@ -18,10 +25,18 @@ from .base import BaseModel
 
 
 def generate_token():
+    """Random unique token identifying an export job."""
     return uuid4().hex
 
 
 class ExporterHistory(BaseModel):
+    """An export job for a workspace and its lifecycle status (queued -> processing -> completed/failed).
+
+    ``project`` is an array of project UUIDs included in the export, ``key`` is
+    the storage key of the generated file and ``reason`` holds the failure
+    message. ``filters``/``rich_filters`` capture the work item filters applied.
+    """
+
     name = models.CharField(max_length=255, verbose_name="Exporter Name", null=True, blank=True)
     type = models.CharField(
         max_length=50,

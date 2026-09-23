@@ -2,6 +2,12 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 # See the LICENSE file for details.
 
+"""``manage.py configure_instance``: seed InstanceConfiguration rows from environment variables.
+
+Run at container start-up. Only creates keys that don't exist yet, so values edited later
+in god mode are never overwritten.
+"""
+
 # Python imports
 import os
 
@@ -14,9 +20,17 @@ from plane.utils.instance_config_variables import instance_config_variables
 
 
 class Command(BaseCommand):
+    """Seed instance configuration defaults and the ``IS_<PROVIDER>_ENABLED`` auth flags."""
+
     help = "Configure instance variables"
 
     def handle(self, *args, **options):
+        """Create any missing configuration keys from ``instance_config_variables``.
+
+        Requires ``SECRET_KEY`` (used to encrypt secret values). Afterwards, if none of the
+        OAuth "enabled" flags exist, derives each one ("1"/"0") from whether that provider's
+        client id/secret (and host, for GitLab/Gitea) are configured.
+        """
         from plane.license.utils.encryption import encrypt_data
         from plane.license.utils.instance_value import get_configuration_value
 

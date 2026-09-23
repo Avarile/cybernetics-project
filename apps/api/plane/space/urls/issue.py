@@ -2,6 +2,8 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 # See the LICENSE file for details.
 
+"""Public issue routes for published boards: issue detail, comments, reactions and votes."""
+
 from django.urls import path
 
 

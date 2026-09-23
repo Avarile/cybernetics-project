@@ -2,6 +2,9 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 # See the LICENSE file for details.
 
+"""URL routes for project modules: CRUD, module work items (in both directions), module links,
+favorites, per-user properties and archiving."""
+
 from django.urls import path
 
 
@@ -34,11 +37,13 @@ urlpatterns = [
         name="project-modules",
     ),
     path(
+    # Assign one issue to multiple modules
         "workspaces/<str:slug>/projects/<uuid:project_id>/issues/<uuid:issue_id>/modules/",
         ModuleIssueViewSet.as_view({"post": "create_issue_modules"}),
         name="issue-module",
     ),
     path(
+    # Add multiple issues to one module / list the module's issues
         "workspaces/<str:slug>/projects/<uuid:project_id>/modules/<uuid:module_id>/issues/",
         ModuleIssueViewSet.as_view({"post": "create_module_issues", "get": "list"}),
         name="project-module-issues",

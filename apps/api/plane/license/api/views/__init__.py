@@ -2,6 +2,8 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 # See the LICENSE file for details.
 
+"""Re-exports the instance-admin API endpoints wired up in ``plane/license/urls.py``."""
+
 from .instance import InstanceEndpoint, SignUpScreenVisitedEndpoint
 
 

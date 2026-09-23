@@ -7,6 +7,9 @@ Shared OTLP endpoint helpers so metrics and traces use the same collector
 when both are enabled. One URL (OTLP_ENDPOINT) is enough: same as traces
 (e.g. https://telemetry.plane.so or https://telemetry.plane.town behind
 nginx ingress with gRPC backend).
+
+Used by the OpenTelemetry tracing/metrics setup to resolve where telemetry is
+exported. All values are read from the OTLP_ENDPOINT environment variable.
 """
 
 import os
@@ -33,6 +36,7 @@ def grpc_endpoint_from_url(url: str) -> str:
     if "://" not in url:
         url = "//" + url
     parsed = urlparse(url)
+    # Fall back to the Plane collector host if the URL has no parseable hostname
     host = parsed.hostname or "telemetry.plane.so"
     if parsed.port is not None:
         port = str(parsed.port)

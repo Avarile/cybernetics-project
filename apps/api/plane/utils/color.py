@@ -2,6 +2,8 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 # See the LICENSE file for details.
 
+"""Color helpers (used for default profile/workspace colors)."""
+
 import random
 import string
 

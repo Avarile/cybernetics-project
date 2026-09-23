@@ -2,6 +2,8 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 # See the LICENSE file for details.
 
+"""Serializers for intake (triage) issues exposed on published boards."""
+
 # Third Party imports
 from rest_framework import serializers
 
@@ -15,6 +17,8 @@ from plane.db.models import Issue, IntakeIssue
 
 
 class IntakeIssueSerializer(BaseSerializer):
+    """IntakeIssue with nested flat issue and lite project details."""
+
     issue_detail = IssueFlatSerializer(source="issue", read_only=True)
     project_detail = ProjectLiteSerializer(source="project", read_only=True)
 
@@ -25,6 +29,8 @@ class IntakeIssueSerializer(BaseSerializer):
 
 
 class IntakeIssueLiteSerializer(BaseSerializer):
+    """Read-only triage status fields of an IntakeIssue."""
+
     class Meta:
         model = IntakeIssue
         fields = ["id", "status", "duplicate_to", "snoozed_till", "source"]
@@ -32,6 +38,11 @@ class IntakeIssueLiteSerializer(BaseSerializer):
 
 
 class IssueStateIntakeSerializer(BaseSerializer):
+    """Issue with state/project/label/assignee details and its intake records.
+
+    ``sub_issues_count`` and ``bridge_id`` are expected as queryset annotations.
+    """
+
     state_detail = StateLiteSerializer(read_only=True, source="state")
     project_detail = ProjectLiteSerializer(read_only=True, source="project")
     label_details = LabelLiteSerializer(read_only=True, source="labels", many=True)

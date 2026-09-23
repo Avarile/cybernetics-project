@@ -2,6 +2,9 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 # See the LICENSE file for details.
 
+"""Shared mistune Markdown renderer instance.
+"""
+
 import mistune
 
 markdown = mistune.Markdown()

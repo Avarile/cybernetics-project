@@ -2,6 +2,13 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 # See the LICENSE file for details.
 
+"""Core integration models.
+
+``Integration`` describes an available third-party integration (e.g. GitHub,
+Slack) and ``WorkspaceIntegration`` records that a workspace has installed it,
+along with the bot user and API token it acts through.
+"""
+
 # Python imports
 import uuid
 
@@ -14,6 +21,12 @@ from plane.db.mixins import AuditModel
 
 
 class Integration(AuditModel):
+    """A globally registered integration provider (instance-wide, not workspace scoped).
+
+    Uses ``AuditModel`` directly rather than ``BaseModel``, so ``save`` does not
+    auto-set ``created_by``/``updated_by``.
+    """
+
     id = models.UUIDField(default=uuid.uuid4, unique=True, editable=False, db_index=True, primary_key=True)
     title = models.CharField(max_length=400)
     provider = models.CharField(max_length=400, unique=True)
@@ -39,6 +52,8 @@ class Integration(AuditModel):
 
 
 class WorkspaceIntegration(BaseModel):
+    """An integration installed in a workspace (at most one per workspace/integration pair)."""
+
     workspace = models.ForeignKey("db.Workspace", related_name="workspace_integrations", on_delete=models.CASCADE)
     # Bot user
     actor = models.ForeignKey("db.User", related_name="integrations", on_delete=models.CASCADE)

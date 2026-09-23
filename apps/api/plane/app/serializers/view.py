@@ -2,6 +2,8 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 # See the LICENSE file for details.
 
+"""Serializers for saved issue views (``IssueView``) and the lightweight issue list used by views."""
+
 # Third party imports
 from rest_framework import serializers
 
@@ -12,16 +14,26 @@ from plane.utils.issue_filters import issue_filters
 
 
 class ViewIssueListSerializer(serializers.Serializer):
+    """Hand-written read serializer for issues listed in a view.
+
+    Relies on prefetched ``issue_assignee``/``label_issue``/``issue_module`` and on
+    annotated ``cycle_id``, ``sub_issues_count``, ``attachment_count`` and ``link_count``.
+    """
+
     def get_assignee_ids(self, instance):
+        """Assignee ids from the prefetched ``issue_assignee`` relation."""
         return [assignee.assignee_id for assignee in instance.issue_assignee.all()]
 
     def get_label_ids(self, instance):
+        """Label ids from the prefetched ``label_issue`` relation."""
         return [label.label_id for label in instance.label_issue.all()]
 
     def get_module_ids(self, instance):
+        """Module ids from the prefetched ``issue_module`` relation."""
         return [module.module_id for module in instance.issue_module.all()]
 
     def to_representation(self, instance):
+        """Build the issue dict directly from model attributes."""
         data = {
             "id": instance.id,
             "name": instance.name,
@@ -54,6 +66,8 @@ class ViewIssueListSerializer(serializers.Serializer):
 
 
 class IssueViewSerializer(DynamicBaseSerializer):
+    """Saved issue view; the stored ``query`` is derived server-side from ``filters``."""
+
     is_favorite = serializers.BooleanField(read_only=True)
 
     class Meta:
@@ -69,6 +83,7 @@ class IssueViewSerializer(DynamicBaseSerializer):
         ]
 
     def create(self, validated_data):
+        """Create the view, converting ``filters`` into an issue filter ``query``."""
         query_params = validated_data.get("filters", {})
         if bool(query_params):
             validated_data["query"] = issue_filters(query_params, "POST")
@@ -77,6 +92,8 @@ class IssueViewSerializer(DynamicBaseSerializer):
         return IssueView.objects.create(**validated_data)
 
     def update(self, instance, validated_data):
+        """Update the view and recompute ``query`` from ``filters``."""
+        # NOTE: the final assignment below overwrites the if/else result using PATCH semantics
         query_params = validated_data.get("filters", {})
         if bool(query_params):
             validated_data["query"] = issue_filters(query_params, "POST")

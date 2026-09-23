@@ -2,6 +2,12 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 # See the LICENSE file for details.
 
+"""Instance configuration endpoints for god mode (``/api/instances/configurations/`` and email helpers).
+
+InstanceConfiguration rows hold instance-wide settings (SMTP, OAuth, feature flags, ...),
+with secret values stored encrypted.
+"""
+
 # Python imports
 from smtplib import (
     SMTPAuthenticationError,
@@ -30,10 +36,13 @@ from plane.license.utils.instance_value import get_email_configuration
 
 
 class InstanceConfigurationEndpoint(BaseAPIView):
+    """Read and bulk-update instance configuration keys (instance admins only)."""
+
     permission_classes = [InstanceAdminPermission]
 
     @cache_response(60 * 60 * 2, user=False)
     def get(self, request):
+        """Return all configuration entries, secrets decrypted (response cached for 2 hours)."""
         instance_configurations = InstanceConfiguration.objects.all()
         serializer = InstanceConfigurationSerializer(instance_configurations, many=True)
         return Response(serializer.data, status=status.HTTP_200_OK)
@@ -41,6 +50,11 @@ class InstanceConfigurationEndpoint(BaseAPIView):
     @invalidate_cache(path="/api/instances/configurations/", user=False)
     @invalidate_cache(path="/api/instances/", user=False)
     def patch(self, request):
+        """Update the value of every existing key present in the request body.
+
+        Unknown keys are ignored; values are stripped strings (None becomes ""), and encrypted
+        keys are re-encrypted before saving. Invalidates the cached configuration and instance responses.
+        """
         configurations = InstanceConfiguration.objects.filter(key__in=request.data.keys())
 
         bulk_configurations = []
@@ -60,10 +74,13 @@ class InstanceConfigurationEndpoint(BaseAPIView):
 
 
 class DisableEmailFeatureEndpoint(BaseAPIView):
+    """Turn off SMTP email for the instance."""
+
     permission_classes = [InstanceAdminPermission]
 
     @invalidate_cache(path="/api/instances/", user=False)
     def delete(self, request):
+        """Blank out all SMTP settings and set ``ENABLE_SMTP`` to "0" in a single UPDATE."""
         try:
             InstanceConfiguration.objects.filter(
                 Q(
@@ -86,7 +103,13 @@ class DisableEmailFeatureEndpoint(BaseAPIView):
 
 
 class EmailCredentialCheckEndpoint(BaseAPIView):
+    """Send a test email using the saved SMTP settings to validate them (instance admins only)."""
+
     def post(self, request):
+        """Send a sample email to ``receiver_email`` and report success or a human-readable SMTP error.
+
+        All delivery failures are returned as 400 with a message describing the likely cause.
+        """
         receiver_email = request.data.get("receiver_email", False)
         if not receiver_email:
             return Response(

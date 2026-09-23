@@ -2,6 +2,12 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 # See the LICENSE file for details.
 
+"""Export schema for work items (issues): column definitions and per-field preparers.
+
+Attachment ids and each issue's latest cycle are bulk-loaded once per queryset in
+``get_context_data`` to avoid per-row queries for those columns.
+"""
+
 from collections import defaultdict
 from typing import Any, Dict, List, Optional
 
@@ -87,7 +93,7 @@ class IssueExportSchema(ExportSchema):
             return date_obj.strftime("%a, %d %b %Y")
         return ""
 
-    # Field definitions with display labels
+    # Field definitions with display labels (declaration order = export column order)
     id = StringField(label="ID")
     project_identifier = StringField(source="project.identifier", label="Project Identifier")
     project_name = StringField(source="project.name", label="Project")
@@ -119,7 +125,10 @@ class IssueExportSchema(ExportSchema):
     parent = StringField(label="Parent")
     relations = JSONField(label="Relations")
 
+    # prepare_<field> methods override the plain ``source`` lookup for their field (see ExportSchema.serialize)
+
     def prepare_id(self, i):
+        """Human-readable work item key, e.g. ``PROJ-42``."""
         return f"{i.project.identifier}-{i.sequence_id}"
 
     def prepare_state_name(self, i):
@@ -135,6 +144,7 @@ class IssueExportSchema(ExportSchema):
         return [label.name for label in i.labels.all()]
 
     def prepare_comments(self, i):
+        """List of ``{comment, created_at, created_by}`` dicts for the issue's comments."""
         return [
             {
                 "comment": comment.comment_stripped,
@@ -154,18 +164,21 @@ class IssueExportSchema(ExportSchema):
         return [f"{u.first_name} {u.last_name}" for u in i.assignees.all()]
 
     def prepare_subscribers_count(self, i):
+        # Note: runs one COUNT query per row
         return i.issue_subscribers.count()
 
     def prepare_attachment_count(self, i):
         return len((self.context.get("attachments_dict") or {}).get(i.id, []))
 
     def prepare_attachment_links(self, i):
+        """Relative API URLs for each attachment, built from the prefetched ``attachments_dict``."""
         return [
             f"/api/assets/v2/workspaces/{i.workspace.slug}/projects/{i.project_id}/issues/{i.id}/attachments/{asset}/"
             for asset in (self.context.get("attachments_dict") or {}).get(i.id, [])
         ]
 
     def prepare_cycle_name(self, i):
+        """Name of the issue's most recently added cycle (from ``cycles_dict``)."""
         cycles_dict = self.context.get("cycles_dict") or {}
         last_cycle = cycles_dict.get(i.id)
         return last_cycle.cycle.name if last_cycle else ""
@@ -190,6 +203,10 @@ class IssueExportSchema(ExportSchema):
         return f"{i.parent.project.identifier}-{i.parent.sequence_id}"
 
     def prepare_relations(self, i):
+        """Map relation type -> related work item key, including reverse relations.
+
+        Keyed by relation type, so only one related item per type is kept.
+        """
         # Should show reverse relation as well
         from plane.db.models.issue import IssueRelationChoices
 
@@ -198,6 +215,7 @@ class IssueExportSchema(ExportSchema):
             for r in i.issue_relation.all()
         }
         reverse_relations = {}
+        # Relations where this issue is the target: translate to the inverse type (e.g. blocked_by -> blocking)
         for relation in i.issue_related.all():
             reverse_relations[IssueRelationChoices._REVERSE_MAPPING[relation.relation_type]] = (
                 f"{relation.issue.project.identifier}-{relation.issue.sequence_id}"

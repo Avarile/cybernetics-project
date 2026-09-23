@@ -2,6 +2,13 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 # See the LICENSE file for details.
 
+"""Management command ``create_bucket``: ensure the instance's S3/MinIO bucket exists.
+
+Reads connection details and ``AWS_S3_BUCKET_NAME`` from environment variables,
+checks the bucket with ``head_bucket`` and creates it on a 404. Typically run
+during container startup.
+"""
+
 # Python imports
 import os
 import boto3
@@ -12,9 +19,12 @@ from django.core.management import BaseCommand
 
 
 class Command(BaseCommand):
+    """Create the default storage bucket if it does not already exist."""
+
     help = "Create the default bucket for the instance"
 
     def handle(self, *args, **options):
+        """Check the bucket and create it when missing; all errors are printed, not raised."""
         # Create a session using the credentials from Django settings
         try:
             s3_client = boto3.client(
@@ -34,6 +44,7 @@ class Command(BaseCommand):
             self.stdout.write(self.style.SUCCESS(f"Bucket '{bucket_name}' exists."))
             return
         except ClientError as e:
+            # head_bucket reports failures as HTTP status codes (404 missing, 403 forbidden)
             error_code = int(e.response["Error"]["Code"])
             bucket_name = os.environ.get("AWS_S3_BUCKET_NAME")
             if error_code == 404:

@@ -2,6 +2,15 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 # See the LICENSE file for details.
 
+"""
+Contract tests for project creation via the public API
+(``POST /api/v1/workspaces/<slug>/projects/``).
+
+Focuses on ``project_lead`` handling (creator vs. other member vs. outsider),
+transactional integrity of the create flow (Project + ProjectMember + default
+States), and the ``transaction.on_commit`` dispatch of the ``model_activity`` task.
+"""
+
 from unittest import mock
 from uuid import uuid4
 
@@ -47,6 +56,7 @@ class TestProjectListCreateAPIEndpoint:
     """Contract tests for POST /api/v1/workspaces/{slug}/projects/."""
 
     def get_url(self, workspace_slug):
+        """Build the project list/create URL for ``workspace_slug``."""
         return f"/api/v1/workspaces/{workspace_slug}/projects/"
 
     @pytest.mark.django_db
@@ -78,7 +88,7 @@ class TestProjectListCreateAPIEndpoint:
         # Creator is registered as admin (single membership; lead == creator
         # should not produce a duplicate row).
         assert ProjectMember.objects.filter(project=project, member=create_user, role=20).count() == 1
-        # Default workflow states must be created.
+        # Default workflow states must be created (Backlog, Todo, In Progress, Done, Cancelled).
         assert State.objects.filter(project=project).count() == 5
 
     @pytest.mark.django_db

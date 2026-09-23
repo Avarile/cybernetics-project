@@ -2,6 +2,14 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 # See the LICENSE file for details.
 
+"""
+GitLab OAuth2 provider (gitlab.com or a self-hosted GITLAB_HOST).
+
+Reads GITLAB_CLIENT_ID/GITLAB_CLIENT_SECRET/GITLAB_HOST from instance config or
+env and maps the GitLab user payload into Plane's ``user_data`` shape. Used by
+the ``/auth/gitlab/`` (app) and ``/auth/spaces/gitlab/`` (space) views.
+"""
+
 # Python imports
 import os
 from datetime import datetime
@@ -19,10 +27,13 @@ from plane.authentication.adapter.error import (
 
 
 class GitLabOAuthProvider(OauthAdapter):
+    """OAuth2 adapter for GitLab."""
+
     provider = "gitlab"
     scope = "read_user"
 
     def __init__(self, request, code=None, state=None, callback=None):
+        """Validate GitLab config and build host-specific authorize/token/user URLs."""
         GITLAB_CLIENT_ID, GITLAB_CLIENT_SECRET, GITLAB_HOST = get_configuration_value(
             [
                 {
@@ -77,6 +88,7 @@ class GitLabOAuthProvider(OauthAdapter):
         )
 
     def set_token_data(self):
+        """Exchange the code for tokens; access-token expiry is computed from ``created_at + expires_in``."""
         data = {
             "client_id": self.client_id,
             "client_secret": self.client_secret,
@@ -107,6 +119,7 @@ class GitLabOAuthProvider(OauthAdapter):
         )
 
     def set_user_data(self):
+        """Load the GitLab profile into ``user_data``."""
         user_info_response = self.get_user_response()
         email = user_info_response.get("email")
         super().set_user_data(

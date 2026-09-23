@@ -2,6 +2,14 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 # See the LICENSE file for details.
 
+"""Sub-issue (child work item) endpoints.
+
+Lists the children of a parent issue (optionally grouped) together with a
+per-state-group distribution, and bulk-assigns existing issues as children of a
+parent. Mounted under the project issue routes, e.g.
+``workspaces/<slug>/projects/<project_id>/issues/<issue_id>/sub-issues/``.
+"""
+
 # Python imports
 import json
 
@@ -31,13 +39,25 @@ from plane.utils.order_queryset import order_issue_queryset
 
 
 class SubIssuesEndpoint(BaseAPIView):
+    """List and bulk-attach sub-issues of a parent issue (project entity permission)."""
+
     permission_classes = [ProjectEntityPermission]
 
     @method_decorator(gzip_page)
     def get(self, request, slug, project_id, issue_id):
+        """Return the sub-issues of ``issue_id`` and their state-group distribution.
+
+        Query params: ``order_by`` (default ``-created_at``) and optional
+        ``group_by`` (an issue field name, or ``assignees__ids`` to fan out per
+        assignee). Response: ``{"sub_issues": list|dict, "state_distribution": dict}``.
+        """
+        # Each annotation below is a correlated subquery (rather than a join) so
+        # the counts / id arrays don't multiply rows. Coalesce turns "no rows"
+        # into 0 or an empty array instead of NULL.
         sub_issues = (
             Issue.issue_objects.filter(parent_id=issue_id, workspace__slug=slug)
             .annotate(
+                # An issue belongs to at most one active cycle; take the first match.
                 cycle_id=Subquery(
                     CycleIssue.objects.filter(issue=OuterRef("id"), deleted_at__isnull=True).values("cycle_id")[:1]
                 )
@@ -100,6 +120,7 @@ class SubIssuesEndpoint(BaseAPIView):
                     Subquery(
                         IssueAssignee.objects.filter(
                             issue_id=OuterRef("id"),
+                            # Only include assignees who are still active project members
                             assignee__member_project__is_active=True,
                             deleted_at__isnull=True,
                         )
@@ -115,6 +136,7 @@ class SubIssuesEndpoint(BaseAPIView):
                     Subquery(
                         ModuleIssue.objects.filter(
                             issue_id=OuterRef("id"),
+                            # Skip archived modules
                             module__archived_at__isnull=True,
                             deleted_at__isnull=True,
                         )
@@ -180,6 +202,8 @@ class SubIssuesEndpoint(BaseAPIView):
             result_dict = defaultdict(list)
 
             for issue in sub_issues:
+                # Assignee grouping is many-to-many: an issue appears under every
+                # assignee it has, and unassigned issues go under "None".
                 if group_by == "assignees__ids":
                     if issue["assignee_ids"]:
                         assignee_ids = issue["assignee_ids"]
@@ -202,6 +226,12 @@ class SubIssuesEndpoint(BaseAPIView):
 
     # Assign multiple sub issues
     def post(self, request, slug, project_id, issue_id):
+        """Set ``issue_id`` as the parent of every issue in ``sub_issue_ids``.
+
+        Bulk-updates ``Issue.parent``, queues one ``issue_activity`` task per
+        sub-issue (with notifications) and returns the updated sub-issues plus
+        their state-group distribution.
+        """
         parent_issue = Issue.issue_objects.get(pk=issue_id)
         sub_issue_ids = request.data.get("sub_issue_ids", [])
 
@@ -217,6 +247,7 @@ class SubIssuesEndpoint(BaseAPIView):
         for sub_issue in sub_issues:
             sub_issue.parent = parent_issue
 
+        # bulk_update skips model save() hooks/signals; activity is logged explicitly below.
         _ = Issue.objects.bulk_update(sub_issues, ["parent"], batch_size=10)
 
         updated_sub_issues = Issue.issue_objects.filter(id__in=sub_issue_ids).annotate(state_group=F("state__group"))

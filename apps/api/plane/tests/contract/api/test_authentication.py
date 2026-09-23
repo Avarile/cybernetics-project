@@ -21,6 +21,7 @@ class TestAPIKeyAuthenticationContract:
 
     @pytest.mark.django_db
     def test_active_user_can_access_with_api_key(self, api_key_client):
+        """Baseline: a valid API key for an active user can read ``/users/me/``."""
         response = api_key_client.get(self.USERS_ME_URL)
 
         assert response.status_code == status.HTTP_200_OK
@@ -29,6 +30,7 @@ class TestAPIKeyAuthenticationContract:
     def test_deactivated_user_cannot_access_with_api_key(
         self, api_key_client, create_user
     ):
+        """An API key stops working as soon as its owning user is deactivated."""
         # The account is disabled after the API key was generated.
         create_user.is_active = False
         create_user.save()

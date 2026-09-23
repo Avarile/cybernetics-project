@@ -2,6 +2,13 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 # See the LICENSE file for details.
 
+"""DRF filter backend for nested JSON ("rich") filters on list endpoints.
+
+A view opts in by setting ``filterset_class`` (see ``filterset.py``); the backend
+validates the and/or/not tree, allow-lists field keys against the FilterSet and
+composes one ``Q`` object that is applied to the queryset in a single ``filter()``.
+"""
+
 # Python imports
 import json
 
@@ -25,6 +32,8 @@ class ComplexFilterBackend(filters.BaseFilterBackend):
     at `plane/utils/filters/README.md`.
     """
 
+    # Query param carrying the JSON filter, and the default max nesting depth
+    # (views may override via ``complex_filter_max_depth``)
     filter_param = "filters"
     default_max_depth = 5
 
@@ -32,7 +41,7 @@ class ComplexFilterBackend(filters.BaseFilterBackend):
         """Normalize filter input and apply JSON-based filtering.
 
         Accepts explicit `filter_data` (dict or JSON string) or reads the
-        `filter` query parameter. Enforces JSON-only filtering.
+        `filters` query parameter (``filter_param``). Enforces JSON-only filtering.
         """
         try:
             if filter_data is not None:
@@ -176,6 +185,7 @@ class ComplexFilterBackend(filters.BaseFilterBackend):
         if not isinstance(node, dict):
             return None
 
+        # Note: operator keys are matched in lower case here, although validation accepts any case
         # 'or' combination - OR of child Q objects
         if "or" in node:
             children = node["or"]
@@ -267,6 +277,7 @@ class ComplexFilterBackend(filters.BaseFilterBackend):
             else:
                 qd[key] = "" if value is None else str(value)
 
+        # Freeze the QueryDict so the FilterSet sees an immutable copy, like request.GET
         qd = qd.copy()
         qd._mutable = False
 
@@ -456,4 +467,5 @@ class ComplexFilterBackend(filters.BaseFilterBackend):
                 )
 
     def _is_scalar(self, value):
+        """Return True for None, str, int, float or bool."""
         return value is None or isinstance(value, (str, int, float, bool))

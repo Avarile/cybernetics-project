@@ -2,6 +2,14 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 # See the LICENSE file for details.
 
+"""Contract tests for Cybernetics-Data records attached to issues.
+
+Covers ``/api/workspaces/<slug>/projects/<id>/issues/<issue_id>/cybernetics-records/``
+(list, attach, delete) and its ``refresh/`` sub-route: snapshot contents, deep
+links, duplicate handling, the per-request record cap, all-or-nothing attach,
+permissions (creator vs admin), issue activity events and throttling.
+"""
+
 import json
 from datetime import timedelta
 from uuid import uuid4
@@ -33,31 +41,40 @@ TABLE = "tblAAAAAAAA"
 
 @pytest.fixture(autouse=True)
 def _isolate(isolate):
+    """Opt every test in this module into the shared ``isolate`` fixture."""
     return isolate
 
 
 def _ref(record_id="recAAAAAAAA", **extra):
+    """Build one record reference payload for the attach endpoint."""
     return {"base_id": BASE, "table_id": TABLE, "record_id": record_id, **extra}
 
 
 def _refs(count):
+    """Build ``count`` distinct, well-formed record references."""
     return [_ref(f"rec{i:08d}") for i in range(count)]
 
 
 def _attach(client, workspace, project, issue, records):
+    """POST record references to attach them to the issue."""
     return client.post(records_url(workspace, project, issue), {"records": records}, format="json")
 
 
 def _refresh(client, workspace, project, issue, payload=None):
+    """POST ``refresh/`` to re-fetch snapshots (optionally limited by ``ids``)."""
     return client.post(records_url(workspace, project, issue, "refresh/"), payload or {}, format="json")
 
 
 def _row(issue, **kwargs):
+    """Create an attached-record row directly in the DB, bypassing the API."""
     return IssueCyberneticsRecordFactory(issue=issue, project=issue.project, **kwargs)
 
 
 class TestList:
+    """Listing attached records: stored snapshots, deep links, scoping and ordering."""
+
     def test_guest_sees_snapshots(self, make_member, workspace, project, issue, integration):
+        """Guests can read stored snapshots even though they cannot browse upstream."""
         row = _row(issue, record_name="ACME", preview={"Email": "a@acme.com"})
         response = make_member(GUEST).get(records_url(workspace, project, issue))
         assert response.status_code == status.HTTP_200_OK
@@ -75,6 +92,7 @@ class TestList:
         )
 
     def test_deep_link_falls_back_after_disconnect(self, session_client, workspace, project, issue, integration):
+        """Without an integration the stored ``source_url`` is used as the deep link."""
         row = _row(issue, source_url="https://old.example.com/stale")
         assert session_client.delete(config_url(workspace, project)).status_code == status.HTTP_204_NO_CONTENT
         response = session_client.get(records_url(workspace, project, issue))
@@ -82,6 +100,7 @@ class TestList:
         assert response.data[0]["deep_link"] == row.source_url
 
     def test_exclusions(self, session_client, workspace, project, other_project, issue, state, integration):
+        """Rows of other issues, other projects and soft-deleted rows are not listed."""
         kept = _row(issue)
         _row(IssueFactory(project=project, state=state))
         _row(IssueFactory(project=other_project))
@@ -101,6 +120,8 @@ class TestList:
 
 
 class TestCreate:
+    """Attaching records: snapshotting upstream, dedupe, validation and all-or-nothing semantics."""
+
     def test_happy_path(self, session_client, workspace, project, issue, integration, fake_client, isolate):
         response = _attach(
             session_client, workspace, project, issue, [_ref(), _ref("recBBBBBBBB", view_id="viwAAAAAAAA")]
@@ -116,6 +137,7 @@ class TestCreate:
         assert rows.count() == 2
         assert all(r.status == "ok" and r.snapshot_at is not None for r in rows)
         assert rows.get(record_id="recBBBBBBBB").view_id == "viwAAAAAAAA"
+        # ``isolate`` is the issue_activity.delay mock: one "created" activity per record.
         assert isolate.call_count == 2
         assert {c.kwargs["type"] for c in isolate.call_args_list} == {"cybernetics_record.activity.created"}
         assert {json.loads(c.kwargs["requested_data"])["record_id"] for c in isolate.call_args_list} == {
@@ -124,6 +146,7 @@ class TestCreate:
         }
 
     def test_duplicates_are_skipped(self, session_client, workspace, project, issue, integration, fake_client, isolate):
+        """Already-attached records and repeats within the same payload are skipped, not errors."""
         _row(issue, record_id="recAAAAAAAA")
         response = _attach(
             session_client, workspace, project, issue, [_ref(), _ref("recBBBBBBBB"), _ref("recBBBBBBBB")]
@@ -151,6 +174,7 @@ class TestCreate:
     def test_mixed_result_creates_nothing(
         self, session_client, workspace, project, issue, integration, fake_client, isolate
     ):
+        """If any record fails to fetch, none are attached and no activity is emitted."""
         ok = fake_client.get_record.return_value
         fake_client.get_record.side_effect = [ok, CyberneticsNotFound("gone")]
         response = _attach(session_client, workspace, project, issue, [_ref(), _ref("recBBBBBBBB")])
@@ -159,6 +183,7 @@ class TestCreate:
         assert not IssueCyberneticsRecord.all_objects.filter(issue=issue).exists()
         isolate.assert_not_called()
 
+    # Between 1 and 10 records may be attached per request.
     @pytest.mark.parametrize("count,expected", [(0, 400), (10, 201), (11, 400)])
     def test_record_cap(self, session_client, workspace, project, issue, integration, fake_client, count, expected):
         response = _attach(session_client, workspace, project, issue, _refs(count))
@@ -200,6 +225,7 @@ class TestCreate:
         assert not IssueCyberneticsRecord.objects.exists()
 
     def test_reattach_after_soft_delete(self, session_client, workspace, project, issue, integration, fake_client):
+        """A soft-deleted attachment does not block re-attaching; a new row is created."""
         _row(issue, record_id="recAAAAAAAA").delete()
         response = _attach(session_client, workspace, project, issue, [_ref()])
         assert response.status_code == status.HTTP_201_CREATED
@@ -209,6 +235,7 @@ class TestCreate:
     def test_concurrent_duplicate(
         self, session_client, workspace, project, issue, integration, fake_client, mocker, isolate
     ):
+        # Simulate a concurrent request winning the unique constraint race.
         mocker.patch.object(IssueCyberneticsRecord.objects, "create", side_effect=IntegrityError("duplicate"))
         response = _attach(session_client, workspace, project, issue, [_ref()])
         assert response.status_code == status.HTTP_201_CREATED
@@ -229,7 +256,10 @@ class TestCreate:
 
 
 class TestDestroy:
+    """Removing an attachment: admins remove any row, members only their own; soft delete + activity."""
+
     def _delete(self, client, workspace, project, issue, pk):
+        """DELETE one attached-record row by its primary key."""
         return client.delete(records_url(workspace, project, issue, f"{pk}/"))
 
     def test_admin_removes_any_row(self, make_member, workspace, project, issue, integration, isolate):
@@ -285,6 +315,8 @@ class TestDestroy:
 
 
 class TestRefresh:
+    """Refreshing snapshots: status updates, ``ids`` validation and the 10-row cap."""
+
     def test_ok_updates_snapshot_and_recovers_missing(
         self, session_client, workspace, project, issue, integration, fake_client
     ):
@@ -304,6 +336,7 @@ class TestRefresh:
         "exc,expected", [(CyberneticsNotFound("gone"), "missing"), (CyberneticsForbidden("no"), "forbidden")]
     )
     def test_upstream_status(self, session_client, workspace, project, issue, integration, fake_client, exc, expected):
+        """Not-found/forbidden update only the row status; the previous snapshot is kept."""
         row = _row(issue, record_name="Kept")
         fake_client.get_record.side_effect = exc
         response = _refresh(session_client, workspace, project, issue)
@@ -313,6 +346,7 @@ class TestRefresh:
         assert row.status == expected
         assert row.record_name == "Kept"
 
+    # ``ids`` must be a list of at most 10 UUIDs.
     @pytest.mark.parametrize("ids", ["not-a-list", 5, [str(uuid4()) for _ in range(11)]])
     def test_invalid_ids(self, session_client, workspace, project, issue, integration, fake_client, ids):
         response = _refresh(session_client, workspace, project, issue, {"ids": ids})
@@ -340,6 +374,7 @@ class TestRefresh:
         fake_client.get_record.assert_not_called()
 
     def test_unreachable_part_way(self, session_client, workspace, project, issue, integration, fake_client):
+        """An unreachable upstream aborts the whole refresh with 502, even after partial success."""
         _row(issue)
         _row(issue)
         fake_client.get_record.side_effect = [fake_client.get_record.return_value, CyberneticsUnreachable("down")]
@@ -358,8 +393,11 @@ class TestRefresh:
 
 
 class TestThrottling:
+    """Attach and refresh (upstream calls) are throttled; list and delete are not."""
+
     @pytest.fixture
     def throttled(self, mocker):
+        """Force the proxy throttle to reject every request (no Retry-After)."""
         mocker.patch.object(CyberneticsDataProxyThrottle, "allow_request", return_value=False)
         mocker.patch.object(CyberneticsDataProxyThrottle, "wait", return_value=None)
 

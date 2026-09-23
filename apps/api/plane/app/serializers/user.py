@@ -2,6 +2,8 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 # See the LICENSE file for details.
 
+"""Serializers for users, the current user's profile/settings, passwords, profiles and linked auth accounts."""
+
 # Third party imports
 from rest_framework import serializers
 
@@ -13,12 +15,16 @@ from .base import BaseSerializer
 
 
 class UserSerializer(BaseSerializer):
+    """Editable user profile; all system/auth fields and the email are read-only and the password is excluded."""
+
     def validate_first_name(self, value):
+        """Reject first names containing a URL (anti-spam)."""
         if contains_url(value):
             raise serializers.ValidationError("First name cannot contain a URL.")
         return value
 
     def validate_last_name(self, value):
+        """Reject last names containing a URL (anti-spam)."""
         if contains_url(value):
             raise serializers.ValidationError("Last name cannot contain a URL.")
         return value
@@ -56,11 +62,14 @@ class UserSerializer(BaseSerializer):
         ]
 
         # If the user has already filled first name or last name then he is onboarded
+        # NOTE: defined inside Meta, so DRF never calls it (no is_onboarded field is exposed)
         def get_is_onboarded(self, obj):
             return bool(obj.first_name) or bool(obj.last_name)
 
 
 class UserMeSerializer(BaseSerializer):
+    """Read-only representation of the currently authenticated user (``/users/me``)."""
+
     class Meta:
         model = User
         fields = [
@@ -88,6 +97,8 @@ class UserMeSerializer(BaseSerializer):
 
 
 class UserMeSettingsSerializer(BaseSerializer):
+    """Current user's settings: resolves which workspace the frontend should open."""
+
     workspace = serializers.SerializerMethodField()
 
     class Meta:
@@ -96,6 +107,10 @@ class UserMeSettingsSerializer(BaseSerializer):
         read_only_fields = fields
 
     def get_workspace(self, obj):
+        """Return the last active workspace (if the user is still a member) or a fallback workspace.
+
+        Also includes the count of pending workspace invites for the user's email.
+        """
         workspace_invites = WorkspaceMemberInvite.objects.filter(email=obj.email).count()
 
         # profile
@@ -124,6 +139,7 @@ class UserMeSettingsSerializer(BaseSerializer):
                 "invites": workspace_invites,
             }
         else:
+            # Last workspace unset or no longer accessible: fall back to the user's oldest workspace
             fallback_workspace = (
                 Workspace.objects.filter(workspace_member__member_id=obj.id, workspace_member__is_active=True)
                 .order_by("created_at")
@@ -139,6 +155,8 @@ class UserMeSettingsSerializer(BaseSerializer):
 
 
 class UserLiteSerializer(BaseSerializer):
+    """Minimal public user representation used throughout the API for nesting."""
+
     class Meta:
         model = User
         fields = [
@@ -154,6 +172,8 @@ class UserLiteSerializer(BaseSerializer):
 
 
 class UserAdminLiteSerializer(BaseSerializer):
+    """Minimal user representation for admins, additionally exposing email and last login medium."""
+
     class Meta:
         model = User
         fields = [
@@ -171,6 +191,7 @@ class UserAdminLiteSerializer(BaseSerializer):
 
 
 class ChangePasswordSerializer(serializers.Serializer):
+    """Validate a password change: the new password must differ from the old one and match the confirmation."""
     model = User
 
     """
@@ -199,6 +220,8 @@ class ResetPasswordSerializer(serializers.Serializer):
 
 
 class ProfileSerializer(BaseSerializer):
+    """User profile (onboarding state, preferences, last workspace, etc.)."""
+
     class Meta:
         model = Profile
         fields = "__all__"
@@ -206,6 +229,8 @@ class ProfileSerializer(BaseSerializer):
 
 
 class AccountSerializer(BaseSerializer):
+    """Social/OAuth account linked to a user."""
+
     class Meta:
         model = Account
         fields = "__all__"
