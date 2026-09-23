@@ -16,7 +16,12 @@ from plane.bgtasks.issue_activities_task import (
 from plane.db.models import IssueActivity
 from plane.tests.factories import IssueFactory, UserFactory
 
-ROW = {"id": "7f4c0a8e-0000-4000-8000-000000000001", "table_name": "Customers", "record_name": "ACME", "record_id": "recAAAAAAAA"}
+ROW = {
+    "id": "7f4c0a8e-0000-4000-8000-000000000001",
+    "table_name": "Customers",
+    "record_name": "ACME",
+    "record_id": "recAAAAAAAA",
+}
 
 
 @pytest.mark.unit

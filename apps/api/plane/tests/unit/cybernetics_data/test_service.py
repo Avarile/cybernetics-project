@@ -319,7 +319,10 @@ class TestBrowse:
                     {"id": "bseCCCCCCCC", "name": "Stock", "icon": None},
                 ],
             },
-            {"space": {"id": "spcBBBBBBBB", "name": ""}, "bases": [{"id": "bseBBBBBBBB", "name": "Ledger", "icon": "💰"}]},
+            {
+                "space": {"id": "spcBBBBBBBB", "name": ""},
+                "bases": [{"id": "bseBBBBBBBB", "name": "Ledger", "icon": "💰"}],
+            },
         ]
 
     @pytest.mark.parametrize("exc", [CyberneticsForbidden("nope"), CyberneticsNotFound("nope")])
@@ -569,7 +572,10 @@ class TestDeepLink:
         assert url == "https://d.example.com/base/bseA/table/tblB?recordId=recC"
 
     def test_without_record(self):
-        assert service.build_deep_link("https://d.example.com", "bseA", "tblB") == "https://d.example.com/base/bseA/table/tblB"
+        assert (
+            service.build_deep_link("https://d.example.com", "bseA", "tblB")
+            == "https://d.example.com/base/bseA/table/tblB"
+        )
 
     def test_quoting(self):
         url = service.build_deep_link("https://d.example.com", "bse/A", "tbl?B", "rec&C", "viw#D")

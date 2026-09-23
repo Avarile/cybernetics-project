@@ -130,7 +130,9 @@ class TestPutCreate:
         fake_client.constructor.assert_not_called()
 
     def test_create_ok(self, session_client, workspace, project, fake_client):
-        response = _put(session_client, workspace, project, {"base_url": "https://data.example.com/api/", "api_token": TOKEN})
+        response = _put(
+            session_client, workspace, project, {"base_url": "https://data.example.com/api/", "api_token": TOKEN}
+        )
         assert response.status_code == status.HTTP_200_OK
         assert set(response.data) == READ_FIELDS
         assert response.data["base_url"] == BASE_URL

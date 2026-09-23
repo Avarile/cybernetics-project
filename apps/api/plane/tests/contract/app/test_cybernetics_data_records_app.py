@@ -102,7 +102,9 @@ class TestList:
 
 class TestCreate:
     def test_happy_path(self, session_client, workspace, project, issue, integration, fake_client, isolate):
-        response = _attach(session_client, workspace, project, issue, [_ref(), _ref("recBBBBBBBB", view_id="viwAAAAAAAA")])
+        response = _attach(
+            session_client, workspace, project, issue, [_ref(), _ref("recBBBBBBBB", view_id="viwAAAAAAAA")]
+        )
         assert response.status_code == status.HTTP_201_CREATED
         assert response.data["skipped"] == []
         created = response.data["created"]
@@ -135,15 +137,20 @@ class TestCreate:
         assert isolate.call_count == 1
 
     @pytest.mark.parametrize(
-        "exc,code", [(CyberneticsNotFound("gone"), "CYBERNETICS_NOT_FOUND"), (CyberneticsForbidden("no"), "CYBERNETICS_FORBIDDEN")]
+        "exc,code",
+        [(CyberneticsNotFound("gone"), "CYBERNETICS_NOT_FOUND"), (CyberneticsForbidden("no"), "CYBERNETICS_FORBIDDEN")],
     )
-    def test_upstream_failure_is_reported(self, session_client, workspace, project, issue, integration, fake_client, exc, code):
+    def test_upstream_failure_is_reported(
+        self, session_client, workspace, project, issue, integration, fake_client, exc, code
+    ):
         fake_client.get_record.side_effect = exc
         response = _attach(session_client, workspace, project, issue, [_ref()])
         assert_error(response, status.HTTP_400_BAD_REQUEST, "CYBERNETICS_ATTACH_FAILED")
         assert response.data["failed"] == [{"record_id": "recAAAAAAAA", "table_id": TABLE, "error_message": code}]
 
-    def test_mixed_result_creates_nothing(self, session_client, workspace, project, issue, integration, fake_client, isolate):
+    def test_mixed_result_creates_nothing(
+        self, session_client, workspace, project, issue, integration, fake_client, isolate
+    ):
         ok = fake_client.get_record.return_value
         fake_client.get_record.side_effect = [ok, CyberneticsNotFound("gone")]
         response = _attach(session_client, workspace, project, issue, [_ref(), _ref("recBBBBBBBB")])
@@ -168,7 +175,9 @@ class TestCreate:
         assert response.status_code == status.HTTP_404_NOT_FOUND
         fake_client.get_record.assert_not_called()
 
-    def test_issue_from_other_project(self, session_client, workspace, project, other_project, integration, fake_client):
+    def test_issue_from_other_project(
+        self, session_client, workspace, project, other_project, integration, fake_client
+    ):
         foreign = IssueFactory(project=other_project)
         response = _attach(session_client, workspace, project, foreign, [_ref()])
         assert response.status_code == status.HTTP_404_NOT_FOUND
@@ -197,7 +206,9 @@ class TestCreate:
         assert len(response.data["created"]) == 1
         assert IssueCyberneticsRecord.all_objects.filter(issue=issue, record_id="recAAAAAAAA").count() == 2
 
-    def test_concurrent_duplicate(self, session_client, workspace, project, issue, integration, fake_client, mocker, isolate):
+    def test_concurrent_duplicate(
+        self, session_client, workspace, project, issue, integration, fake_client, mocker, isolate
+    ):
         mocker.patch.object(IssueCyberneticsRecord.objects, "create", side_effect=IntegrityError("duplicate"))
         response = _attach(session_client, workspace, project, issue, [_ref()])
         assert response.status_code == status.HTTP_201_CREATED
@@ -234,12 +245,17 @@ class TestDestroy:
 
     def test_other_member_cannot(self, make_member, workspace, project, issue, integration):
         row = _row(issue)
-        assert self._delete(make_member(MEMBER), workspace, project, issue, row.id).status_code == status.HTTP_403_FORBIDDEN
+        assert (
+            self._delete(make_member(MEMBER), workspace, project, issue, row.id).status_code
+            == status.HTTP_403_FORBIDDEN
+        )
         assert IssueCyberneticsRecord.objects.filter(pk=row.pk).exists()
 
     def test_guest_cannot(self, make_member, workspace, project, issue, integration):
         row = _row(issue)
-        assert self._delete(make_member(GUEST), workspace, project, issue, row.id).status_code == status.HTTP_403_FORBIDDEN
+        assert (
+            self._delete(make_member(GUEST), workspace, project, issue, row.id).status_code == status.HTTP_403_FORBIDDEN
+        )
 
     def test_unknown_pk(self, session_client, workspace, project, issue, integration):
         assert self._delete(session_client, workspace, project, issue, uuid4()).status_code == status.HTTP_404_NOT_FOUND
@@ -269,7 +285,9 @@ class TestDestroy:
 
 
 class TestRefresh:
-    def test_ok_updates_snapshot_and_recovers_missing(self, session_client, workspace, project, issue, integration, fake_client):
+    def test_ok_updates_snapshot_and_recovers_missing(
+        self, session_client, workspace, project, issue, integration, fake_client
+    ):
         row = _row(issue, record_id="recAAAAAAAA", record_name="Old", status="missing")
         before = row.snapshot_at
         response = _refresh(session_client, workspace, project, issue)

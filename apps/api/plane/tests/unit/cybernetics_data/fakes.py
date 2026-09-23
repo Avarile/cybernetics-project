@@ -165,4 +165,3 @@ class FakeTeable:
         if isinstance(result, int):
             return FakeResponse(result, {"message": "not found"})
         return FakeResponse(200, result)
-

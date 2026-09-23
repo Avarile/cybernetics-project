@@ -105,7 +105,9 @@ def make_member(workspace, project, api_client):
 
     def _make(role, target_project=None):
         user = User.objects.create(email=f"{uuid4().hex[:8]}@example.com", username=uuid4().hex[:12])
-        WorkspaceMember.objects.create(workspace=workspace, member=user, role=MEMBER if (role or 0) >= MEMBER else GUEST)
+        WorkspaceMember.objects.create(
+            workspace=workspace, member=user, role=MEMBER if (role or 0) >= MEMBER else GUEST
+        )
         if role is not None:
             ProjectMember.objects.create(project=target_project or project, member=user, role=role, is_active=True)
         api_client.force_authenticate(user=user)

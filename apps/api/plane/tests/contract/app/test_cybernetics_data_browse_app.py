@@ -147,7 +147,9 @@ class TestUpstreamErrors:
             (CyberneticsDataError("boom"), 502, "CYBERNETICS_ERROR"),
         ],
     )
-    def test_error_mapping(self, session_client, workspace, project, integration, fake_client, exc, status_code, error_message):
+    def test_error_mapping(
+        self, session_client, workspace, project, integration, fake_client, exc, status_code, error_message
+    ):
         fake_client.list_bases.side_effect = exc
         response = session_client.get(_databases(workspace, project))
         assert_error(response, status_code, error_message)
@@ -262,7 +264,10 @@ class TestRecords:
             (TABLE, {"base_id": BASE, "skip": "1.5"}),
             (TABLE, {"base_id": BASE, "search": "x" * 201}),
             (TABLE, {"base_id": BASE, "filter": "{not json"}),
-            (TABLE, {"base_id": BASE, "filter": json.dumps({"filterSet": [{"fieldId": "fldAAAAAAAA", "operator": "x"}]})}),
+            (
+                TABLE,
+                {"base_id": BASE, "filter": json.dumps({"filterSet": [{"fieldId": "fldAAAAAAAA", "operator": "x"}]})},
+            ),
             (TABLE, {"base_id": BASE, "order_by": "[{"}),
             (TABLE, {"base_id": BASE, "order_by": json.dumps([{"field_id": "fldAAAAAAAA", "order": "up"}])}),
         ],
@@ -287,7 +292,9 @@ class TestRecords:
         "take,skip,expected",
         [("0", "-5", (1, 0)), ("500", "20", (200, 20)), ("25", "", (25, 0)), ("", "99999999999", (50, 10_000_000))],
     )
-    def test_take_and_skip_are_clamped(self, session_client, workspace, project, integration, fake_client, take, skip, expected):
+    def test_take_and_skip_are_clamped(
+        self, session_client, workspace, project, integration, fake_client, take, skip, expected
+    ):
         response = session_client.get(_records(workspace, project, base_id=BASE, take=take, skip=skip))
         assert response.status_code == status.HTTP_200_OK
         kwargs = fake_client.list_records.call_args.kwargs
@@ -352,7 +359,9 @@ class TestRecordDetail:
             (TABLE, RECORD, {"base_id": "bse"}),
         ],
     )
-    def test_invalid_ids(self, session_client, workspace, project, integration, fake_client, table_id, record_id, params):
+    def test_invalid_ids(
+        self, session_client, workspace, project, integration, fake_client, table_id, record_id, params
+    ):
         response = session_client.get(_record(workspace, project, table_id, record_id, **params))
         assert_error(response, status.HTTP_400_BAD_REQUEST, "CYBERNETICS_BAD_REQUEST")
         fake_client.get_record.assert_not_called()
