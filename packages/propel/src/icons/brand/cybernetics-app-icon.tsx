@@ -10,7 +10,7 @@ import type { ISvgIcons } from "../type";
 import { BRAND_ACCENT, BRAND_CREAM } from "./tokens";
 
 /**
- * The plated app icon — bronze tile, cream glyph. Unlike {@link CyberneticsMark}
+ * The plated app icon — slate tile, cream glyph. Unlike {@link CyberneticsMark}
  * this is a fixed-color lockup: it stands in for the installed app, so it must
  * look the same everywhere rather than inheriting the surrounding text color.
  */

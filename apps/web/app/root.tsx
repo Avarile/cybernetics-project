@@ -48,7 +48,7 @@ export const links: LinksFunction = () => [
   { rel: "shortcut icon", href: faviconIco },
   { rel: "apple-touch-icon", sizes: "180x180", href: appleTouchIcon },
   // Safari pinned tabs need a single-colour vector.
-  { rel: "mask-icon", href: faviconFlatSvg, color: "#B4763A" },
+  { rel: "mask-icon", href: faviconFlatSvg, color: "#76889C" },
   { rel: "manifest", href: "/site.webmanifest.json" },
   { rel: "stylesheet", href: globalStyles },
   {

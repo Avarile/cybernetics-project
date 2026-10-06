@@ -1,0 +1,47 @@
+● This is a Plane fork, a pnpm + turbo monorepo. It has a Django API in apps/api, which sits outside the pnpm workspace, and React Router (Vite) 
+  frontends in apps/web, admin, space and live. The NestJS backend was removed in 5b8259daca, so Django is now the only backend. On this machine
+  you don't use the documented docker-compose-local.yml stack. Django runs directly on your machine against the shared platform-* containers,
+  through apps/api/bin/run-host.sh. That script loads apps/api/.env, rewrites plane-db/plane-redis/plane-mq to 127.0.0.1:30898/30490/30672, and
+  uses plane.settings.local and .venv.
+
+  Current state:
+  - All the platform-* containers (Postgres, Redis, RabbitMQ, MinIO) are up.
+  - apps/api/.venv exists.
+  - No database migrations are waiting to be applied.
+  - Ports 8000, 3000, 3001, 3002 and 3100 are all free.
+  - So no setup is needed; you can start everything now.
+
+  Start it (4 terminals)
+
+  # 1–3: in apps/api
+  ./bin/run-host.sh python manage.py runserver 8000      # API on :8000, reloads automatically
+  ./bin/run-host.sh celery -A plane worker -l info       # emails, webhooks, imports and notifications
+  ./bin/run-host.sh celery -A plane beat -l info         # scheduled jobs (optional)
+
+  # 4: repo root
+  pnpm dev     # web :3000 · admin :3001 · space :3002 · live :3100, plus the shared-package watchers
+
+  For the UI only, run pnpm --filter web dev (and pnpm --filter admin dev if you need god-mode). The first pnpm dev builds the shared packages
+  before the apps come up.
+
+  Check it works: run curl -s -o /dev/null -w '%{http_code}\n' localhost:8000/api/instances/; it should print 200. Then open
+  http://localhost:3000.
+
+  Things to watch for
+
+  - Use localhost, never 127.0.0.1. CORS only allows the localhost origins, so every call fails on 127.0.0.1.
+  - Run every Django command through ./bin/run-host.sh. Without it you get could not translate host name "plane-db".
+  - Emails aren't really sent. Magic codes and invites are printed in the Celery worker terminal.
+  - On a fresh database, create the instance admin at http://localhost:3001/god-mode/ first.
+  - After a git pull with new migrations, run ./bin/run-host.sh python manage.py migrate. Restart the worker and beat after backend changes;
+    unlike runserver, they don't reload automatically.
+  - After changing packages/propel (the UI kit), run pnpm --filter @plane/propel build && pnpm dev.
+  - Don't run docker compose -f docker-compose-local.yml up. Its bundled Postgres, Redis and RabbitMQ would duplicate the shared infra. To run
+    Django in containers instead, add -f docker-compose-local.override.yml, which attaches it to the shared backbone network.
+  - Database safety: only ever touch the plane_dev database, Redis DB 4 and the plane_dev RabbitMQ vhost. The plane database on the same server is
+    production.
+  - If the infra is down, run cd ~/Documents/dev-ops/docker-compose_deploy && make infra.
+
+  The full write-up, including first-time setup, a database reset and troubleshooting, is in developments/scripts/start_dev_server_python. I
+  couldn't read apps/web/.env because permission was denied. An earlier note says it had admin and space on the wrong ports (3002 and 3003). If
+  links to published projects point at :3003, set it to match .env.example: admin 3001, space 3002.

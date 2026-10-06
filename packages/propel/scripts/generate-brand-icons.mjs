@@ -25,7 +25,7 @@ const sharp = require("sharp");
 
 const INK = "#0E1116";
 const CREAM = "#F4F2EC";
-const ACCENT = "#B4763A";
+const ACCENT = "#76889C";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const BRAND = resolve(HERE, "../assets/brand");

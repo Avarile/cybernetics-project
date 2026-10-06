@@ -144,7 +144,7 @@ export const AuthRoot = observer(function AuthRoot(props: TAuthRoot) {
           currentAuthMode={currentAuthMode}
         />
       )}
-      <TermsAndConditions authType={authMode} />
+      {/* <TermsAndConditions authType={authMode} /> */}
     </AuthContainer>
   );
 });

@@ -13,8 +13,8 @@
  * theme. These constants are the flat, theme-less source values.
  */
 
-/** Cybernetics Project accent — bronze. */
-export const BRAND_ACCENT = "#B4763A";
+/** Cybernetics Project accent — slate. */
+export const BRAND_ACCENT = "#76889C";
 
 /** Brand ink, used for the parent-brand mark and dark plates. */
 export const BRAND_INK = "#0E1116";

@@ -75,7 +75,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <link rel="manifest" href="/site.webmanifest.json" />
         <link rel="shortcut icon" href={faviconIco} />
         {/* Safari pinned tabs need a single-colour vector. */}
-        <link rel="mask-icon" href={faviconFlatSvg} color="#B4763A" />
+        <link rel="mask-icon" href={faviconFlatSvg} color="#76889C" />
         {/* Meta info for PWA */}
         <meta name="application-name" content="Cybernetics" />
         <meta name="apple-mobile-web-app-capable" content="yes" />
