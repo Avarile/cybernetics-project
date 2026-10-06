@@ -29,6 +29,8 @@ export interface IUserLite {
   first_name: string;
   id: string;
   is_bot: boolean;
+  /** Set for bot users, e.g. "AGENT" for agentic members. */
+  bot_type?: string | null;
   last_name: string;
   joining_date?: string;
 }

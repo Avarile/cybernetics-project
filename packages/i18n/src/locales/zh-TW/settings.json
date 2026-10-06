@@ -144,7 +144,8 @@
           "modules": "模組",
           "intake": "Intake",
           "estimates": "評估",
-          "stickies": "Stickies"
+          "stickies": "Stickies",
+          "agents": "代理程式"
         }
       }
     }

@@ -166,9 +166,10 @@ class UserLiteSerializer(BaseSerializer):
             "avatar",
             "avatar_url",
             "is_bot",
+            "bot_type",
             "display_name",
         ]
-        read_only_fields = ["id", "is_bot"]
+        read_only_fields = ["id", "is_bot", "bot_type"]
 
 
 class UserAdminLiteSerializer(BaseSerializer):
@@ -183,11 +184,12 @@ class UserAdminLiteSerializer(BaseSerializer):
             "avatar",
             "avatar_url",
             "is_bot",
+            "bot_type",
             "display_name",
             "email",
             "last_login_medium",
         ]
-        read_only_fields = ["id", "is_bot"]
+        read_only_fields = ["id", "is_bot", "bot_type"]
 
 
 class ChangePasswordSerializer(serializers.Serializer):

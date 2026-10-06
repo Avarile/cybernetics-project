@@ -7,6 +7,7 @@
 # Django imports
 from django.contrib.auth import login
 from django.conf import settings
+from django.core.exceptions import PermissionDenied
 
 # Module imports
 from plane.utils.host import base_host
@@ -16,8 +17,11 @@ from plane.utils.ip_address import get_client_ip
 def user_login(request, user, is_app=False, is_admin=False, is_space=False):
     """Log ``user`` into the session and store device info (user agent, IP, frontend domain) on it.
 
-    Admin logins get the shorter ADMIN_SESSION_COOKIE_AGE expiry.
+    Admin logins get the shorter ADMIN_SESSION_COOKIE_AGE expiry. Bot users are refused.
     """
+    # Defence in depth: every sign-in path ends here, and bots must never get a session
+    if user.is_bot:
+        raise PermissionDenied("Bot users cannot sign in")
     login(request=request, user=user)
 
     # If is admin cookie set the custom age

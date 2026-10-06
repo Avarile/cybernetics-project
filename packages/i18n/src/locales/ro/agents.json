@@ -1,0 +1,178 @@
+{
+  "agents": {
+    "badge": "Agent",
+    "manage_link": "Membrii agenți se gestionează din pagina Agenți →",
+    "status": {
+      "active": "Activ",
+      "paused": "Întrerupt",
+      "archived": "Arhivat"
+    },
+    "tabs": {
+      "overview": "Prezentare generală",
+      "how_it_works": "Cum funcționează",
+      "workflow": "Flux de lucru",
+      "tools": "Instrumente și indicații",
+      "context": "Context",
+      "projects": "Proiecte",
+      "work_items": "Activități",
+      "settings": "Setări"
+    },
+    "actions": {
+      "copy": "Copiază",
+      "remove": "Elimină"
+    },
+    "create": {
+      "button": "Agent nou",
+      "title": "Creați un agent",
+      "description": "Definiți un agent AI căruia i se pot atribui activități. Platformele LLM îi încarcă definiția prin API sau MCP.",
+      "submit": "Creează agentul"
+    },
+    "fields": {
+      "name": "Nume",
+      "name_placeholder": "Bot QA",
+      "handle": "Identificator",
+      "handle_help": "Folosit pentru a face referire la agent din API și MCP. Litere mici, cifre, - și _.",
+      "role_title": "Rol",
+      "role_title_placeholder": "Inginer QA",
+      "avatar_emoji": "Emoji pentru avatar",
+      "avatar_emoji_help": "Opțional. Lăsați gol pentru pictograma implicită a agentului.",
+      "summary": "Rezumat",
+      "summary_placeholder": "Un rând despre ce face acest agent",
+      "summary_help": "Afișat în listele de agenți pentru ca LLM-urile să aleagă agentul potrivit.",
+      "profile": "Profil",
+      "profile_help": "Persona și contextul, în Markdown.",
+      "goal": "Obiectiv",
+      "goal_help": "Ce optimizează agentul și cum se măsoară succesul.",
+      "goal_placeholder": "Depistarea regresiilor înainte să ajungă în producție",
+      "how_it_works": "Cum funcționează",
+      "how_it_works_help": "Abordare, limite și constrângeri, în Markdown.",
+      "instructions": "Instrucțiuni",
+      "instructions_help": "Instrucțiunile de lucru urmate de LLM, ca un prompt de sistem.",
+      "capabilities": "Competențe",
+      "capabilities_help": "Etichete scurte care descriu punctele forte ale agentului. Apăsați Enter pentru a adăuga.",
+      "capability_placeholder": "Adăugați o competență",
+      "owner": "Responsabil",
+      "owner_help": "Persoana responsabilă de acest agent.",
+      "no_owner": "Fără responsabil"
+    },
+    "list": {
+      "search": "Căutați agenți",
+      "filter_all": "Toți",
+      "no_summary": "Încă nu există rezumat",
+      "version": "v{version}",
+      "projects": "{count, plural, one {# proiect} few {# proiecte} other {# de proiecte}}",
+      "open_items": "{count, plural, one {# activitate deschisă} few {# activități deschise} other {# de activități deschise}}",
+      "owner": "Responsabil: {name}"
+    },
+    "empty": {
+      "title": "Încă nu există agenți",
+      "description": "Membrii agenți sunt agenți AI cu profil, obiectiv și flux de lucru. Atribuiți-le activități și încărcați-le definițiile în platforme LLM prin API sau MCP.",
+      "no_match": "Niciun agent nu corespunde filtrelor"
+    },
+    "detail": {
+      "not_found": "Acest agent nu a fost găsit.",
+      "no_access": "Doar administratorii și membrii spațiului de lucru pot vedea agenții.",
+      "shared_notice": "Această definiție este partajată cu platforme LLM prin API și MCP. Nu includeți niciodată secrete."
+    },
+    "overview": {
+      "open_items": "Activități deschise",
+      "projects": "Proiecte",
+      "version": "Versiunea definiției"
+    },
+    "markdown": {
+      "write": "Scrieți",
+      "preview": "Previzualizare",
+      "empty": "Încă nu există nimic aici"
+    },
+    "workflow": {
+      "description": "Pașii pe care agentul îi urmează, în ordine. Marcați pașii la care trebuie să se oprească și să aștepte aprobarea unei persoane.",
+      "empty": "Nu este definit niciun flux de lucru",
+      "add_step": "Adăugați un pas",
+      "title_placeholder": "Titlul pasului",
+      "description_placeholder": "Ce se întâmplă în acest pas (Markdown)",
+      "expected_output": "Rezultat așteptat",
+      "expected_output_placeholder": "Rezultatul așteptat al acestui pas",
+      "requires_approval": "Necesită aprobare",
+      "requires_approval_help": "Necesită aprobarea unei persoane înainte de a continua",
+      "move_up": "Mută mai sus",
+      "move_down": "Mută mai jos"
+    },
+    "tools": {
+      "title": "Instrumente",
+      "description": "Descrieți instrumentele pe care trebuie să le folosească agentul. Este doar descriptiv; nu adăugați niciodată secrete sau date de autentificare.",
+      "empty": "Nu este descris niciun instrument",
+      "add": "Adăugați un instrument",
+      "name_placeholder": "Numele instrumentului",
+      "description_placeholder": "Ce face instrumentul",
+      "usage_placeholder": "Când și cum se folosește (Markdown)",
+      "hints_title": "Indicații de rulare",
+      "hints_help": "Setări recomandate pentru platforma LLM, precum modelul sau temperatura, ca obiect JSON.",
+      "hints_invalid": "Introduceți un obiect JSON valid"
+    },
+    "context": {
+      "title": "Context pentru LLM",
+      "title_version": "Context pentru LLM (v{version})",
+      "help": "Exact ce primesc platformele LLM pentru acest agent.",
+      "unsaved_preview": "Previzualizare cu modificările nesalvate.",
+      "rendered": "Context generat",
+      "size": "{kb} KB · aproximativ {tokens} tokeni",
+      "preview_error": "Previzualizarea nu a putut fi generată. Verificați câmpurile.",
+      "versions": "Versiuni",
+      "current": "curentă",
+      "copied": "Copiat în clipboard",
+      "connect_title": "Folosiți acest agent într-o platformă LLM",
+      "connect_help": "Conectați Claude Code, ChatGPT sau alt client MCP cu un token API personal.",
+      "connect_settings": "Configurați MCP",
+      "mcp_server": "Server MCP",
+      "llm_prompt": "Exemplu de prompt",
+      "llm_prompt_example": "Încarcă agentul Cybernetics @{handle} din spațiul de lucru {workspace} cu get_agent_context și acționează ca el. Apoi lucrează la coada lui cu list_agent_work_items și get_agent_task_brief."
+    },
+    "projects": {
+      "description": "Agenților li se pot atribui activități doar în proiectele la care au acces.",
+      "select": "Selectați un proiect",
+      "add": "Adaugă la proiect",
+      "empty": "Acest agent nu are încă acces la niciun proiect."
+    },
+    "work_items": {
+      "open": "Deschise",
+      "completed": "Finalizate",
+      "cancelled": "Anulate",
+      "empty": "Nu există activități aici",
+      "copy_brief": "Copiază descrierea sarcinii",
+      "brief_copied": "Descrierea sarcinii {key} a fost copiată"
+    },
+    "settings": {
+      "admin_only": "Doar administratorii spațiului de lucru pot modifica setările agenților.",
+      "accept_title": "Acceptă atribuiri noi",
+      "accept_description": "Când este dezactivat, agentul își păstrează activitățile curente, dar nu i se pot atribui altele noi.",
+      "pause_title": "Întrerupeți agentul",
+      "pause_description": "Un agent întrerupt nu poate primi atribuiri noi. Definiția lui rămâne disponibilă.",
+      "pause": "Întrerupe",
+      "resume": "Reia",
+      "archive_title": "Arhivați agentul",
+      "archive_description": "Elimină agentul din proiectele sale. Atribuirile existente rămân în istoric.",
+      "archive": "Arhivează",
+      "restore_title": "Restaurați agentul",
+      "restore_description": "Reactivează agentul cu accesul anterior la proiecte.",
+      "restore": "Restaurează",
+      "delete_title": "Ștergeți agentul",
+      "delete_description": "Agentul va fi eliminat definitiv. Tastați {handle} pentru a confirma.",
+      "delete": "Șterge agentul"
+    },
+    "save": {
+      "unsaved": "Există modificări nesalvate",
+      "change_note_placeholder": "Descrieți modificarea (opțional)",
+      "discard": "Renunță",
+      "save": "Salvează"
+    },
+    "toasts": {
+      "created": "{name} a fost creat",
+      "saved": "Modificările au fost salvate",
+      "saved_version": "Salvat ca versiunea {version}",
+      "archived": "Agentul a fost arhivat",
+      "restored": "Agentul a fost restaurat",
+      "deleted": "Agentul a fost șters",
+      "error": "A apărut o eroare. Încercați din nou."
+    }
+  }
+}

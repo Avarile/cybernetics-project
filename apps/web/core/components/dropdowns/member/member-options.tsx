@@ -11,7 +11,9 @@ import { useParams } from "next/navigation";
 import { createPortal } from "react-dom";
 import { usePopper } from "react-popper";
 import { Combobox } from "@headlessui/react";
+import { Bot } from "lucide-react";
 // plane imports
+import { AGENT_BOT_TYPE } from "@plane/constants";
 import { useTranslation } from "@plane/i18n";
 import { CheckIcon, SearchIcon, SuspendedUserIcon } from "@plane/propel/icons";
 import { EPillSize, EPillVariant, Pill } from "@plane/propel/pill";
@@ -19,6 +21,7 @@ import type { IUserLite } from "@plane/types";
 import { Avatar } from "@plane/ui";
 import { cn, getFileURL, sortByCurrentUserThenSelected } from "@plane/utils";
 // hooks
+import { useAgent } from "@/hooks/store/use-agent";
 import { useMember } from "@/hooks/store/use-member";
 import { useUser } from "@/hooks/store/user";
 import { usePlatformOS } from "@/hooks/use-platform-os";
@@ -60,6 +63,7 @@ export const MemberOptions = observer(function MemberOptions(props: Props) {
   const {
     workspace: { isUserSuspended },
   } = useMember();
+  const { getAgentByBotUserId } = useAgent();
   const { isMobile } = usePlatformOS();
   // popper-js init
   const { styles, attributes } = usePopper(referenceElement, popperElement, {
@@ -90,17 +94,30 @@ export const MemberOptions = observer(function MemberOptions(props: Props) {
     }
   };
 
+  const selectedIds = Array.isArray(value) ? value : value ? [value] : [];
+  const isAgent = (userId: string) => getUserDetails(userId)?.bot_type === AGENT_BOT_TYPE;
+  // Paused/archived agents can't take new work; keep them only where already selected
+  const isUnavailableAgent = (userId: string) => {
+    const agent = getAgentByBotUserId(userId);
+    return !!agent && !(agent.status === "active" && agent.accept_assignments) && !selectedIds.includes(userId);
+  };
+
   const options = memberIds
-    ?.map((userId) => {
+    ?.filter((userId) => !isUnavailableAgent(userId))
+    .map((userId) => {
       const userDetails = getUserDetails(userId);
+      const agent = isAgent(userId);
       return {
         value: userId,
-        query: `${userDetails?.display_name} ${userDetails?.first_name} ${userDetails?.last_name}`,
+        isAgent: agent,
+        query: `${userDetails?.display_name} ${userDetails?.first_name} ${userDetails?.last_name}${agent ? " agent" : ""}`,
         content: (
           <div className="flex items-center gap-2">
             <div className="w-4">
               {isUserSuspended(userId, workspaceSlug?.toString()) ? (
                 <SuspendedUserIcon className="h-3.5 w-3.5 text-placeholder" />
+              ) : agent ? (
+                <Bot className="h-3.5 w-3.5 text-accent-primary" />
               ) : (
                 <Avatar name={userDetails?.display_name} src={getFileURL(userDetails?.avatar_url ?? "")} />
               )}
@@ -111,19 +128,24 @@ export const MemberOptions = observer(function MemberOptions(props: Props) {
                 isUserSuspended(userId, workspaceSlug?.toString()) ? "text-placeholder" : ""
               )}
             >
-              {currentUser?.id === userId ? t("you") : userDetails?.display_name}
+              {currentUser?.id === userId ? t("you") : (agent && userDetails?.first_name) || userDetails?.display_name}
             </span>
+            {agent && <span className="flex-shrink-0 text-10 text-accent-primary">{t("agents.badge")}</span>}
           </div>
         ),
       };
     })
     .filter((o) => !!o);
 
-  const filteredOptions = sortByCurrentUserThenSelected(
+  const sortedOptions = sortByCurrentUserThenSelected(
     query === "" ? options : options?.filter((o) => o?.query.toLowerCase().includes(query.toLowerCase())),
     value,
     currentUser?.id
   );
+  // People first, then agents (stable within each group)
+  const filteredOptions = sortedOptions
+    ? [...sortedOptions.filter((o) => !o?.isAgent), ...sortedOptions.filter((o) => o?.isAgent)]
+    : sortedOptions;
 
   return createPortal(
     <Combobox.Options data-prevent-outside-click static>

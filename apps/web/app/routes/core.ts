@@ -105,6 +105,12 @@ export const coreRoutes: RouteConfigEntry[] = [
           route(":workspaceSlug/stickies", "./(all)/[workspaceSlug]/(projects)/stickies/page.tsx"),
         ]),
 
+        // Agentic members
+        layout("./(all)/[workspaceSlug]/(projects)/agents/layout.tsx", [
+          route(":workspaceSlug/agents", "./(all)/[workspaceSlug]/(projects)/agents/page.tsx"),
+          route(":workspaceSlug/agents/:agentId/:tab?", "./(all)/[workspaceSlug]/(projects)/agents/[agentId]/page.tsx"),
+        ]),
+
         // Workspace Views
         layout("./(all)/[workspaceSlug]/(projects)/workspace-views/layout.tsx", [
           route(":workspaceSlug/workspace-views", "./(all)/[workspaceSlug]/(projects)/workspace-views/page.tsx"),

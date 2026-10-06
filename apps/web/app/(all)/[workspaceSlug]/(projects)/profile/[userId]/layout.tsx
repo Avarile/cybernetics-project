@@ -4,6 +4,7 @@
  * See the LICENSE file for details.
  */
 
+import { useEffect } from "react";
 import { observer } from "mobx-react";
 import { usePathname } from "next/navigation";
 import { Outlet } from "react-router";
@@ -17,7 +18,9 @@ import { ProfileSidebar } from "@/components/profile/sidebar";
 // constants
 import { USER_PROFILE_PROJECT_SEGREGATION } from "@plane/constants";
 // hooks
+import { useAgent } from "@/hooks/store/use-agent";
 import { useUserPermissions } from "@/hooks/store/user";
+import { useAppRouter } from "@/hooks/use-app-router";
 import useSize from "@/hooks/use-window-size";
 // local components
 import { UserService } from "@/services/user.service";
@@ -32,8 +35,15 @@ function UseProfileLayout({ params }: Route.ComponentProps) {
   // router
   const { workspaceSlug, userId } = params;
   const pathname = usePathname();
+  const router = useAppRouter();
   // store hooks
   const { allowPermissions } = useUserPermissions();
+  const { getAgentByBotUserId } = useAgent();
+  // Agentic members have an agent page instead of a profile
+  const agent = getAgentByBotUserId(userId);
+  useEffect(() => {
+    if (agent) router.replace(`/${workspaceSlug}/agents/${agent.id}`);
+  }, [agent, router, workspaceSlug]);
   const { t } = useTranslation();
   // derived values
   const isAuthorized = allowPermissions(

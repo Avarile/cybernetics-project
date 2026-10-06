@@ -53,7 +53,7 @@ class TestToolsets:
     async def test_all_groups_by_default(self, all_tools):
         tools = await tools_by_name(build_server())
 
-        assert len(tools) == 85
+        assert len(tools) == 96
         assert {"create_project", "triage_intake_work_item", "create_estimate_points", "delete_sticky"} <= set(tools)
 
     @pytest.mark.anyio

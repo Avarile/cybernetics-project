@@ -1,0 +1,178 @@
+{
+  "agents": {
+    "badge": "智能体",
+    "manage_link": "智能体成员请在“智能体”页面管理 →",
+    "status": {
+      "active": "活跃",
+      "paused": "已暂停",
+      "archived": "已归档"
+    },
+    "tabs": {
+      "overview": "概览",
+      "how_it_works": "工作方式",
+      "workflow": "工作流程",
+      "tools": "工具与提示",
+      "context": "上下文",
+      "projects": "项目",
+      "work_items": "工作项",
+      "settings": "设置"
+    },
+    "actions": {
+      "copy": "复制",
+      "remove": "移除"
+    },
+    "create": {
+      "button": "新建智能体",
+      "title": "创建智能体",
+      "description": "定义一个可以分配工作项的 AI 智能体。LLM 平台通过 API 或 MCP 加载它的定义。",
+      "submit": "创建智能体"
+    },
+    "fields": {
+      "name": "名称",
+      "name_placeholder": "QA 机器人",
+      "handle": "标识",
+      "handle_help": "用于在 API 和 MCP 中引用该智能体。仅限小写字母、数字、- 和 _。",
+      "role_title": "角色",
+      "role_title_placeholder": "QA 工程师",
+      "avatar_emoji": "头像表情",
+      "avatar_emoji_help": "可选。留空则使用默认的智能体图标。",
+      "summary": "简介",
+      "summary_placeholder": "用一句话说明这个智能体做什么",
+      "summary_help": "显示在智能体列表中，方便 LLM 选择合适的智能体。",
+      "profile": "档案",
+      "profile_help": "角色设定与背景（Markdown）。",
+      "goal": "目标",
+      "goal_help": "智能体追求什么，以及如何衡量成功。",
+      "goal_placeholder": "在问题进入生产环境之前发现回归",
+      "how_it_works": "工作方式",
+      "how_it_works_help": "方法、边界和约束（Markdown）。",
+      "instructions": "指令",
+      "instructions_help": "LLM 遵循的工作指令，相当于系统提示词。",
+      "capabilities": "能力",
+      "capabilities_help": "描述智能体擅长领域的简短标签。按 Enter 添加。",
+      "capability_placeholder": "添加能力",
+      "owner": "负责人",
+      "owner_help": "对该智能体负责的人。",
+      "no_owner": "无负责人"
+    },
+    "list": {
+      "search": "搜索智能体",
+      "filter_all": "全部",
+      "no_summary": "暂无简介",
+      "version": "v{version}",
+      "projects": "{count, plural, one {# 个项目} other {# 个项目}}",
+      "open_items": "{count, plural, one {# 个未完成工作项} other {# 个未完成工作项}}",
+      "owner": "负责人：{name}"
+    },
+    "empty": {
+      "title": "暂无智能体",
+      "description": "智能体成员是拥有档案、目标和工作流程的 AI 智能体。您可以为其分配工作项，并通过 API 或 MCP 将其定义加载到 LLM 平台。",
+      "no_match": "没有符合筛选条件的智能体"
+    },
+    "detail": {
+      "not_found": "未找到该智能体。",
+      "no_access": "只有工作区管理员和成员可以查看智能体。",
+      "shared_notice": "此定义会通过 API 和 MCP 共享给 LLM 平台。切勿在其中包含任何机密信息。"
+    },
+    "overview": {
+      "open_items": "未完成工作项",
+      "projects": "项目",
+      "version": "定义版本"
+    },
+    "markdown": {
+      "write": "编辑",
+      "preview": "预览",
+      "empty": "暂无内容"
+    },
+    "workflow": {
+      "description": "智能体按顺序执行的步骤。请标记需要停下来等待人工审批的步骤。",
+      "empty": "尚未定义工作流程",
+      "add_step": "添加步骤",
+      "title_placeholder": "步骤标题",
+      "description_placeholder": "此步骤要做什么（Markdown）",
+      "expected_output": "预期产出",
+      "expected_output_placeholder": "此步骤的预期产出",
+      "requires_approval": "需要审批",
+      "requires_approval_help": "继续之前需要人工审批",
+      "move_up": "上移",
+      "move_down": "下移"
+    },
+    "tools": {
+      "title": "工具",
+      "description": "描述智能体应使用的工具。此处仅作说明，切勿添加任何机密或凭据。",
+      "empty": "尚未描述任何工具",
+      "add": "添加工具",
+      "name_placeholder": "工具名称",
+      "description_placeholder": "工具的用途",
+      "usage_placeholder": "何时以及如何使用（Markdown）",
+      "hints_title": "运行提示",
+      "hints_help": "给 LLM 平台的建议设置，例如模型或温度，以 JSON 对象表示。",
+      "hints_invalid": "请输入有效的 JSON 对象"
+    },
+    "context": {
+      "title": "LLM 上下文",
+      "title_version": "LLM 上下文（v{version}）",
+      "help": "LLM 平台为此智能体收到的完整内容。",
+      "unsaved_preview": "包含您未保存更改的预览。",
+      "rendered": "生成的上下文",
+      "size": "{kb} KB · 约 {tokens} 个 token",
+      "preview_error": "无法生成预览。请检查各字段。",
+      "versions": "版本",
+      "current": "当前",
+      "copied": "已复制到剪贴板",
+      "connect_title": "在 LLM 平台中使用此智能体",
+      "connect_help": "使用个人 API 令牌连接 Claude Code、ChatGPT 或其他 MCP 客户端。",
+      "connect_settings": "设置 MCP",
+      "mcp_server": "MCP 服务器",
+      "llm_prompt": "示例提示词",
+      "llm_prompt_example": "用 get_agent_context 加载工作区 {workspace} 中的 Cybernetics 智能体 @{handle}，并以该智能体的身份行事。然后用 list_agent_work_items 和 get_agent_task_brief 处理它的队列。"
+    },
+    "projects": {
+      "description": "只能在智能体有权访问的项目中为其分配工作项。",
+      "select": "选择项目",
+      "add": "添加到项目",
+      "empty": "该智能体尚无任何项目的访问权限。"
+    },
+    "work_items": {
+      "open": "未完成",
+      "completed": "已完成",
+      "cancelled": "已取消",
+      "empty": "暂无工作项",
+      "copy_brief": "复制任务简报",
+      "brief_copied": "已复制 {key} 的任务简报"
+    },
+    "settings": {
+      "admin_only": "只有工作区管理员可以更改智能体设置。",
+      "accept_title": "接受新分配",
+      "accept_description": "关闭后，智能体保留当前工作项，但无法再分配新的工作项。",
+      "pause_title": "暂停智能体",
+      "pause_description": "已暂停的智能体无法接受新分配。其定义仍可使用。",
+      "pause": "暂停",
+      "resume": "恢复运行",
+      "archive_title": "归档智能体",
+      "archive_description": "将智能体移出其项目。现有分配会保留在历史记录中。",
+      "archive": "归档",
+      "restore_title": "恢复智能体",
+      "restore_description": "以之前的项目访问权限重新激活智能体。",
+      "restore": "恢复",
+      "delete_title": "删除智能体",
+      "delete_description": "该智能体将被永久删除。输入 {handle} 以确认。",
+      "delete": "删除智能体"
+    },
+    "save": {
+      "unsaved": "您有未保存的更改",
+      "change_note_placeholder": "描述此次更改（可选）",
+      "discard": "放弃",
+      "save": "保存"
+    },
+    "toasts": {
+      "created": "已创建 {name}",
+      "saved": "更改已保存",
+      "saved_version": "已保存为版本 {version}",
+      "archived": "智能体已归档",
+      "restored": "智能体已恢复",
+      "deleted": "智能体已删除",
+      "error": "出现问题，请重试。"
+    }
+  }
+}

@@ -1,0 +1,178 @@
+{
+  "agents": {
+    "badge": "Agent",
+    "manage_link": "Członkami-agentami zarządza się na stronie Agenci →",
+    "status": {
+      "active": "Aktywny",
+      "paused": "Wstrzymany",
+      "archived": "Zarchiwizowany"
+    },
+    "tabs": {
+      "overview": "Przegląd",
+      "how_it_works": "Jak działa",
+      "workflow": "Przebieg pracy",
+      "tools": "Narzędzia i wskazówki",
+      "context": "Kontekst",
+      "projects": "Projekty",
+      "work_items": "Elementy pracy",
+      "settings": "Ustawienia"
+    },
+    "actions": {
+      "copy": "Kopiuj",
+      "remove": "Usuń"
+    },
+    "create": {
+      "button": "Nowy agent",
+      "title": "Utwórz agenta",
+      "description": "Zdefiniuj agenta AI, któremu można przypisywać elementy pracy. Platformy LLM wczytują jego definicję przez API lub MCP.",
+      "submit": "Utwórz agenta"
+    },
+    "fields": {
+      "name": "Nazwa",
+      "name_placeholder": "Bot QA",
+      "handle": "Identyfikator",
+      "handle_help": "Służy do odwoływania się do agenta z API i MCP. Małe litery, cyfry, - i _.",
+      "role_title": "Rola",
+      "role_title_placeholder": "Inżynier QA",
+      "avatar_emoji": "Emoji awatara",
+      "avatar_emoji_help": "Opcjonalne. Pozostaw puste, aby użyć domyślnej ikony agenta.",
+      "summary": "Podsumowanie",
+      "summary_placeholder": "Jedno zdanie o tym, co robi ten agent",
+      "summary_help": "Wyświetlane na listach agentów, aby LLM mogły wybrać właściwego agenta.",
+      "profile": "Profil",
+      "profile_help": "Persona i kontekst, w formacie Markdown.",
+      "goal": "Cel",
+      "goal_help": "Co agent optymalizuje i jak mierzy się sukces.",
+      "goal_placeholder": "Wykrywać regresje, zanim trafią na produkcję",
+      "how_it_works": "Jak działa",
+      "how_it_works_help": "Podejście, granice i ograniczenia, w formacie Markdown.",
+      "instructions": "Instrukcje",
+      "instructions_help": "Instrukcje działania, których przestrzega LLM, podobnie jak prompt systemowy.",
+      "capabilities": "Umiejętności",
+      "capabilities_help": "Krótkie tagi opisujące mocne strony agenta. Naciśnij Enter, aby dodać.",
+      "capability_placeholder": "Dodaj umiejętność",
+      "owner": "Właściciel",
+      "owner_help": "Osoba odpowiedzialna za tego agenta.",
+      "no_owner": "Brak właściciela"
+    },
+    "list": {
+      "search": "Szukaj agentów",
+      "filter_all": "Wszyscy",
+      "no_summary": "Brak podsumowania",
+      "version": "v{version}",
+      "projects": "{count, plural, one {# projekt} few {# projekty} many {# projektów} other {# projektu}}",
+      "open_items": "{count, plural, one {# otwarty element pracy} few {# otwarte elementy pracy} many {# otwartych elementów pracy} other {# otwartego elementu pracy}}",
+      "owner": "Właściciel: {name}"
+    },
+    "empty": {
+      "title": "Brak agentów",
+      "description": "Członkowie-agenci to agenci AI z profilem, celem i przebiegiem pracy. Przypisuj im elementy pracy i wczytuj ich definicje do platform LLM przez API lub MCP.",
+      "no_match": "Żaden agent nie pasuje do filtrów"
+    },
+    "detail": {
+      "not_found": "Nie znaleziono tego agenta.",
+      "no_access": "Agentów mogą wyświetlać tylko administratorzy i członkowie przestrzeni roboczej.",
+      "shared_notice": "Ta definicja jest udostępniana platformom LLM przez API i MCP. Nigdy nie umieszczaj w niej sekretów."
+    },
+    "overview": {
+      "open_items": "Otwarte elementy pracy",
+      "projects": "Projekty",
+      "version": "Wersja definicji"
+    },
+    "markdown": {
+      "write": "Edycja",
+      "preview": "Podgląd",
+      "empty": "Jeszcze nic tu nie ma"
+    },
+    "workflow": {
+      "description": "Kroki, które agent wykonuje po kolei. Oznacz kroki, w których musi się zatrzymać i poczekać na zatwierdzenie przez człowieka.",
+      "empty": "Brak zdefiniowanego przebiegu pracy",
+      "add_step": "Dodaj krok",
+      "title_placeholder": "Tytuł kroku",
+      "description_placeholder": "Co dzieje się w tym kroku (Markdown)",
+      "expected_output": "Oczekiwany wynik",
+      "expected_output_placeholder": "Oczekiwany wynik tego kroku",
+      "requires_approval": "Wymaga zatwierdzenia",
+      "requires_approval_help": "Przed kontynuacją wymaga zatwierdzenia przez człowieka",
+      "move_up": "Przenieś w górę",
+      "move_down": "Przenieś w dół"
+    },
+    "tools": {
+      "title": "Narzędzia",
+      "description": "Opisz narzędzia, których agent ma używać. To wyłącznie opis — nigdy nie dodawaj sekretów ani danych logowania.",
+      "empty": "Brak opisanych narzędzi",
+      "add": "Dodaj narzędzie",
+      "name_placeholder": "Nazwa narzędzia",
+      "description_placeholder": "Co robi narzędzie",
+      "usage_placeholder": "Kiedy i jak go używać (Markdown)",
+      "hints_title": "Wskazówki uruchomieniowe",
+      "hints_help": "Zalecane ustawienia dla platformy LLM, np. model lub temperatura, jako obiekt JSON.",
+      "hints_invalid": "Wprowadź prawidłowy obiekt JSON"
+    },
+    "context": {
+      "title": "Kontekst dla LLM",
+      "title_version": "Kontekst dla LLM (v{version})",
+      "help": "Dokładnie to, co platformy LLM otrzymują dla tego agenta.",
+      "unsaved_preview": "Podgląd z niezapisanymi zmianami.",
+      "rendered": "Wygenerowany kontekst",
+      "size": "{kb} KB · około {tokens} tokenów",
+      "preview_error": "Nie udało się wygenerować podglądu. Sprawdź pola.",
+      "versions": "Wersje",
+      "current": "bieżąca",
+      "copied": "Skopiowano do schowka",
+      "connect_title": "Użyj tego agenta na platformie LLM",
+      "connect_help": "Połącz Claude Code, ChatGPT lub innego klienta MCP za pomocą osobistego tokenu API.",
+      "connect_settings": "Skonfiguruj MCP",
+      "mcp_server": "Serwer MCP",
+      "llm_prompt": "Przykładowy prompt",
+      "llm_prompt_example": "Wczytaj agenta Cybernetics @{handle} z przestrzeni roboczej {workspace} za pomocą get_agent_context i działaj jako on. Następnie zrealizuj jego kolejkę za pomocą list_agent_work_items i get_agent_task_brief."
+    },
+    "projects": {
+      "description": "Agentom można przypisywać elementy pracy tylko w projektach, do których mają dostęp.",
+      "select": "Wybierz projekt",
+      "add": "Dodaj do projektu",
+      "empty": "Ten agent nie ma jeszcze dostępu do żadnego projektu."
+    },
+    "work_items": {
+      "open": "Otwarte",
+      "completed": "Ukończone",
+      "cancelled": "Anulowane",
+      "empty": "Brak elementów pracy",
+      "copy_brief": "Kopiuj opis zadania",
+      "brief_copied": "Skopiowano opis zadania {key}"
+    },
+    "settings": {
+      "admin_only": "Ustawienia agentów mogą zmieniać tylko administratorzy przestrzeni roboczej.",
+      "accept_title": "Przyjmuj nowe przypisania",
+      "accept_description": "Po wyłączeniu agent zachowuje bieżące elementy pracy, ale nie można mu przypisać nowych.",
+      "pause_title": "Wstrzymaj agenta",
+      "pause_description": "Wstrzymany agent nie może otrzymywać nowych przypisań. Jego definicja pozostaje dostępna.",
+      "pause": "Wstrzymaj",
+      "resume": "Wznów",
+      "archive_title": "Zarchiwizuj agenta",
+      "archive_description": "Usuwa agenta z jego projektów. Istniejące przypisania pozostają w historii.",
+      "archive": "Archiwizuj",
+      "restore_title": "Przywróć agenta",
+      "restore_description": "Ponownie aktywuje agenta z wcześniejszym dostępem do projektów.",
+      "restore": "Przywróć",
+      "delete_title": "Usuń agenta",
+      "delete_description": "Agent zostanie trwale usunięty. Wpisz {handle}, aby potwierdzić.",
+      "delete": "Usuń agenta"
+    },
+    "save": {
+      "unsaved": "Istnieją niezapisane zmiany",
+      "change_note_placeholder": "Opisz zmianę (opcjonalnie)",
+      "discard": "Odrzuć",
+      "save": "Zapisz"
+    },
+    "toasts": {
+      "created": "Utworzono {name}",
+      "saved": "Zapisano zmiany",
+      "saved_version": "Zapisano jako wersję {version}",
+      "archived": "Zarchiwizowano agenta",
+      "restored": "Przywrócono agenta",
+      "deleted": "Usunięto agenta",
+      "error": "Coś poszło nie tak. Spróbuj ponownie."
+    }
+  }
+}

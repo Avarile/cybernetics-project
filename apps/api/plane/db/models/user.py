@@ -64,6 +64,7 @@ class BotTypeEnum(models.TextChoices):
     """Kinds of bot users (stored in ``User.bot_type`` when ``is_bot`` is set)."""
 
     WORKSPACE_SEED = "WORKSPACE_SEED", "Workspace Seed"
+    AGENT = "AGENT", "Agent"
 
 
 class User(AbstractBaseUser, PermissionsMixin):

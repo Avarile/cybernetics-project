@@ -144,7 +144,8 @@
           "modules": "Modules",
           "intake": "Intake",
           "estimates": "Estimations",
-          "stickies": "Stickies"
+          "stickies": "Stickies",
+          "agents": "Agents"
         }
       }
     }

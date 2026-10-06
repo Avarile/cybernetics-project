@@ -7,7 +7,7 @@
 import { useState } from "react";
 import { observer } from "mobx-react";
 // plane imports
-import { EUserPermissions, EUserPermissionsLevel, MEMBER_TRACKER_ELEMENTS } from "@plane/constants";
+import { AGENT_BOT_TYPE, EUserPermissions, EUserPermissionsLevel, MEMBER_TRACKER_ELEMENTS } from "@plane/constants";
 import { useTranslation } from "@plane/i18n";
 import { Button } from "@plane/propel/button";
 import { SearchIcon } from "@plane/propel/icons";
@@ -42,6 +42,8 @@ export const ProjectMemberList = observer(function ProjectMemberList(props: TPro
     const memberDetails = projectId ? getFilteredProjectMemberDetails(userId, projectId.toString()) : null;
 
     if (!memberDetails?.member || !memberDetails.original_role) return false;
+    // Agentic members' project access is managed on the Agents page
+    if (memberDetails.member.bot_type === AGENT_BOT_TYPE) return false;
 
     const fullName = `${memberDetails?.member.first_name} ${memberDetails?.member.last_name}`.toLowerCase();
     const displayName = memberDetails?.member.display_name.toLowerCase();

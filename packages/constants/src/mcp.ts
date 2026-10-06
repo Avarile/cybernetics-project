@@ -31,7 +31,8 @@ export type TMCPToolGroup =
   | "modules"
   | "intake"
   | "estimates"
-  | "stickies";
+  | "stickies"
+  | "agents";
 
 export type TMCPTool = {
   name: string;
@@ -54,6 +55,7 @@ export const MCP_TOOL_GROUPS: TMCPToolGroup[] = [
   "intake",
   "estimates",
   "stickies",
+  "agents",
 ];
 
 export const MCP_TOOL_GROUP_LABELS: Record<TMCPToolGroup, string> = {
@@ -68,6 +70,7 @@ export const MCP_TOOL_GROUP_LABELS: Record<TMCPToolGroup, string> = {
   intake: "account_settings.mcp.tools.groups.intake",
   estimates: "account_settings.mcp.tools.groups.estimates",
   stickies: "account_settings.mcp.tools.groups.stickies",
+  agents: "account_settings.mcp.tools.groups.agents",
 };
 
 export const MCP_TOOLS: TMCPTool[] = [
@@ -111,7 +114,8 @@ export const MCP_TOOLS: TMCPTool[] = [
     name: "create_project",
     group: "projects",
     mode: "write",
-    description: "Create a project. You become its admin and it gets the default workflow states (Backlog, Todo, In Progress, Done, Cancelled). Cycles and modules are enabled unless turned off; enable intake to accept triage submissions. Workspace guests cannot create projects.",
+    description:
+      "Create a project. You become its admin and it gets the default workflow states (Backlog, Todo, In Progress, Done, Cancelled). Cycles and modules are enabled unless turned off; enable intake to accept triage submissions. Workspace guests cannot create projects.",
   },
   {
     name: "update_project",
@@ -123,7 +127,8 @@ export const MCP_TOOLS: TMCPTool[] = [
     name: "delete_project",
     group: "projects",
     mode: "destructive",
-    description: "Permanently delete a project and everything in it (work items, cycles, modules, ...). This cannot be undone. Pass the project's identifier as confirm_identifier; the call is refused if it does not match. Only project admins can do this.",
+    description:
+      "Permanently delete a project and everything in it (work items, cycles, modules, ...). This cannot be undone. Pass the project's identifier as confirm_identifier; the call is refused if it does not match. Only project admins can do this.",
   },
   {
     name: "archive_project",
@@ -219,7 +224,8 @@ export const MCP_TOOLS: TMCPTool[] = [
     name: "invite_workspace_member",
     group: "members",
     mode: "write",
-    description: "Invite someone to the workspace by email. This records the invitation; it does not send an email itself. Workspace admins only.",
+    description:
+      "Invite someone to the workspace by email. This records the invitation; it does not send an email itself. Workspace admins only.",
   },
   {
     name: "cancel_workspace_invitation",
@@ -231,7 +237,8 @@ export const MCP_TOOLS: TMCPTool[] = [
     name: "list_work_items",
     group: "work_items",
     mode: "read",
-    description: "List work items the current user can see, with optional filters. Filters combine with AND; values inside one filter combine with OR. For example assignees=['me'] and state_groups=['unstarted', 'started'] lists the user's open work, and adding due_before=<yesterday> finds what is overdue. Returns a page of results, the total count and next_offset.",
+    description:
+      "List work items the current user can see, with optional filters. Filters combine with AND; values inside one filter combine with OR. For example assignees=['me'] and state_groups=['unstarted', 'started'] lists the user's open work, and adding due_before=<yesterday> finds what is overdue. Returns a page of results, the total count and next_offset.",
   },
   {
     name: "search_work_items",
@@ -243,7 +250,8 @@ export const MCP_TOOLS: TMCPTool[] = [
     name: "get_work_item",
     group: "work_items",
     mode: "read",
-    description: "Get a work item with its state, assignees and labels expanded. Pass either its key (e.g. 'WEB-123') or both project_id and work_item_id.",
+    description:
+      "Get a work item with its state, assignees and labels expanded. Pass either its key (e.g. 'WEB-123') or both project_id and work_item_id.",
   },
   {
     name: "create_work_item",
@@ -255,7 +263,8 @@ export const MCP_TOOLS: TMCPTool[] = [
     name: "update_work_item",
     group: "work_items",
     mode: "write",
-    description: "Update a work item. Only the fields you pass change. assignee_ids and label_ids REPLACE the whole set, so include the existing ids you want to keep (see get_work_item).",
+    description:
+      "Update a work item. Only the fields you pass change. assignee_ids and label_ids REPLACE the whole set, so include the existing ids you want to keep (see get_work_item).",
   },
   {
     name: "delete_work_item",
@@ -393,7 +402,8 @@ export const MCP_TOOLS: TMCPTool[] = [
     name: "transfer_cycle_work_items",
     group: "cycles",
     mode: "write",
-    description: "Move a finished cycle's unfinished work items into another cycle (sprint rollover). Completed and cancelled work items stay. The source cycle must have ended.",
+    description:
+      "Move a finished cycle's unfinished work items into another cycle (sprint rollover). Completed and cancelled work items stay. The source cycle must have ended.",
   },
   {
     name: "archive_cycle",
@@ -483,7 +493,8 @@ export const MCP_TOOLS: TMCPTool[] = [
     name: "create_intake_work_item",
     group: "intake",
     mode: "write",
-    description: "Submit a work item to a project's intake queue for triage (for example a bug report). The project must have intake enabled.",
+    description:
+      "Submit a work item to a project's intake queue for triage (for example a bug report). The project must have intake enabled.",
   },
   {
     name: "list_intake_work_items",
@@ -501,7 +512,8 @@ export const MCP_TOOLS: TMCPTool[] = [
     name: "triage_intake_work_item",
     group: "intake",
     mode: "write",
-    description: "Triage an intake item: 'accept' moves it into the project as a regular work item, 'reject' declines it, 'snooze' hides it until snoozed_till, 'duplicate' marks it as a duplicate of duplicate_of_id, 'pending' puts it back in the queue. Only project admins can triage.",
+    description:
+      "Triage an intake item: 'accept' moves it into the project as a regular work item, 'reject' declines it, 'snooze' hides it until snoozed_till, 'duplicate' marks it as a duplicate of duplicate_of_id, 'pending' puts it back in the queue. Only project admins can triage.",
   },
   {
     name: "delete_intake_work_item",
@@ -519,7 +531,8 @@ export const MCP_TOOLS: TMCPTool[] = [
     name: "create_estimate",
     group: "estimates",
     mode: "write",
-    description: "Create the project's estimate system, then add its values with create_estimate_points and activate it with update_project(estimate_id=...). A project can only have one estimate.",
+    description:
+      "Create the project's estimate system, then add its values with create_estimate_points and activate it with update_project(estimate_id=...). A project can only have one estimate.",
   },
   {
     name: "update_estimate",
@@ -580,5 +593,72 @@ export const MCP_TOOLS: TMCPTool[] = [
     group: "stickies",
     mode: "destructive",
     description: "Delete a sticky.",
+  },
+  {
+    name: "list_agents",
+    group: "agents",
+    mode: "read",
+    description:
+      "List the workspace's agentic members (AI agents defined in Plane) with handle, summary and capabilities.",
+  },
+  {
+    name: "get_agent_context",
+    group: "agents",
+    mode: "read",
+    description: "Load an agent's definition as prompt-ready Markdown to use as operating instructions.",
+  },
+  {
+    name: "get_agent",
+    group: "agents",
+    mode: "read",
+    description: "Get an agent's full structured definition and status, including its bot_user_id used for assignment.",
+  },
+  {
+    name: "list_agent_work_items",
+    group: "agents",
+    mode: "read",
+    description: "List work items assigned to an agent (its queue).",
+  },
+  {
+    name: "get_agent_task_brief",
+    group: "agents",
+    mode: "read",
+    description: "Get a task brief: the agent's definition plus one of its assigned work items, as Markdown.",
+  },
+  {
+    name: "list_agent_revisions",
+    group: "agents",
+    mode: "read",
+    description: "List an agent's definition versions with change notes.",
+  },
+  {
+    name: "create_agent",
+    group: "agents",
+    mode: "write",
+    description: "Create an agentic member (workspace admins only).",
+  },
+  {
+    name: "update_agent",
+    group: "agents",
+    mode: "write",
+    description: "Update an agent (workspace admins only). Definition changes bump the version.",
+  },
+  {
+    name: "archive_agent",
+    group: "agents",
+    mode: "write",
+    description: "Archive an agent: it leaves its projects and cannot get new assignments.",
+  },
+  {
+    name: "grant_agent_project_access",
+    group: "agents",
+    mode: "write",
+    description: "Let an agent be assigned work items in the given projects.",
+  },
+  {
+    name: "revoke_agent_project_access",
+    group: "agents",
+    mode: "destructive",
+    description: "Remove an agent's access to a project (existing assignments are kept).",
   },
 ];

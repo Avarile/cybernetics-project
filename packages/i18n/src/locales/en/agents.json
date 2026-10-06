@@ -1,0 +1,178 @@
+{
+  "agents": {
+    "badge": "Agent",
+    "manage_link": "Agentic members are managed on the Agents page →",
+    "status": {
+      "active": "Active",
+      "paused": "Paused",
+      "archived": "Archived"
+    },
+    "tabs": {
+      "overview": "Overview",
+      "how_it_works": "How it works",
+      "workflow": "Workflow",
+      "tools": "Tools & hints",
+      "context": "Context",
+      "projects": "Projects",
+      "work_items": "Work items",
+      "settings": "Settings"
+    },
+    "actions": {
+      "copy": "Copy",
+      "remove": "Remove"
+    },
+    "create": {
+      "button": "New agent",
+      "title": "Create an agent",
+      "description": "Define an AI agent that can be assigned work items. LLM platforms load its definition through the API or MCP.",
+      "submit": "Create agent"
+    },
+    "fields": {
+      "name": "Name",
+      "name_placeholder": "QA Bot",
+      "handle": "Handle",
+      "handle_help": "Used to reference the agent from the API and MCP. Lowercase letters, numbers, - and _.",
+      "role_title": "Role",
+      "role_title_placeholder": "QA engineer",
+      "avatar_emoji": "Avatar emoji",
+      "avatar_emoji_help": "Optional. Leave empty to use the default agent icon.",
+      "summary": "Summary",
+      "summary_placeholder": "One line on what this agent does",
+      "summary_help": "Shown in agent lists so LLMs can pick the right agent.",
+      "profile": "Profile",
+      "profile_help": "Persona and background, in Markdown.",
+      "goal": "Goal",
+      "goal_help": "What the agent optimises for and how success is measured.",
+      "goal_placeholder": "Catch regressions before they reach production",
+      "how_it_works": "How it works",
+      "how_it_works_help": "Approach, boundaries and constraints, in Markdown.",
+      "instructions": "Instructions",
+      "instructions_help": "Operating instructions the LLM follows, like a system prompt.",
+      "capabilities": "Capabilities",
+      "capabilities_help": "Short tags that describe what the agent is good at. Press Enter to add.",
+      "capability_placeholder": "Add a capability",
+      "owner": "Owner",
+      "owner_help": "The person accountable for this agent.",
+      "no_owner": "No owner"
+    },
+    "list": {
+      "search": "Search agents",
+      "filter_all": "All",
+      "no_summary": "No summary yet",
+      "version": "v{version}",
+      "projects": "{count, plural, one {# project} other {# projects}}",
+      "open_items": "{count, plural, one {# open work item} other {# open work items}}",
+      "owner": "Owner: {name}"
+    },
+    "empty": {
+      "title": "No agents yet",
+      "description": "Agentic members are AI agents with a profile, goal and workflow. Assign them work items and load their definitions into LLM platforms through the API or MCP.",
+      "no_match": "No agents match your filters"
+    },
+    "detail": {
+      "not_found": "This agent could not be found.",
+      "no_access": "Only workspace admins and members can view agents.",
+      "shared_notice": "This definition is shared with LLM platforms through the API and MCP. Never put secrets in it."
+    },
+    "overview": {
+      "open_items": "Open work items",
+      "projects": "Projects",
+      "version": "Definition version"
+    },
+    "markdown": {
+      "write": "Write",
+      "preview": "Preview",
+      "empty": "Nothing here yet"
+    },
+    "workflow": {
+      "description": "The steps the agent follows, in order. Mark steps where it must stop and wait for a person to approve.",
+      "empty": "No workflow defined",
+      "add_step": "Add step",
+      "title_placeholder": "Step title",
+      "description_placeholder": "What happens in this step (Markdown)",
+      "expected_output": "Expected output",
+      "expected_output_placeholder": "Expected output of this step",
+      "requires_approval": "Needs approval",
+      "requires_approval_help": "Requires human approval before continuing",
+      "move_up": "Move up",
+      "move_down": "Move down"
+    },
+    "tools": {
+      "title": "Tools",
+      "description": "Describe the tools the agent should use. This is descriptive only; never add secrets or credentials.",
+      "empty": "No tools described",
+      "add": "Add tool",
+      "name_placeholder": "Tool name",
+      "description_placeholder": "What the tool does",
+      "usage_placeholder": "When and how to use it (Markdown)",
+      "hints_title": "Runtime hints",
+      "hints_help": "Advisory settings for the LLM platform, such as model or temperature, as a JSON object.",
+      "hints_invalid": "Enter a valid JSON object"
+    },
+    "context": {
+      "title": "LLM context",
+      "title_version": "LLM context (v{version})",
+      "help": "Exactly what LLM platforms receive for this agent.",
+      "unsaved_preview": "Preview including your unsaved changes.",
+      "rendered": "Rendered context",
+      "size": "{kb} KB · about {tokens} tokens",
+      "preview_error": "The preview could not be rendered. Check the fields for errors.",
+      "versions": "Versions",
+      "current": "current",
+      "copied": "Copied to clipboard",
+      "connect_title": "Use this agent in an LLM platform",
+      "connect_help": "Connect Claude Code, ChatGPT or another MCP client with a personal API token.",
+      "connect_settings": "Set up MCP",
+      "mcp_server": "MCP server",
+      "llm_prompt": "Example prompt",
+      "llm_prompt_example": "Load the Cybernetics agent @{handle} in workspace {workspace} with get_agent_context and act as it. Then work through its queue with list_agent_work_items and get_agent_task_brief."
+    },
+    "projects": {
+      "description": "Agents can only be assigned work items in projects they have access to.",
+      "select": "Select a project",
+      "add": "Add to project",
+      "empty": "This agent has no project access yet."
+    },
+    "work_items": {
+      "open": "Open",
+      "completed": "Completed",
+      "cancelled": "Cancelled",
+      "empty": "No work items here",
+      "copy_brief": "Copy task brief",
+      "brief_copied": "Task brief for {key} copied"
+    },
+    "settings": {
+      "admin_only": "Only workspace admins can change agent settings.",
+      "accept_title": "Accept new assignments",
+      "accept_description": "When off, the agent keeps its current work items but cannot be assigned new ones.",
+      "pause_title": "Pause agent",
+      "pause_description": "A paused agent cannot receive new assignments. Its definition stays available.",
+      "pause": "Pause",
+      "resume": "Resume",
+      "archive_title": "Archive agent",
+      "archive_description": "Removes the agent from its projects. Existing assignments are kept for history.",
+      "archive": "Archive",
+      "restore_title": "Restore agent",
+      "restore_description": "Makes the agent active again with its previous project access.",
+      "restore": "Restore",
+      "delete_title": "Delete agent",
+      "delete_description": "This permanently removes the agent. Type {handle} to confirm.",
+      "delete": "Delete agent"
+    },
+    "save": {
+      "unsaved": "You have unsaved changes",
+      "change_note_placeholder": "Describe the change (optional)",
+      "discard": "Discard",
+      "save": "Save"
+    },
+    "toasts": {
+      "created": "{name} created",
+      "saved": "Changes saved",
+      "saved_version": "Saved as version {version}",
+      "archived": "Agent archived",
+      "restored": "Agent restored",
+      "deleted": "Agent deleted",
+      "error": "Something went wrong. Please try again."
+    }
+  }
+}

@@ -1,0 +1,178 @@
+{
+  "agents": {
+    "badge": "Tác tử",
+    "manage_link": "Thành viên tác tử được quản lý trên trang Tác tử →",
+    "status": {
+      "active": "Đang hoạt động",
+      "paused": "Đã tạm dừng",
+      "archived": "Đã lưu trữ"
+    },
+    "tabs": {
+      "overview": "Tổng quan",
+      "how_it_works": "Cách hoạt động",
+      "workflow": "Quy trình",
+      "tools": "Công cụ và gợi ý",
+      "context": "Ngữ cảnh",
+      "projects": "Dự án",
+      "work_items": "Mục công việc",
+      "settings": "Cài đặt"
+    },
+    "actions": {
+      "copy": "Sao chép",
+      "remove": "Gỡ bỏ"
+    },
+    "create": {
+      "button": "Tác tử mới",
+      "title": "Tạo tác tử",
+      "description": "Định nghĩa một tác tử AI có thể được giao mục công việc. Các nền tảng LLM tải định nghĩa của tác tử qua API hoặc MCP.",
+      "submit": "Tạo tác tử"
+    },
+    "fields": {
+      "name": "Tên",
+      "name_placeholder": "Bot QA",
+      "handle": "Định danh",
+      "handle_help": "Dùng để tham chiếu tác tử từ API và MCP. Chữ thường, chữ số, - và _.",
+      "role_title": "Vai trò",
+      "role_title_placeholder": "Kỹ sư QA",
+      "avatar_emoji": "Emoji ảnh đại diện",
+      "avatar_emoji_help": "Không bắt buộc. Để trống để dùng biểu tượng tác tử mặc định.",
+      "summary": "Tóm tắt",
+      "summary_placeholder": "Một dòng mô tả việc tác tử này làm",
+      "summary_help": "Hiển thị trong danh sách tác tử để LLM chọn đúng tác tử.",
+      "profile": "Hồ sơ",
+      "profile_help": "Tính cách và bối cảnh, viết bằng Markdown.",
+      "goal": "Mục tiêu",
+      "goal_help": "Tác tử tối ưu cho điều gì và thành công được đo như thế nào.",
+      "goal_placeholder": "Phát hiện lỗi hồi quy trước khi lên môi trường production",
+      "how_it_works": "Cách hoạt động",
+      "how_it_works_help": "Cách tiếp cận, giới hạn và ràng buộc, viết bằng Markdown.",
+      "instructions": "Chỉ dẫn",
+      "instructions_help": "Chỉ dẫn vận hành mà LLM tuân theo, tương tự system prompt.",
+      "capabilities": "Năng lực",
+      "capabilities_help": "Các thẻ ngắn mô tả điểm mạnh của tác tử. Nhấn Enter để thêm.",
+      "capability_placeholder": "Thêm năng lực",
+      "owner": "Người phụ trách",
+      "owner_help": "Người chịu trách nhiệm về tác tử này.",
+      "no_owner": "Chưa có người phụ trách"
+    },
+    "list": {
+      "search": "Tìm tác tử",
+      "filter_all": "Tất cả",
+      "no_summary": "Chưa có tóm tắt",
+      "version": "v{version}",
+      "projects": "{count, plural, one {# dự án} other {# dự án}}",
+      "open_items": "{count, plural, one {# mục công việc đang mở} other {# mục công việc đang mở}}",
+      "owner": "Người phụ trách: {name}"
+    },
+    "empty": {
+      "title": "Chưa có tác tử nào",
+      "description": "Thành viên tác tử là các tác tử AI có hồ sơ, mục tiêu và quy trình. Hãy giao mục công việc cho họ và tải định nghĩa của họ vào các nền tảng LLM qua API hoặc MCP.",
+      "no_match": "Không có tác tử nào khớp với bộ lọc"
+    },
+    "detail": {
+      "not_found": "Không tìm thấy tác tử này.",
+      "no_access": "Chỉ quản trị viên và thành viên của không gian làm việc mới xem được tác tử.",
+      "shared_notice": "Định nghĩa này được chia sẻ với các nền tảng LLM qua API và MCP. Tuyệt đối không đưa thông tin bí mật vào đây."
+    },
+    "overview": {
+      "open_items": "Mục công việc đang mở",
+      "projects": "Dự án",
+      "version": "Phiên bản định nghĩa"
+    },
+    "markdown": {
+      "write": "Soạn",
+      "preview": "Xem trước",
+      "empty": "Chưa có nội dung"
+    },
+    "workflow": {
+      "description": "Các bước tác tử thực hiện theo thứ tự. Đánh dấu những bước tác tử phải dừng lại và chờ người phê duyệt.",
+      "empty": "Chưa định nghĩa quy trình",
+      "add_step": "Thêm bước",
+      "title_placeholder": "Tiêu đề bước",
+      "description_placeholder": "Điều gì diễn ra ở bước này (Markdown)",
+      "expected_output": "Kết quả mong đợi",
+      "expected_output_placeholder": "Kết quả mong đợi của bước này",
+      "requires_approval": "Cần phê duyệt",
+      "requires_approval_help": "Cần người phê duyệt trước khi tiếp tục",
+      "move_up": "Chuyển lên",
+      "move_down": "Chuyển xuống"
+    },
+    "tools": {
+      "title": "Công cụ",
+      "description": "Mô tả các công cụ tác tử nên dùng. Đây chỉ là mô tả; tuyệt đối không thêm thông tin bí mật hay thông tin đăng nhập.",
+      "empty": "Chưa mô tả công cụ nào",
+      "add": "Thêm công cụ",
+      "name_placeholder": "Tên công cụ",
+      "description_placeholder": "Công cụ làm gì",
+      "usage_placeholder": "Khi nào và cách dùng (Markdown)",
+      "hints_title": "Gợi ý khi chạy",
+      "hints_help": "Thiết lập đề xuất cho nền tảng LLM, như mô hình hoặc nhiệt độ, dưới dạng đối tượng JSON.",
+      "hints_invalid": "Nhập một đối tượng JSON hợp lệ"
+    },
+    "context": {
+      "title": "Ngữ cảnh cho LLM",
+      "title_version": "Ngữ cảnh cho LLM (v{version})",
+      "help": "Chính xác những gì nền tảng LLM nhận được cho tác tử này.",
+      "unsaved_preview": "Bản xem trước gồm cả các thay đổi chưa lưu của bạn.",
+      "rendered": "Ngữ cảnh đã tạo",
+      "size": "{kb} KB · khoảng {tokens} token",
+      "preview_error": "Không thể tạo bản xem trước. Hãy kiểm tra các trường.",
+      "versions": "Phiên bản",
+      "current": "hiện tại",
+      "copied": "Đã sao chép vào bảng nhớ tạm",
+      "connect_title": "Dùng tác tử này trên nền tảng LLM",
+      "connect_help": "Kết nối Claude Code, ChatGPT hoặc ứng dụng MCP khác bằng token API cá nhân.",
+      "connect_settings": "Thiết lập MCP",
+      "mcp_server": "Máy chủ MCP",
+      "llm_prompt": "Prompt mẫu",
+      "llm_prompt_example": "Tải tác tử Cybernetics @{handle} trong không gian làm việc {workspace} bằng get_agent_context và hành động như tác tử đó. Sau đó xử lý hàng đợi của nó bằng list_agent_work_items và get_agent_task_brief."
+    },
+    "projects": {
+      "description": "Tác tử chỉ có thể được giao mục công việc trong các dự án mà nó có quyền truy cập.",
+      "select": "Chọn một dự án",
+      "add": "Thêm vào dự án",
+      "empty": "Tác tử này chưa có quyền truy cập dự án nào."
+    },
+    "work_items": {
+      "open": "Đang mở",
+      "completed": "Đã hoàn thành",
+      "cancelled": "Đã hủy",
+      "empty": "Không có mục công việc nào",
+      "copy_brief": "Sao chép tóm tắt nhiệm vụ",
+      "brief_copied": "Đã sao chép tóm tắt nhiệm vụ {key}"
+    },
+    "settings": {
+      "admin_only": "Chỉ quản trị viên không gian làm việc mới thay đổi được cài đặt tác tử.",
+      "accept_title": "Nhận giao việc mới",
+      "accept_description": "Khi tắt, tác tử giữ các mục công việc hiện tại nhưng không thể được giao thêm.",
+      "pause_title": "Tạm dừng tác tử",
+      "pause_description": "Tác tử đã tạm dừng không thể nhận giao việc mới. Định nghĩa của nó vẫn có thể truy cập.",
+      "pause": "Tạm dừng",
+      "resume": "Tiếp tục",
+      "archive_title": "Lưu trữ tác tử",
+      "archive_description": "Gỡ tác tử khỏi các dự án. Các giao việc hiện có được giữ lại trong lịch sử.",
+      "archive": "Lưu trữ",
+      "restore_title": "Khôi phục tác tử",
+      "restore_description": "Kích hoạt lại tác tử với quyền truy cập dự án trước đây.",
+      "restore": "Khôi phục",
+      "delete_title": "Xóa tác tử",
+      "delete_description": "Tác tử sẽ bị xóa vĩnh viễn. Nhập {handle} để xác nhận.",
+      "delete": "Xóa tác tử"
+    },
+    "save": {
+      "unsaved": "Bạn có thay đổi chưa lưu",
+      "change_note_placeholder": "Mô tả thay đổi (không bắt buộc)",
+      "discard": "Hủy bỏ",
+      "save": "Lưu"
+    },
+    "toasts": {
+      "created": "Đã tạo {name}",
+      "saved": "Đã lưu thay đổi",
+      "saved_version": "Đã lưu thành phiên bản {version}",
+      "archived": "Đã lưu trữ tác tử",
+      "restored": "Đã khôi phục tác tử",
+      "deleted": "Đã xóa tác tử",
+      "error": "Đã xảy ra lỗi. Vui lòng thử lại."
+    }
+  }
+}

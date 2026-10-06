@@ -35,6 +35,7 @@ from plane.db.models import (
     User,
     EstimatePoint,
 )
+from plane.utils.agents.assignment import is_assignable_member, unassignable_agents
 from plane.utils.content_validator import (
     validate_html_content,
     validate_binary_data,
@@ -127,6 +128,13 @@ class IssueSerializer(BaseSerializer):
                 role__gte=15,
                 member_id__in=data["assignees"],
             ).values_list("member_id", flat=True)
+            # Paused/archived agents cannot receive new assignments; say so instead of dropping them
+            blocked = unassignable_agents(data["assignees"], self.instance.id if self.instance else None)
+            if blocked:
+                handles = ", ".join(f"@{handle}" for handle in sorted(blocked.values()))
+                raise serializers.ValidationError(
+                    {"assignees": f"Agent(s) {handles} are paused or archived and cannot receive new assignments"}
+                )
 
         # Validate labels are from project
         if data.get("labels", []):
@@ -214,6 +222,7 @@ class IssueSerializer(BaseSerializer):
                 # Then assign it to default assignee, if it is a valid assignee
                 if (
                     default_assignee_id is not None
+                    and is_assignable_member(default_assignee_id)
                     and ProjectMember.objects.filter(
                         member_id=default_assignee_id,
                         project_id=project_id,

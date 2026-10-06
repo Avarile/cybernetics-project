@@ -7,6 +7,7 @@
 Included from plane/urls.py under the ``api/v1/`` prefix.
 """
 
+from .agent import urlpatterns as agent_patterns
 from .asset import urlpatterns as asset_patterns
 from .cycle import urlpatterns as cycle_patterns
 from .estimate import urlpatterns as estimate_patterns
@@ -22,6 +23,7 @@ from .invite import urlpatterns as invite_patterns
 from .sticky import urlpatterns as sticky_patterns
 
 urlpatterns = [
+    *agent_patterns,
     *asset_patterns,
     *cycle_patterns,
     *estimate_patterns,

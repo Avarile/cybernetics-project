@@ -1,0 +1,178 @@
+{
+  "agents": {
+    "badge": "Agen",
+    "manage_link": "Anggota agen dikelola di halaman Agen →",
+    "status": {
+      "active": "Aktif",
+      "paused": "Dijeda",
+      "archived": "Diarsipkan"
+    },
+    "tabs": {
+      "overview": "Ringkasan",
+      "how_it_works": "Cara kerja",
+      "workflow": "Alur kerja",
+      "tools": "Alat & petunjuk",
+      "context": "Konteks",
+      "projects": "Projek",
+      "work_items": "Item kerja",
+      "settings": "Pengaturan"
+    },
+    "actions": {
+      "copy": "Salin",
+      "remove": "Hapus"
+    },
+    "create": {
+      "button": "Agen baru",
+      "title": "Buat agen",
+      "description": "Tentukan agen AI yang dapat diberi item kerja. Platform LLM memuat definisinya melalui API atau MCP.",
+      "submit": "Buat agen"
+    },
+    "fields": {
+      "name": "Nama",
+      "name_placeholder": "Bot QA",
+      "handle": "Pengenal",
+      "handle_help": "Dipakai untuk merujuk agen dari API dan MCP. Huruf kecil, angka, - dan _.",
+      "role_title": "Peran",
+      "role_title_placeholder": "Insinyur QA",
+      "avatar_emoji": "Emoji avatar",
+      "avatar_emoji_help": "Opsional. Biarkan kosong untuk memakai ikon agen bawaan.",
+      "summary": "Ringkasan",
+      "summary_placeholder": "Satu baris tentang apa yang dilakukan agen ini",
+      "summary_help": "Ditampilkan di daftar agen agar LLM dapat memilih agen yang tepat.",
+      "profile": "Profil",
+      "profile_help": "Persona dan latar belakang, dalam Markdown.",
+      "goal": "Tujuan",
+      "goal_help": "Apa yang dioptimalkan agen dan bagaimana keberhasilan diukur.",
+      "goal_placeholder": "Menemukan regresi sebelum sampai ke produksi",
+      "how_it_works": "Cara kerja",
+      "how_it_works_help": "Pendekatan, batasan, dan kendala, dalam Markdown.",
+      "instructions": "Instruksi",
+      "instructions_help": "Instruksi kerja yang diikuti LLM, seperti prompt sistem.",
+      "capabilities": "Kemampuan",
+      "capabilities_help": "Tag singkat yang menjelaskan keunggulan agen. Tekan Enter untuk menambahkan.",
+      "capability_placeholder": "Tambahkan kemampuan",
+      "owner": "Penanggung jawab",
+      "owner_help": "Orang yang bertanggung jawab atas agen ini.",
+      "no_owner": "Tanpa penanggung jawab"
+    },
+    "list": {
+      "search": "Cari agen",
+      "filter_all": "Semua",
+      "no_summary": "Belum ada ringkasan",
+      "version": "v{version}",
+      "projects": "{count, plural, one {# projek} other {# projek}}",
+      "open_items": "{count, plural, one {# item kerja terbuka} other {# item kerja terbuka}}",
+      "owner": "Penanggung jawab: {name}"
+    },
+    "empty": {
+      "title": "Belum ada agen",
+      "description": "Anggota agen adalah agen AI dengan profil, tujuan, dan alur kerja. Berikan item kerja kepada mereka dan muat definisinya ke platform LLM melalui API atau MCP.",
+      "no_match": "Tidak ada agen yang cocok dengan filter Anda"
+    },
+    "detail": {
+      "not_found": "Agen ini tidak ditemukan.",
+      "no_access": "Hanya admin dan anggota ruang kerja yang dapat melihat agen.",
+      "shared_notice": "Definisi ini dibagikan ke platform LLM melalui API dan MCP. Jangan pernah memasukkan rahasia ke dalamnya."
+    },
+    "overview": {
+      "open_items": "Item kerja terbuka",
+      "projects": "Projek",
+      "version": "Versi definisi"
+    },
+    "markdown": {
+      "write": "Tulis",
+      "preview": "Pratinjau",
+      "empty": "Belum ada isi"
+    },
+    "workflow": {
+      "description": "Langkah-langkah yang diikuti agen secara berurutan. Tandai langkah tempat agen harus berhenti dan menunggu persetujuan seseorang.",
+      "empty": "Belum ada alur kerja",
+      "add_step": "Tambah langkah",
+      "title_placeholder": "Judul langkah",
+      "description_placeholder": "Apa yang terjadi pada langkah ini (Markdown)",
+      "expected_output": "Hasil yang diharapkan",
+      "expected_output_placeholder": "Hasil yang diharapkan dari langkah ini",
+      "requires_approval": "Perlu persetujuan",
+      "requires_approval_help": "Memerlukan persetujuan seseorang sebelum melanjutkan",
+      "move_up": "Pindahkan ke atas",
+      "move_down": "Pindahkan ke bawah"
+    },
+    "tools": {
+      "title": "Alat",
+      "description": "Jelaskan alat yang perlu digunakan agen. Ini hanya deskripsi; jangan pernah menambahkan rahasia atau kredensial.",
+      "empty": "Belum ada alat yang dijelaskan",
+      "add": "Tambah alat",
+      "name_placeholder": "Nama alat",
+      "description_placeholder": "Fungsi alat ini",
+      "usage_placeholder": "Kapan dan cara menggunakannya (Markdown)",
+      "hints_title": "Petunjuk runtime",
+      "hints_help": "Pengaturan yang disarankan untuk platform LLM, seperti model atau temperatur, sebagai objek JSON.",
+      "hints_invalid": "Masukkan objek JSON yang valid"
+    },
+    "context": {
+      "title": "Konteks LLM",
+      "title_version": "Konteks LLM (v{version})",
+      "help": "Persis apa yang diterima platform LLM untuk agen ini.",
+      "unsaved_preview": "Pratinjau termasuk perubahan Anda yang belum disimpan.",
+      "rendered": "Konteks yang dihasilkan",
+      "size": "{kb} KB · sekitar {tokens} token",
+      "preview_error": "Pratinjau tidak dapat dibuat. Periksa isian Anda.",
+      "versions": "Versi",
+      "current": "saat ini",
+      "copied": "Disalin ke papan klip",
+      "connect_title": "Gunakan agen ini di platform LLM",
+      "connect_help": "Hubungkan Claude Code, ChatGPT, atau klien MCP lain dengan token API pribadi.",
+      "connect_settings": "Siapkan MCP",
+      "mcp_server": "Server MCP",
+      "llm_prompt": "Contoh prompt",
+      "llm_prompt_example": "Muat agen Cybernetics @{handle} di ruang kerja {workspace} dengan get_agent_context dan bertindaklah sebagai agen itu. Lalu kerjakan antreannya dengan list_agent_work_items dan get_agent_task_brief."
+    },
+    "projects": {
+      "description": "Agen hanya dapat diberi item kerja di projek yang dapat diaksesnya.",
+      "select": "Pilih projek",
+      "add": "Tambahkan ke projek",
+      "empty": "Agen ini belum memiliki akses ke projek mana pun."
+    },
+    "work_items": {
+      "open": "Terbuka",
+      "completed": "Selesai",
+      "cancelled": "Dibatalkan",
+      "empty": "Tidak ada item kerja",
+      "copy_brief": "Salin ringkasan tugas",
+      "brief_copied": "Ringkasan tugas {key} disalin"
+    },
+    "settings": {
+      "admin_only": "Hanya admin ruang kerja yang dapat mengubah pengaturan agen.",
+      "accept_title": "Terima penugasan baru",
+      "accept_description": "Jika nonaktif, agen tetap memegang item kerja saat ini tetapi tidak dapat diberi yang baru.",
+      "pause_title": "Jeda agen",
+      "pause_description": "Agen yang dijeda tidak dapat menerima penugasan baru. Definisinya tetap tersedia.",
+      "pause": "Jeda",
+      "resume": "Lanjutkan",
+      "archive_title": "Arsipkan agen",
+      "archive_description": "Mengeluarkan agen dari projeknya. Penugasan yang ada tetap tersimpan dalam riwayat.",
+      "archive": "Arsipkan",
+      "restore_title": "Pulihkan agen",
+      "restore_description": "Mengaktifkan kembali agen dengan akses projek sebelumnya.",
+      "restore": "Pulihkan",
+      "delete_title": "Hapus agen",
+      "delete_description": "Agen akan dihapus secara permanen. Ketik {handle} untuk mengonfirmasi.",
+      "delete": "Hapus agen"
+    },
+    "save": {
+      "unsaved": "Ada perubahan yang belum disimpan",
+      "change_note_placeholder": "Jelaskan perubahan (opsional)",
+      "discard": "Buang",
+      "save": "Simpan"
+    },
+    "toasts": {
+      "created": "{name} dibuat",
+      "saved": "Perubahan disimpan",
+      "saved_version": "Disimpan sebagai versi {version}",
+      "archived": "Agen diarsipkan",
+      "restored": "Agen dipulihkan",
+      "deleted": "Agen dihapus",
+      "error": "Terjadi kesalahan. Silakan coba lagi."
+    }
+  }
+}

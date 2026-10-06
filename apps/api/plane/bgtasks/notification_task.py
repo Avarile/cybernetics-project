@@ -706,6 +706,13 @@ def notifications(
                 new_mentions=new_mentions,
                 removed_mention=removed_mention,
             )
+            # Bot users (e.g. agentic members) never receive in-app or email notifications
+            receiver_ids = {n.receiver_id for n in bulk_notifications} | {log.receiver_id for log in bulk_email_logs}
+            bot_ids = set(User.objects.filter(id__in=receiver_ids, is_bot=True).values_list("id", flat=True))
+            if bot_ids:
+                bulk_notifications = [n for n in bulk_notifications if UUID(str(n.receiver_id)) not in bot_ids]
+                bulk_email_logs = [log for log in bulk_email_logs if UUID(str(log.receiver_id)) not in bot_ids]
+
             # Bulk create notifications
             Notification.objects.bulk_create(bulk_notifications, batch_size=100)
             EmailNotificationLog.objects.bulk_create(bulk_email_logs, batch_size=100, ignore_conflicts=True)

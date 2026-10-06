@@ -1,0 +1,178 @@
+{
+  "agents": {
+    "badge": "エージェント",
+    "manage_link": "エージェントメンバーは「エージェント」ページで管理します →",
+    "status": {
+      "active": "稼働中",
+      "paused": "一時停止中",
+      "archived": "アーカイブ済み"
+    },
+    "tabs": {
+      "overview": "概要",
+      "how_it_works": "動作の仕組み",
+      "workflow": "ワークフロー",
+      "tools": "ツールとヒント",
+      "context": "コンテキスト",
+      "projects": "プロジェクト",
+      "work_items": "作業項目",
+      "settings": "設定"
+    },
+    "actions": {
+      "copy": "コピー",
+      "remove": "削除"
+    },
+    "create": {
+      "button": "新しいエージェント",
+      "title": "エージェントを作成",
+      "description": "作業項目を割り当てられる AI エージェントを定義します。LLM プラットフォームは API または MCP 経由でその定義を読み込みます。",
+      "submit": "エージェントを作成"
+    },
+    "fields": {
+      "name": "名前",
+      "name_placeholder": "QA ボット",
+      "handle": "ハンドル",
+      "handle_help": "API や MCP からエージェントを参照するときに使います。小文字の英字、数字、- と _ が使えます。",
+      "role_title": "役割",
+      "role_title_placeholder": "QA エンジニア",
+      "avatar_emoji": "アバターの絵文字",
+      "avatar_emoji_help": "任意です。空欄にすると既定のエージェントアイコンを使います。",
+      "summary": "概要",
+      "summary_placeholder": "このエージェントが何をするかを 1 行で",
+      "summary_help": "LLM が適切なエージェントを選べるよう、エージェント一覧に表示されます。",
+      "profile": "プロフィール",
+      "profile_help": "ペルソナと背景（Markdown）。",
+      "goal": "目標",
+      "goal_help": "エージェントが何を最適化するか、成功をどう測るか。",
+      "goal_placeholder": "本番環境に届く前にリグレッションを見つける",
+      "how_it_works": "動作の仕組み",
+      "how_it_works_help": "進め方、範囲、制約（Markdown）。",
+      "instructions": "指示",
+      "instructions_help": "LLM が従う作業指示です。システムプロンプトに相当します。",
+      "capabilities": "得意分野",
+      "capabilities_help": "エージェントの得意分野を表す短いタグです。Enter キーで追加します。",
+      "capability_placeholder": "得意分野を追加",
+      "owner": "担当者",
+      "owner_help": "このエージェントに責任を持つ人です。",
+      "no_owner": "担当者なし"
+    },
+    "list": {
+      "search": "エージェントを検索",
+      "filter_all": "すべて",
+      "no_summary": "概要はまだありません",
+      "version": "v{version}",
+      "projects": "{count, plural, one {# 件のプロジェクト} other {# 件のプロジェクト}}",
+      "open_items": "{count, plural, one {未完了の作業項目 # 件} other {未完了の作業項目 # 件}}",
+      "owner": "担当者: {name}"
+    },
+    "empty": {
+      "title": "エージェントはまだありません",
+      "description": "エージェントメンバーは、プロフィール、目標、ワークフローを持つ AI エージェントです。作業項目を割り当て、その定義を API または MCP 経由で LLM プラットフォームに読み込めます。",
+      "no_match": "条件に一致するエージェントはありません"
+    },
+    "detail": {
+      "not_found": "このエージェントは見つかりませんでした。",
+      "no_access": "エージェントを閲覧できるのはワークスペースの管理者とメンバーのみです。",
+      "shared_notice": "この定義は API と MCP を通じて LLM プラットフォームと共有されます。機密情報は絶対に含めないでください。"
+    },
+    "overview": {
+      "open_items": "未完了の作業項目",
+      "projects": "プロジェクト",
+      "version": "定義のバージョン"
+    },
+    "markdown": {
+      "write": "編集",
+      "preview": "プレビュー",
+      "empty": "まだ内容がありません"
+    },
+    "workflow": {
+      "description": "エージェントが順番に進める手順です。人の承認を待つ必要がある手順には印を付けてください。",
+      "empty": "ワークフローは定義されていません",
+      "add_step": "手順を追加",
+      "title_placeholder": "手順のタイトル",
+      "description_placeholder": "この手順で行うこと（Markdown）",
+      "expected_output": "期待される成果物",
+      "expected_output_placeholder": "この手順で期待される成果物",
+      "requires_approval": "承認が必要",
+      "requires_approval_help": "続行する前に人の承認が必要です",
+      "move_up": "上へ移動",
+      "move_down": "下へ移動"
+    },
+    "tools": {
+      "title": "ツール",
+      "description": "エージェントが使うべきツールを記述します。説明のためだけの項目です。機密情報や認証情報は絶対に追加しないでください。",
+      "empty": "ツールは記述されていません",
+      "add": "ツールを追加",
+      "name_placeholder": "ツール名",
+      "description_placeholder": "ツールの機能",
+      "usage_placeholder": "いつ、どのように使うか（Markdown）",
+      "hints_title": "実行時のヒント",
+      "hints_help": "モデルや温度など、LLM プラットフォーム向けの推奨設定（JSON オブジェクト）。",
+      "hints_invalid": "有効な JSON オブジェクトを入力してください"
+    },
+    "context": {
+      "title": "LLM コンテキスト",
+      "title_version": "LLM コンテキスト（v{version}）",
+      "help": "LLM プラットフォームがこのエージェントについて受け取る内容そのものです。",
+      "unsaved_preview": "未保存の変更を含むプレビューです。",
+      "rendered": "生成されたコンテキスト",
+      "size": "{kb} KB · 約 {tokens} トークン",
+      "preview_error": "プレビューを生成できませんでした。入力内容を確認してください。",
+      "versions": "バージョン",
+      "current": "現在",
+      "copied": "クリップボードにコピーしました",
+      "connect_title": "LLM プラットフォームでこのエージェントを使う",
+      "connect_help": "個人用 API トークンで Claude Code、ChatGPT などの MCP クライアントを接続します。",
+      "connect_settings": "MCP を設定",
+      "mcp_server": "MCP サーバー",
+      "llm_prompt": "プロンプトの例",
+      "llm_prompt_example": "ワークスペース {workspace} の Cybernetics エージェント @{handle} を get_agent_context で読み込み、そのエージェントとして行動してください。次に list_agent_work_items と get_agent_task_brief でキューの作業を進めてください。"
+    },
+    "projects": {
+      "description": "エージェントに作業項目を割り当てられるのは、アクセス権のあるプロジェクトだけです。",
+      "select": "プロジェクトを選択",
+      "add": "プロジェクトに追加",
+      "empty": "このエージェントはまだどのプロジェクトにもアクセスできません。"
+    },
+    "work_items": {
+      "open": "未完了",
+      "completed": "完了",
+      "cancelled": "キャンセル済み",
+      "empty": "作業項目はありません",
+      "copy_brief": "タスク概要をコピー",
+      "brief_copied": "{key} のタスク概要をコピーしました"
+    },
+    "settings": {
+      "admin_only": "エージェントの設定を変更できるのはワークスペースの管理者のみです。",
+      "accept_title": "新しい割り当てを受け付ける",
+      "accept_description": "オフにすると、現在の作業項目は保持されますが、新しい作業項目は割り当てられません。",
+      "pause_title": "エージェントを一時停止",
+      "pause_description": "一時停止中のエージェントには新しい割り当てができません。定義は引き続き利用できます。",
+      "pause": "一時停止",
+      "resume": "再開",
+      "archive_title": "エージェントをアーカイブ",
+      "archive_description": "エージェントをプロジェクトから外します。既存の割り当ては履歴として残ります。",
+      "archive": "アーカイブ",
+      "restore_title": "エージェントを復元",
+      "restore_description": "以前のプロジェクトへのアクセス権のまま、エージェントを再び有効にします。",
+      "restore": "復元",
+      "delete_title": "エージェントを削除",
+      "delete_description": "エージェントは完全に削除されます。確認のため {handle} と入力してください。",
+      "delete": "エージェントを削除"
+    },
+    "save": {
+      "unsaved": "未保存の変更があります",
+      "change_note_placeholder": "変更内容の説明（任意）",
+      "discard": "破棄",
+      "save": "保存"
+    },
+    "toasts": {
+      "created": "{name} を作成しました",
+      "saved": "変更を保存しました",
+      "saved_version": "バージョン {version} として保存しました",
+      "archived": "エージェントをアーカイブしました",
+      "restored": "エージェントを復元しました",
+      "deleted": "エージェントを削除しました",
+      "error": "問題が発生しました。もう一度お試しください。"
+    }
+  }
+}

@@ -12,7 +12,7 @@ per-member project preferences. Roles: 5 = guest, 15 = member, 20 = admin.
 # Third Party imports
 from rest_framework.response import Response
 from rest_framework import status
-from django.db.models import Min
+from django.db.models import Min, Q
 
 # Module imports
 from .base import BaseViewSet, BaseAPIView
@@ -25,7 +25,7 @@ from plane.app.serializers import (
 
 from plane.app.permissions import WorkspaceUserPermission
 
-from plane.db.models import Project, ProjectMember, ProjectUserProperty, WorkspaceMember
+from plane.db.models import BotTypeEnum, Project, ProjectMember, ProjectUserProperty, WorkspaceMember
 from plane.bgtasks.project_add_user_email_task import project_add_user_email
 from plane.utils.host import base_host
 from plane.app.permissions.base import allow_permission, ROLE
@@ -173,10 +173,11 @@ class ProjectMemberViewSet(BaseViewSet):
     def list(self, request, slug, project_id):
         """List active project members who are also active in the workspace (id, member, role only)."""
         # Get the list of project members for the project
+        # Agentic members are bots but must be listed so they can be picked as assignees
         project_members = ProjectMember.objects.filter(
+            Q(member__is_bot=False) | Q(member__bot_type=BotTypeEnum.AGENT),
             project_id=project_id,
             workspace__slug=slug,
-            member__is_bot=False,
             is_active=True,
             member__member_workspace__workspace__slug=slug,
             member__member_workspace__is_active=True,

@@ -144,7 +144,8 @@
           "modules": "Modul",
           "intake": "Intake",
           "estimates": "Perkiraan",
-          "stickies": "Stickies"
+          "stickies": "Stickies",
+          "agents": "Agen"
         }
       }
     }

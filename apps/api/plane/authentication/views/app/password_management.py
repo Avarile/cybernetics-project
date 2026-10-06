@@ -90,7 +90,8 @@ class ForgotPasswordEndpoint(APIView):
             return Response(exc.get_error_dict(), status=status.HTTP_400_BAD_REQUEST)
 
         # Get the user
-        user = User.objects.filter(email=email).first()
+        # Bot users (e.g. agentic members) can never reset a password
+        user = User.objects.filter(email=email, is_bot=False).first()
         if user:
             # Get the reset token for user
             uidb64, token = generate_password_token(user=user)
@@ -120,7 +121,7 @@ class ResetPasswordEndpoint(View):
             # Decode the id from the uidb64
             try:
                 id = smart_str(urlsafe_base64_decode(uidb64))
-                user = User.objects.get(id=id)
+                user = User.objects.get(id=id, is_bot=False)
             except (ValueError, User.DoesNotExist):
                 exc = AuthenticationException(
                     error_code=AUTHENTICATION_ERROR_CODES["INVALID_PASSWORD_TOKEN"],

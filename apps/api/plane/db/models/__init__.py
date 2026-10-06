@@ -98,3 +98,5 @@ from .sticky import Sticky
 from .description import Description, DescriptionVersion
 
 from .cybernetics_data import IssueCyberneticsRecord, ProjectCyberneticsDataIntegration
+
+from .agent import WorkspaceAgent, WorkspaceAgentRevision

@@ -4,6 +4,7 @@
  * See the LICENSE file for details.
  */
 
+export * from "./agent";
 export * from "./activity";
 export * from "./ai";
 export * from "./analytics";

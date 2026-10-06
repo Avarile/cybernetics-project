@@ -33,6 +33,7 @@ import {
   WORKSPACE_PROJECT_NAVIGATION_PREFERENCES,
 } from "@plane/constants";
 // hooks
+import { useAgent } from "@/hooks/store/use-agent";
 import { useFavorite } from "@/hooks/store/use-favorite";
 import { useMember } from "@/hooks/store/use-member";
 import { useProject } from "@/hooks/store/use-project";
@@ -54,6 +55,7 @@ export const WorkspaceAuthWrapper = observer(function WorkspaceAuthWrapper(props
   const { signOut, data: currentUser } = useUser();
   const { fetchPartialProjects } = useProject();
   const { fetchFavorite } = useFavorite();
+  const { fetchAgents } = useAgent();
   const {
     workspace: { fetchWorkspaceMembers },
   } = useMember();
@@ -98,6 +100,16 @@ export const WorkspaceAuthWrapper = observer(function WorkspaceAuthWrapper(props
       revalidateIfStale: false,
       revalidateOnFocus: false,
     }
+  );
+  // fetch workspace agents (admins and members) so pickers know which agents can take new work
+  useSWR(
+    workspaceSlug && currentWorkspace && canPerformWorkspaceMemberActions
+      ? `WORKSPACE_AGENTS_${workspaceSlug.toString()}`
+      : null,
+    workspaceSlug && currentWorkspace && canPerformWorkspaceMemberActions
+      ? () => fetchAgents(workspaceSlug.toString())
+      : null,
+    { revalidateIfStale: false, revalidateOnFocus: false }
   );
   // fetch workspace favorite
   useSWR(

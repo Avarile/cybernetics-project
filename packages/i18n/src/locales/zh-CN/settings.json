@@ -144,7 +144,8 @@
           "modules": "模块",
           "intake": "Intake",
           "estimates": "估算",
-          "stickies": "Stickies"
+          "stickies": "Stickies",
+          "agents": "智能体"
         }
       }
     }

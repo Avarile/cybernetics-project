@@ -51,6 +51,7 @@ from plane.db.models import (
     ProjectMember,
     EstimatePoint,
 )
+from plane.utils.agents.assignment import is_assignable_member, unassignable_agents
 from plane.utils.content_validator import (
     validate_html_content,
     validate_binary_data,
@@ -177,6 +178,10 @@ class IssueCreateSerializer(BaseSerializer):
                 is_active=True,
                 member_id__in=attrs["assignee_ids"],
             ).values_list("member_id", flat=True)
+            # Silently drop paused/archived agents unless they already hold this work item
+            blocked = unassignable_agents(attrs["assignee_ids"], self.instance.id if self.instance else None)
+            if blocked:
+                attrs["assignee_ids"] = [member_id for member_id in attrs["assignee_ids"] if member_id not in blocked]
 
         # Validate labels are from project
         # Silently drop labels that don't belong to the project
@@ -263,6 +268,7 @@ class IssueCreateSerializer(BaseSerializer):
             # Then assign it to default assignee, if it is a valid assignee
             if (
                 default_assignee_id is not None
+                and is_assignable_member(default_assignee_id)
                 and ProjectMember.objects.filter(
                     member_id=default_assignee_id,
                     project_id=project_id,

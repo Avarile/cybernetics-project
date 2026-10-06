@@ -144,7 +144,8 @@
           "modules": "Модули",
           "intake": "Intake",
           "estimates": "Оценки",
-          "stickies": "Stickies"
+          "stickies": "Stickies",
+          "agents": "Агенты"
         }
       }
     }

@@ -427,6 +427,9 @@ def track_assignees(
                 epoch=epoch,
             )
         )
+        # Bot assignees (agentic members) are not subscribed: they never get notifications
+        if assignee.is_bot:
+            continue
         bulk_subscribers.append(
             IssueSubscriber(
                 subscriber_id=assignee.id,

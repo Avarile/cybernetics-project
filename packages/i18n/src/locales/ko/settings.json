@@ -144,7 +144,8 @@
           "modules": "모듈",
           "intake": "Intake",
           "estimates": "추정",
-          "stickies": "Stickies"
+          "stickies": "Stickies",
+          "agents": "에이전트"
         }
       }
     }

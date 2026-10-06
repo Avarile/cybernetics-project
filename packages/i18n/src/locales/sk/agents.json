@@ -1,0 +1,178 @@
+{
+  "agents": {
+    "badge": "Agent",
+    "manage_link": "Agentských členov spravujete na stránke Agenti →",
+    "status": {
+      "active": "Aktívny",
+      "paused": "Pozastavený",
+      "archived": "Archivovaný"
+    },
+    "tabs": {
+      "overview": "Prehľad",
+      "how_it_works": "Ako funguje",
+      "workflow": "Postup",
+      "tools": "Nástroje a odporúčania",
+      "context": "Kontext",
+      "projects": "Projekty",
+      "work_items": "Pracovné položky",
+      "settings": "Nastavenia"
+    },
+    "actions": {
+      "copy": "Kopírovať",
+      "remove": "Odstrániť"
+    },
+    "create": {
+      "button": "Nový agent",
+      "title": "Vytvoriť agenta",
+      "description": "Definujte agenta AI, ktorému možno prideľovať pracovné položky. Platformy LLM načítavajú jeho definíciu cez API alebo MCP.",
+      "submit": "Vytvoriť agenta"
+    },
+    "fields": {
+      "name": "Názov",
+      "name_placeholder": "QA bot",
+      "handle": "Identifikátor",
+      "handle_help": "Slúži na odkazovanie na agenta z API a MCP. Malé písmená, číslice, - a _.",
+      "role_title": "Rola",
+      "role_title_placeholder": "QA inžinier",
+      "avatar_emoji": "Emoji avatara",
+      "avatar_emoji_help": "Voliteľné. Ponechajte prázdne pre predvolenú ikonu agenta.",
+      "summary": "Zhrnutie",
+      "summary_placeholder": "Jedna veta o tom, čo tento agent robí",
+      "summary_help": "Zobrazuje sa v zoznamoch agentov, aby LLM mohli vybrať správneho agenta.",
+      "profile": "Profil",
+      "profile_help": "Persona a kontext vo formáte Markdown.",
+      "goal": "Cieľ",
+      "goal_help": "Čo agent optimalizuje a ako sa meria úspech.",
+      "goal_placeholder": "Odhaliť regresie skôr, než sa dostanú do produkcie",
+      "how_it_works": "Ako funguje",
+      "how_it_works_help": "Prístup, hranice a obmedzenia vo formáte Markdown.",
+      "instructions": "Pokyny",
+      "instructions_help": "Pracovné pokyny, ktorými sa LLM riadi, podobne ako systémový prompt.",
+      "capabilities": "Schopnosti",
+      "capabilities_help": "Krátke štítky opisujúce silné stránky agenta. Pridajte ich klávesom Enter.",
+      "capability_placeholder": "Pridať schopnosť",
+      "owner": "Vlastník",
+      "owner_help": "Osoba zodpovedná za tohto agenta.",
+      "no_owner": "Bez vlastníka"
+    },
+    "list": {
+      "search": "Hľadať agentov",
+      "filter_all": "Všetko",
+      "no_summary": "Zatiaľ bez zhrnutia",
+      "version": "v{version}",
+      "projects": "{count, plural, one {# projekt} few {# projekty} many {# projektu} other {# projektov}}",
+      "open_items": "{count, plural, one {# otvorená pracovná položka} few {# otvorené pracovné položky} many {# otvorenej pracovnej položky} other {# otvorených pracovných položiek}}",
+      "owner": "Vlastník: {name}"
+    },
+    "empty": {
+      "title": "Zatiaľ žiadni agenti",
+      "description": "Agentskí členovia sú agenti AI s profilom, cieľom a postupom. Prideľujte im pracovné položky a načítavajte ich definície do platforiem LLM cez API alebo MCP.",
+      "no_match": "Vašim filtrom nezodpovedá žiadny agent"
+    },
+    "detail": {
+      "not_found": "Tohto agenta sa nepodarilo nájsť.",
+      "no_access": "Agentov môžu zobraziť iba správcovia a členovia pracovného priestoru.",
+      "shared_notice": "Táto definícia sa zdieľa s platformami LLM cez API a MCP. Nikdy do nej nevkladajte tajné údaje."
+    },
+    "overview": {
+      "open_items": "Otvorené pracovné položky",
+      "projects": "Projekty",
+      "version": "Verzia definície"
+    },
+    "markdown": {
+      "write": "Písať",
+      "preview": "Náhľad",
+      "empty": "Zatiaľ tu nič nie je"
+    },
+    "workflow": {
+      "description": "Kroky, ktoré agent postupne vykonáva. Označte kroky, pri ktorých sa musí zastaviť a počkať na schválenie človekom.",
+      "empty": "Nie je definovaný žiadny postup",
+      "add_step": "Pridať krok",
+      "title_placeholder": "Názov kroku",
+      "description_placeholder": "Čo sa v tomto kroku deje (Markdown)",
+      "expected_output": "Očakávaný výstup",
+      "expected_output_placeholder": "Očakávaný výstup tohto kroku",
+      "requires_approval": "Vyžaduje schválenie",
+      "requires_approval_help": "Pred pokračovaním vyžaduje schválenie človekom",
+      "move_up": "Posunúť nahor",
+      "move_down": "Posunúť nadol"
+    },
+    "tools": {
+      "title": "Nástroje",
+      "description": "Opíšte nástroje, ktoré má agent používať. Ide iba o opis – nikdy nepridávajte tajné ani prihlasovacie údaje.",
+      "empty": "Nie sú opísané žiadne nástroje",
+      "add": "Pridať nástroj",
+      "name_placeholder": "Názov nástroja",
+      "description_placeholder": "Čo nástroj robí",
+      "usage_placeholder": "Kedy a ako ho použiť (Markdown)",
+      "hints_title": "Odporúčania pre beh",
+      "hints_help": "Odporúčané nastavenia pre platformu LLM, napríklad model alebo teplota, ako objekt JSON.",
+      "hints_invalid": "Zadajte platný objekt JSON"
+    },
+    "context": {
+      "title": "Kontext pre LLM",
+      "title_version": "Kontext pre LLM (v{version})",
+      "help": "Presne to, čo platformy LLM pre tohto agenta dostanú.",
+      "unsaved_preview": "Náhľad vrátane neuložených zmien.",
+      "rendered": "Vygenerovaný kontext",
+      "size": "{kb} KB · približne {tokens} tokenov",
+      "preview_error": "Náhľad sa nepodarilo vygenerovať. Skontrolujte polia.",
+      "versions": "Verzie",
+      "current": "aktuálna",
+      "copied": "Skopírované do schránky",
+      "connect_title": "Použiť tohto agenta na platforme LLM",
+      "connect_help": "Pripojte Claude Code, ChatGPT alebo iného klienta MCP pomocou osobného tokenu API.",
+      "connect_settings": "Nastaviť MCP",
+      "mcp_server": "Server MCP",
+      "llm_prompt": "Ukážkový prompt",
+      "llm_prompt_example": "Načítaj agenta Cybernetics @{handle} z pracovného priestoru {workspace} pomocou get_agent_context a konaj ako on. Potom spracuj jeho front pomocou list_agent_work_items a get_agent_task_brief."
+    },
+    "projects": {
+      "description": "Agentom možno prideľovať pracovné položky iba v projektoch, ku ktorým majú prístup.",
+      "select": "Vyberte projekt",
+      "add": "Pridať do projektu",
+      "empty": "Tento agent zatiaľ nemá prístup k žiadnemu projektu."
+    },
+    "work_items": {
+      "open": "Otvorené",
+      "completed": "Dokončené",
+      "cancelled": "Zrušené",
+      "empty": "Žiadne pracovné položky",
+      "copy_brief": "Kopírovať zadanie úlohy",
+      "brief_copied": "Zadanie úlohy {key} skopírované"
+    },
+    "settings": {
+      "admin_only": "Nastavenia agentov môžu meniť iba správcovia pracovného priestoru.",
+      "accept_title": "Prijímať nové pridelenia",
+      "accept_description": "Po vypnutí si agent ponechá súčasné pracovné položky, ale nemožno mu prideliť nové.",
+      "pause_title": "Pozastaviť agenta",
+      "pause_description": "Pozastavený agent nemôže dostávať nové pridelenia. Jeho definícia zostáva dostupná.",
+      "pause": "Pozastaviť",
+      "resume": "Pokračovať",
+      "archive_title": "Archivovať agenta",
+      "archive_description": "Odstráni agenta z jeho projektov. Existujúce pridelenia zostanú v histórii.",
+      "archive": "Archivovať",
+      "restore_title": "Obnoviť agenta",
+      "restore_description": "Znova aktivuje agenta s jeho predchádzajúcim prístupom k projektom.",
+      "restore": "Obnoviť",
+      "delete_title": "Odstrániť agenta",
+      "delete_description": "Agent bude natrvalo odstránený. Na potvrdenie zadajte {handle}.",
+      "delete": "Odstrániť agenta"
+    },
+    "save": {
+      "unsaved": "Máte neuložené zmeny",
+      "change_note_placeholder": "Opíšte zmenu (voliteľné)",
+      "discard": "Zahodiť",
+      "save": "Uložiť"
+    },
+    "toasts": {
+      "created": "{name} vytvorený",
+      "saved": "Zmeny uložené",
+      "saved_version": "Uložené ako verzia {version}",
+      "archived": "Agent archivovaný",
+      "restored": "Agent obnovený",
+      "deleted": "Agent odstránený",
+      "error": "Niečo sa pokazilo. Skúste to prosím znova."
+    }
+  }
+}

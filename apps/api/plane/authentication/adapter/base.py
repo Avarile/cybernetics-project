@@ -355,6 +355,14 @@ class Adapter:
         # and is allowed through for its first login; an account deactivated via
         # the API has last_logout_time set and is blocked regardless of whether
         # it had previously logged in.
+        # Bot users (agentic members, workspace seed bot) never sign in by any method
+        if user and user.is_bot:
+            raise AuthenticationException(
+                error_code=AUTHENTICATION_ERROR_CODES["USER_ACCOUNT_DEACTIVATED"],
+                error_message="USER_ACCOUNT_DEACTIVATED",
+                payload={"email": email},
+            )
+
         if user and not user.is_active and user.last_logout_time is not None:
             raise AuthenticationException(
                 error_code=AUTHENTICATION_ERROR_CODES["USER_ACCOUNT_DEACTIVATED"],

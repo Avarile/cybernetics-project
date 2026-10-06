@@ -8,6 +8,7 @@ Aggregates the per-feature URL modules; mounted under ``/api/`` by
 ``plane/urls.py``.
 """
 
+from .agent import urlpatterns as agent_urls
 from .analytic import urlpatterns as analytic_urls
 from .api import urlpatterns as api_urls
 from .asset import urlpatterns as asset_urls
@@ -31,6 +32,7 @@ from .timezone import urlpatterns as timezone_urls
 from .exporter import urlpatterns as exporter_urls
 
 urlpatterns = [
+    *agent_urls,
     *analytic_urls,
     *asset_urls,
     *cycle_urls,

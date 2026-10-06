@@ -1,0 +1,178 @@
+{
+  "agents": {
+    "badge": "Agent",
+    "manage_link": "Agentní členy spravujete na stránce Agenti →",
+    "status": {
+      "active": "Aktivní",
+      "paused": "Pozastavený",
+      "archived": "Archivovaný"
+    },
+    "tabs": {
+      "overview": "Přehled",
+      "how_it_works": "Jak funguje",
+      "workflow": "Postup",
+      "tools": "Nástroje a doporučení",
+      "context": "Kontext",
+      "projects": "Projekty",
+      "work_items": "Pracovní položky",
+      "settings": "Nastavení"
+    },
+    "actions": {
+      "copy": "Kopírovat",
+      "remove": "Odebrat"
+    },
+    "create": {
+      "button": "Nový agent",
+      "title": "Vytvořit agenta",
+      "description": "Definujte agenta AI, kterému lze přiřazovat pracovní položky. Platformy LLM načítají jeho definici přes API nebo MCP.",
+      "submit": "Vytvořit agenta"
+    },
+    "fields": {
+      "name": "Název",
+      "name_placeholder": "QA bot",
+      "handle": "Identifikátor",
+      "handle_help": "Slouží k odkazování na agenta z API a MCP. Malá písmena, číslice, - a _.",
+      "role_title": "Role",
+      "role_title_placeholder": "QA inženýr",
+      "avatar_emoji": "Emoji avatara",
+      "avatar_emoji_help": "Volitelné. Ponechte prázdné pro výchozí ikonu agenta.",
+      "summary": "Shrnutí",
+      "summary_placeholder": "Jedna věta o tom, co tento agent dělá",
+      "summary_help": "Zobrazuje se v seznamech agentů, aby LLM mohly vybrat správného agenta.",
+      "profile": "Profil",
+      "profile_help": "Persona a kontext ve formátu Markdown.",
+      "goal": "Cíl",
+      "goal_help": "Co agent optimalizuje a jak se měří úspěch.",
+      "goal_placeholder": "Odhalit regrese dříve, než se dostanou do produkce",
+      "how_it_works": "Jak funguje",
+      "how_it_works_help": "Přístup, hranice a omezení ve formátu Markdown.",
+      "instructions": "Pokyny",
+      "instructions_help": "Pracovní pokyny, kterými se LLM řídí, podobně jako systémový prompt.",
+      "capabilities": "Schopnosti",
+      "capabilities_help": "Krátké štítky popisující silné stránky agenta. Přidejte je klávesou Enter.",
+      "capability_placeholder": "Přidat schopnost",
+      "owner": "Vlastník",
+      "owner_help": "Osoba odpovědná za tohoto agenta.",
+      "no_owner": "Bez vlastníka"
+    },
+    "list": {
+      "search": "Hledat agenty",
+      "filter_all": "Vše",
+      "no_summary": "Zatím bez shrnutí",
+      "version": "v{version}",
+      "projects": "{count, plural, one {# projekt} few {# projekty} many {# projektu} other {# projektů}}",
+      "open_items": "{count, plural, one {# otevřená pracovní položka} few {# otevřené pracovní položky} many {# otevřené pracovní položky} other {# otevřených pracovních položek}}",
+      "owner": "Vlastník: {name}"
+    },
+    "empty": {
+      "title": "Zatím žádní agenti",
+      "description": "Agentní členové jsou agenti AI s profilem, cílem a postupem. Přiřazujte jim pracovní položky a načítejte jejich definice do platforem LLM přes API nebo MCP.",
+      "no_match": "Vašim filtrům neodpovídá žádný agent"
+    },
+    "detail": {
+      "not_found": "Tohoto agenta se nepodařilo najít.",
+      "no_access": "Agenty mohou zobrazit pouze správci a členové pracovního prostoru.",
+      "shared_notice": "Tato definice se sdílí s platformami LLM přes API a MCP. Nikdy do ní nevkládejte tajné údaje."
+    },
+    "overview": {
+      "open_items": "Otevřené pracovní položky",
+      "projects": "Projekty",
+      "version": "Verze definice"
+    },
+    "markdown": {
+      "write": "Psát",
+      "preview": "Náhled",
+      "empty": "Zatím zde nic není"
+    },
+    "workflow": {
+      "description": "Kroky, které agent postupně provádí. Označte kroky, u kterých se musí zastavit a počkat na schválení člověkem.",
+      "empty": "Není definován žádný postup",
+      "add_step": "Přidat krok",
+      "title_placeholder": "Název kroku",
+      "description_placeholder": "Co se v tomto kroku děje (Markdown)",
+      "expected_output": "Očekávaný výstup",
+      "expected_output_placeholder": "Očekávaný výstup tohoto kroku",
+      "requires_approval": "Vyžaduje schválení",
+      "requires_approval_help": "Před pokračováním vyžaduje schválení člověkem",
+      "move_up": "Posunout nahoru",
+      "move_down": "Posunout dolů"
+    },
+    "tools": {
+      "title": "Nástroje",
+      "description": "Popište nástroje, které má agent používat. Jde pouze o popis – nikdy nepřidávejte tajné údaje ani přihlašovací údaje.",
+      "empty": "Nejsou popsány žádné nástroje",
+      "add": "Přidat nástroj",
+      "name_placeholder": "Název nástroje",
+      "description_placeholder": "Co nástroj dělá",
+      "usage_placeholder": "Kdy a jak ho použít (Markdown)",
+      "hints_title": "Doporučení pro běh",
+      "hints_help": "Doporučená nastavení pro platformu LLM, například model nebo teplota, jako objekt JSON.",
+      "hints_invalid": "Zadejte platný objekt JSON"
+    },
+    "context": {
+      "title": "Kontext pro LLM",
+      "title_version": "Kontext pro LLM (v{version})",
+      "help": "Přesně to, co platformy LLM pro tohoto agenta dostanou.",
+      "unsaved_preview": "Náhled včetně neuložených změn.",
+      "rendered": "Vygenerovaný kontext",
+      "size": "{kb} KB · přibližně {tokens} tokenů",
+      "preview_error": "Náhled se nepodařilo vygenerovat. Zkontrolujte pole.",
+      "versions": "Verze",
+      "current": "aktuální",
+      "copied": "Zkopírováno do schránky",
+      "connect_title": "Použít tohoto agenta na platformě LLM",
+      "connect_help": "Připojte Claude Code, ChatGPT nebo jiného klienta MCP pomocí osobního tokenu API.",
+      "connect_settings": "Nastavit MCP",
+      "mcp_server": "Server MCP",
+      "llm_prompt": "Ukázkový prompt",
+      "llm_prompt_example": "Načti agenta Cybernetics @{handle} z pracovního prostoru {workspace} pomocí get_agent_context a jednej jako on. Potom zpracuj jeho frontu pomocí list_agent_work_items a get_agent_task_brief."
+    },
+    "projects": {
+      "description": "Agentům lze přiřazovat pracovní položky jen v projektech, ke kterým mají přístup.",
+      "select": "Vyberte projekt",
+      "add": "Přidat do projektu",
+      "empty": "Tento agent zatím nemá přístup k žádnému projektu."
+    },
+    "work_items": {
+      "open": "Otevřené",
+      "completed": "Dokončené",
+      "cancelled": "Zrušené",
+      "empty": "Žádné pracovní položky",
+      "copy_brief": "Kopírovat zadání úkolu",
+      "brief_copied": "Zadání úkolu {key} zkopírováno"
+    },
+    "settings": {
+      "admin_only": "Nastavení agentů mohou měnit pouze správci pracovního prostoru.",
+      "accept_title": "Přijímat nová přiřazení",
+      "accept_description": "Po vypnutí si agent ponechá současné pracovní položky, ale nelze mu přiřadit nové.",
+      "pause_title": "Pozastavit agenta",
+      "pause_description": "Pozastavený agent nemůže dostávat nová přiřazení. Jeho definice zůstává dostupná.",
+      "pause": "Pozastavit",
+      "resume": "Obnovit činnost",
+      "archive_title": "Archivovat agenta",
+      "archive_description": "Odebere agenta z jeho projektů. Stávající přiřazení zůstanou v historii.",
+      "archive": "Archivovat",
+      "restore_title": "Obnovit agenta",
+      "restore_description": "Znovu aktivuje agenta s jeho dřívějším přístupem k projektům.",
+      "restore": "Obnovit",
+      "delete_title": "Smazat agenta",
+      "delete_description": "Agent bude trvale odstraněn. Pro potvrzení zadejte {handle}.",
+      "delete": "Smazat agenta"
+    },
+    "save": {
+      "unsaved": "Máte neuložené změny",
+      "change_note_placeholder": "Popište změnu (volitelné)",
+      "discard": "Zahodit",
+      "save": "Uložit"
+    },
+    "toasts": {
+      "created": "{name} vytvořen",
+      "saved": "Změny uloženy",
+      "saved_version": "Uloženo jako verze {version}",
+      "archived": "Agent archivován",
+      "restored": "Agent obnoven",
+      "deleted": "Agent smazán",
+      "error": "Něco se pokazilo. Zkuste to prosím znovu."
+    }
+  }
+}

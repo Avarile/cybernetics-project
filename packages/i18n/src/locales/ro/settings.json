@@ -144,7 +144,8 @@
           "modules": "Module",
           "intake": "Intake",
           "estimates": "Estimări",
-          "stickies": "Stickies"
+          "stickies": "Stickies",
+          "agents": "Agenți"
         }
       }
     }

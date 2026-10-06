@@ -1,0 +1,178 @@
+{
+  "agents": {
+    "badge": "Agente",
+    "manage_link": "I membri agenti si gestiscono nella pagina Agenti →",
+    "status": {
+      "active": "Attivo",
+      "paused": "In pausa",
+      "archived": "Archiviato"
+    },
+    "tabs": {
+      "overview": "Panoramica",
+      "how_it_works": "Come funziona",
+      "workflow": "Flusso",
+      "tools": "Strumenti e indicazioni",
+      "context": "Contesto",
+      "projects": "Progetti",
+      "work_items": "Elementi di lavoro",
+      "settings": "Impostazioni"
+    },
+    "actions": {
+      "copy": "Copia",
+      "remove": "Rimuovi"
+    },
+    "create": {
+      "button": "Nuovo agente",
+      "title": "Crea un agente",
+      "description": "Definisca un agente IA a cui assegnare elementi di lavoro. Le piattaforme LLM caricano la sua definizione tramite l’API o MCP.",
+      "submit": "Crea agente"
+    },
+    "fields": {
+      "name": "Nome",
+      "name_placeholder": "Bot QA",
+      "handle": "Handle",
+      "handle_help": "Serve a fare riferimento all’agente dall’API e da MCP. Lettere minuscole, numeri, - e _.",
+      "role_title": "Ruolo",
+      "role_title_placeholder": "Ingegnere QA",
+      "avatar_emoji": "Emoji dell’avatar",
+      "avatar_emoji_help": "Facoltativo. Lasci vuoto per usare l’icona predefinita dell’agente.",
+      "summary": "Riepilogo",
+      "summary_placeholder": "Una riga su cosa fa questo agente",
+      "summary_help": "Mostrato negli elenchi degli agenti affinché gli LLM scelgano l’agente giusto.",
+      "profile": "Profilo",
+      "profile_help": "Personalità e contesto, in Markdown.",
+      "goal": "Obiettivo",
+      "goal_help": "Cosa ottimizza l’agente e come si misura il successo.",
+      "goal_placeholder": "Individuare le regressioni prima che arrivino in produzione",
+      "how_it_works": "Come funziona",
+      "how_it_works_help": "Approccio, limiti e vincoli, in Markdown.",
+      "instructions": "Istruzioni",
+      "instructions_help": "Istruzioni operative seguite dall’LLM, come un prompt di sistema.",
+      "capabilities": "Competenze",
+      "capabilities_help": "Brevi tag che descrivono i punti di forza dell’agente. Premere Invio per aggiungere.",
+      "capability_placeholder": "Aggiungi una competenza",
+      "owner": "Responsabile",
+      "owner_help": "La persona responsabile di questo agente.",
+      "no_owner": "Nessun responsabile"
+    },
+    "list": {
+      "search": "Cerca agenti",
+      "filter_all": "Tutti",
+      "no_summary": "Nessun riepilogo",
+      "version": "v{version}",
+      "projects": "{count, plural, one {# progetto} many {# progetti} other {# progetti}}",
+      "open_items": "{count, plural, one {# elemento di lavoro aperto} many {# elementi di lavoro aperti} other {# elementi di lavoro aperti}}",
+      "owner": "Responsabile: {name}"
+    },
+    "empty": {
+      "title": "Ancora nessun agente",
+      "description": "I membri agenti sono agenti IA con un profilo, un obiettivo e un flusso. Assegni loro elementi di lavoro e carichi le loro definizioni nelle piattaforme LLM tramite l’API o MCP.",
+      "no_match": "Nessun agente corrisponde ai filtri"
+    },
+    "detail": {
+      "not_found": "Impossibile trovare questo agente.",
+      "no_access": "Solo gli amministratori e i membri dello spazio di lavoro possono vedere gli agenti.",
+      "shared_notice": "Questa definizione è condivisa con piattaforme LLM tramite l’API e MCP. Non inserisca mai segreti."
+    },
+    "overview": {
+      "open_items": "Elementi di lavoro aperti",
+      "projects": "Progetti",
+      "version": "Versione della definizione"
+    },
+    "markdown": {
+      "write": "Scrivi",
+      "preview": "Anteprima",
+      "empty": "Ancora nulla qui"
+    },
+    "workflow": {
+      "description": "I passaggi che l’agente segue, in ordine. Contrassegni quelli in cui deve fermarsi e attendere l’approvazione di una persona.",
+      "empty": "Nessun flusso definito",
+      "add_step": "Aggiungi passaggio",
+      "title_placeholder": "Titolo del passaggio",
+      "description_placeholder": "Cosa succede in questo passaggio (Markdown)",
+      "expected_output": "Risultato atteso",
+      "expected_output_placeholder": "Risultato atteso di questo passaggio",
+      "requires_approval": "Richiede approvazione",
+      "requires_approval_help": "Richiede l’approvazione di una persona prima di continuare",
+      "move_up": "Sposta su",
+      "move_down": "Sposta giù"
+    },
+    "tools": {
+      "title": "Strumenti",
+      "description": "Descriva gli strumenti che l’agente deve usare. È solo descrittivo: non aggiunga mai segreti o credenziali.",
+      "empty": "Nessuno strumento descritto",
+      "add": "Aggiungi strumento",
+      "name_placeholder": "Nome dello strumento",
+      "description_placeholder": "Cosa fa lo strumento",
+      "usage_placeholder": "Quando e come usarlo (Markdown)",
+      "hints_title": "Indicazioni di esecuzione",
+      "hints_help": "Impostazioni consigliate per la piattaforma LLM, come modello o temperatura, in un oggetto JSON.",
+      "hints_invalid": "Inserisca un oggetto JSON valido"
+    },
+    "context": {
+      "title": "Contesto per LLM",
+      "title_version": "Contesto per LLM (v{version})",
+      "help": "Esattamente ciò che le piattaforme LLM ricevono per questo agente.",
+      "unsaved_preview": "Anteprima con le modifiche non salvate.",
+      "rendered": "Contesto generato",
+      "size": "{kb} KB · circa {tokens} token",
+      "preview_error": "Impossibile generare l’anteprima. Controlli i campi.",
+      "versions": "Versioni",
+      "current": "attuale",
+      "copied": "Copiato negli appunti",
+      "connect_title": "Usare questo agente in una piattaforma LLM",
+      "connect_help": "Colleghi Claude Code, ChatGPT o un altro client MCP con un token API personale.",
+      "connect_settings": "Configura MCP",
+      "mcp_server": "Server MCP",
+      "llm_prompt": "Prompt di esempio",
+      "llm_prompt_example": "Carica l’agente Cybernetics @{handle} dello spazio di lavoro {workspace} con get_agent_context e agisci come tale. Poi lavora la sua coda con list_agent_work_items e get_agent_task_brief."
+    },
+    "projects": {
+      "description": "Agli agenti si possono assegnare elementi di lavoro solo nei progetti a cui hanno accesso.",
+      "select": "Seleziona un progetto",
+      "add": "Aggiungi al progetto",
+      "empty": "Questo agente non ha ancora accesso ad alcun progetto."
+    },
+    "work_items": {
+      "open": "Aperti",
+      "completed": "Completati",
+      "cancelled": "Annullati",
+      "empty": "Nessun elemento di lavoro",
+      "copy_brief": "Copia brief dell’attività",
+      "brief_copied": "Brief dell’attività {key} copiato"
+    },
+    "settings": {
+      "admin_only": "Solo gli amministratori dello spazio di lavoro possono modificare le impostazioni degli agenti.",
+      "accept_title": "Accetta nuove assegnazioni",
+      "accept_description": "Se disattivato, l’agente mantiene gli elementi di lavoro attuali ma non può riceverne di nuovi.",
+      "pause_title": "Metti in pausa l’agente",
+      "pause_description": "Un agente in pausa non può ricevere nuove assegnazioni. La sua definizione resta disponibile.",
+      "pause": "Metti in pausa",
+      "resume": "Riprendi",
+      "archive_title": "Archivia agente",
+      "archive_description": "Rimuove l’agente dai suoi progetti. Le assegnazioni esistenti restano nella cronologia.",
+      "archive": "Archivia",
+      "restore_title": "Ripristina agente",
+      "restore_description": "Riattiva l’agente con il precedente accesso ai progetti.",
+      "restore": "Ripristina",
+      "delete_title": "Elimina agente",
+      "delete_description": "L’agente verrà rimosso definitivamente. Digiti {handle} per confermare.",
+      "delete": "Elimina agente"
+    },
+    "save": {
+      "unsaved": "Ci sono modifiche non salvate",
+      "change_note_placeholder": "Descriva la modifica (facoltativo)",
+      "discard": "Annulla modifiche",
+      "save": "Salva"
+    },
+    "toasts": {
+      "created": "{name} creato",
+      "saved": "Modifiche salvate",
+      "saved_version": "Salvato come versione {version}",
+      "archived": "Agente archiviato",
+      "restored": "Agente ripristinato",
+      "deleted": "Agente eliminato",
+      "error": "Si è verificato un errore. Riprovi."
+    }
+  }
+}

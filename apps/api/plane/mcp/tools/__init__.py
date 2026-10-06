@@ -22,6 +22,7 @@ TOOL_GROUPS = [
     "intake",
     "estimates",
     "stickies",
+    "agents",
 ]
 # Always registered: clients need them to find workspace slugs and their own user id.
 ALWAYS_ENABLED = {"context"}

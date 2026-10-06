@@ -6,10 +6,12 @@
 
 import { useState } from "react";
 import { observer } from "mobx-react";
+import Link from "next/link";
 import { useParams } from "next/navigation";
 import useSWR from "swr";
 import { Disclosure } from "@headlessui/react";
 // plane imports
+import { AGENT_BOT_TYPE } from "@plane/constants";
 import { useTranslation } from "@plane/i18n";
 import { ChevronDownIcon } from "@plane/propel/icons";
 import { Collapsible } from "@plane/ui";
@@ -60,7 +62,10 @@ export const WorkspaceMembersList = observer(function WorkspaceMembersList(props
 
   // derived values
   const filteredMemberIds = workspaceSlug ? getFilteredWorkspaceMemberIds(workspaceSlug.toString()) : [];
-  const searchedMemberIds = searchQuery ? getSearchedWorkspaceMemberIds(searchQuery) : filteredMemberIds;
+  // Agentic members are managed on the Agents page, not here
+  const searchedMemberIds = (searchQuery ? getSearchedWorkspaceMemberIds(searchQuery) : filteredMemberIds)?.filter(
+    (memberId) => getWorkspaceMemberDetails(memberId)?.member?.bot_type !== AGENT_BOT_TYPE
+  );
   const searchedInvitationsIds = getSearchedWorkspaceInvitationIds(searchQuery);
   const memberDetails = searchedMemberIds
     ?.map((memberId) => getWorkspaceMemberDetails(memberId))
@@ -72,6 +77,12 @@ export const WorkspaceMembersList = observer(function WorkspaceMembersList(props
 
   return (
     <>
+      <Link
+        href={`/${workspaceSlug?.toString()}/agents`}
+        className="mb-2 inline-flex text-body-xs-regular text-accent-primary hover:underline"
+      >
+        {t("agents.manage_link")}
+      </Link>
       <div className="divide-y-[0.5px] divide-subtle overflow-scroll">
         {searchedMemberIds?.length !== 0 && <WorkspaceMembersListItem memberDetails={memberDetails ?? []} />}
         {searchedInvitationsIds?.length === 0 && searchedMemberIds?.length === 0 && (

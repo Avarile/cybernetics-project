@@ -11,7 +11,7 @@ import { API_BASE_URL, MCP_ENDPOINT_PATH } from "@plane/constants";
 export const TOKEN_PLACEHOLDER = "<YOUR_TOKEN>";
 
 /** Name the server is registered under in the client's config. */
-const SERVER_NAME = "plane";
+const SERVER_NAME = "cybernetics-project-management";
 
 const PROTOCOL_VERSION = "2026-07-28";
 

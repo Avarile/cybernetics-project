@@ -1,0 +1,5 @@
+```build image
+  docker build -f apps/api/Dockerfile.api -t cybernetics-project-backend:$T apps/api
+  docker build -f apps/web/Dockerfile.web -t cybernetics-project-web:$T .
+```
+Replace web:latest with whatever name and tag you want, for example myregistry/web:v1.

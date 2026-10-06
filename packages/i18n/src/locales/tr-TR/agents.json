@@ -1,0 +1,178 @@
+{
+  "agents": {
+    "badge": "Ajan",
+    "manage_link": "Ajan üyeler Ajanlar sayfasından yönetilir →",
+    "status": {
+      "active": "Etkin",
+      "paused": "Duraklatıldı",
+      "archived": "Arşivlendi"
+    },
+    "tabs": {
+      "overview": "Genel bakış",
+      "how_it_works": "Nasıl çalışır",
+      "workflow": "İş akışı",
+      "tools": "Araçlar ve ipuçları",
+      "context": "Bağlam",
+      "projects": "Projeler",
+      "work_items": "İş öğeleri",
+      "settings": "Ayarlar"
+    },
+    "actions": {
+      "copy": "Kopyala",
+      "remove": "Kaldır"
+    },
+    "create": {
+      "button": "Yeni ajan",
+      "title": "Ajan oluşturun",
+      "description": "İş öğesi atanabilecek bir yapay zekâ ajanı tanımlayın. LLM platformları tanımını API veya MCP üzerinden yükler.",
+      "submit": "Ajan oluştur"
+    },
+    "fields": {
+      "name": "Ad",
+      "name_placeholder": "QA Botu",
+      "handle": "Tanımlayıcı",
+      "handle_help": "API ve MCP üzerinden ajana başvurmak için kullanılır. Küçük harf, rakam, - ve _.",
+      "role_title": "Rol",
+      "role_title_placeholder": "QA mühendisi",
+      "avatar_emoji": "Avatar emojisi",
+      "avatar_emoji_help": "İsteğe bağlı. Varsayılan ajan simgesini kullanmak için boş bırakın.",
+      "summary": "Özet",
+      "summary_placeholder": "Bu ajanın ne yaptığına dair tek satır",
+      "summary_help": "LLM'lerin doğru ajanı seçebilmesi için ajan listelerinde gösterilir.",
+      "profile": "Profil",
+      "profile_help": "Kişilik ve geçmiş, Markdown biçiminde.",
+      "goal": "Hedef",
+      "goal_help": "Ajanın neyi optimize ettiği ve başarının nasıl ölçüldüğü.",
+      "goal_placeholder": "Gerilemeleri canlı ortama ulaşmadan yakalamak",
+      "how_it_works": "Nasıl çalışır",
+      "how_it_works_help": "Yaklaşım, sınırlar ve kısıtlamalar, Markdown biçiminde.",
+      "instructions": "Talimatlar",
+      "instructions_help": "LLM'nin uyduğu çalışma talimatları; sistem istemine benzer.",
+      "capabilities": "Yetenekler",
+      "capabilities_help": "Ajanın güçlü yönlerini anlatan kısa etiketler. Eklemek için Enter tuşuna basın.",
+      "capability_placeholder": "Yetenek ekleyin",
+      "owner": "Sorumlu",
+      "owner_help": "Bu ajandan sorumlu kişi.",
+      "no_owner": "Sorumlu yok"
+    },
+    "list": {
+      "search": "Ajan arayın",
+      "filter_all": "Tümü",
+      "no_summary": "Henüz özet yok",
+      "version": "v{version}",
+      "projects": "{count, plural, one {# proje} other {# proje}}",
+      "open_items": "{count, plural, one {# açık iş öğesi} other {# açık iş öğesi}}",
+      "owner": "Sorumlu: {name}"
+    },
+    "empty": {
+      "title": "Henüz ajan yok",
+      "description": "Ajan üyeler; profili, hedefi ve iş akışı olan yapay zekâ ajanlarıdır. Onlara iş öğeleri atayın ve tanımlarını API veya MCP üzerinden LLM platformlarına yükleyin.",
+      "no_match": "Filtrelerinizle eşleşen ajan yok"
+    },
+    "detail": {
+      "not_found": "Bu ajan bulunamadı.",
+      "no_access": "Ajanları yalnızca çalışma alanı yöneticileri ve üyeleri görebilir.",
+      "shared_notice": "Bu tanım API ve MCP üzerinden LLM platformlarıyla paylaşılır. İçine asla gizli bilgi eklemeyin."
+    },
+    "overview": {
+      "open_items": "Açık iş öğeleri",
+      "projects": "Projeler",
+      "version": "Tanım sürümü"
+    },
+    "markdown": {
+      "write": "Yaz",
+      "preview": "Önizleme",
+      "empty": "Burada henüz bir şey yok"
+    },
+    "workflow": {
+      "description": "Ajanın sırayla izlediği adımlar. Durup bir kişinin onayını beklemesi gereken adımları işaretleyin.",
+      "empty": "Tanımlı iş akışı yok",
+      "add_step": "Adım ekle",
+      "title_placeholder": "Adım başlığı",
+      "description_placeholder": "Bu adımda neler olur (Markdown)",
+      "expected_output": "Beklenen çıktı",
+      "expected_output_placeholder": "Bu adımın beklenen çıktısı",
+      "requires_approval": "Onay gerekir",
+      "requires_approval_help": "Devam etmeden önce bir kişinin onayı gerekir",
+      "move_up": "Yukarı taşı",
+      "move_down": "Aşağı taşı"
+    },
+    "tools": {
+      "title": "Araçlar",
+      "description": "Ajanın kullanması gereken araçları açıklayın. Bu yalnızca açıklamadır; asla gizli bilgi veya kimlik bilgisi eklemeyin.",
+      "empty": "Açıklanmış araç yok",
+      "add": "Araç ekle",
+      "name_placeholder": "Araç adı",
+      "description_placeholder": "Aracın ne yaptığı",
+      "usage_placeholder": "Ne zaman ve nasıl kullanılacağı (Markdown)",
+      "hints_title": "Çalışma ipuçları",
+      "hints_help": "LLM platformu için önerilen ayarlar (ör. model veya sıcaklık), JSON nesnesi olarak.",
+      "hints_invalid": "Geçerli bir JSON nesnesi girin"
+    },
+    "context": {
+      "title": "LLM bağlamı",
+      "title_version": "LLM bağlamı (v{version})",
+      "help": "LLM platformlarının bu ajan için aldığı içeriğin tam hâli.",
+      "unsaved_preview": "Kaydedilmemiş değişikliklerinizi içeren önizleme.",
+      "rendered": "Oluşturulan bağlam",
+      "size": "{kb} KB · yaklaşık {tokens} token",
+      "preview_error": "Önizleme oluşturulamadı. Alanları kontrol edin.",
+      "versions": "Sürümler",
+      "current": "geçerli",
+      "copied": "Panoya kopyalandı",
+      "connect_title": "Bu ajanı bir LLM platformunda kullanın",
+      "connect_help": "Claude Code, ChatGPT veya başka bir MCP istemcisini kişisel API token'ı ile bağlayın.",
+      "connect_settings": "MCP'yi ayarlayın",
+      "mcp_server": "MCP sunucusu",
+      "llm_prompt": "Örnek istem",
+      "llm_prompt_example": "{workspace} çalışma alanındaki Cybernetics ajanı @{handle} tanımını get_agent_context ile yükle ve bu ajan gibi davran. Ardından list_agent_work_items ve get_agent_task_brief ile kuyruğundaki işleri tamamla."
+    },
+    "projects": {
+      "description": "Ajanlara yalnızca erişimleri olan projelerde iş öğesi atanabilir.",
+      "select": "Proje seçin",
+      "add": "Projeye ekle",
+      "empty": "Bu ajanın henüz hiçbir projeye erişimi yok."
+    },
+    "work_items": {
+      "open": "Açık",
+      "completed": "Tamamlanan",
+      "cancelled": "İptal edilen",
+      "empty": "Burada iş öğesi yok",
+      "copy_brief": "Görev özetini kopyala",
+      "brief_copied": "{key} görev özeti kopyalandı"
+    },
+    "settings": {
+      "admin_only": "Ajan ayarlarını yalnızca çalışma alanı yöneticileri değiştirebilir.",
+      "accept_title": "Yeni atamaları kabul et",
+      "accept_description": "Kapalıyken ajan mevcut iş öğelerini korur ancak ona yeni iş öğesi atanamaz.",
+      "pause_title": "Ajanı duraklat",
+      "pause_description": "Duraklatılmış bir ajana yeni atama yapılamaz. Tanımı kullanılabilir kalır.",
+      "pause": "Duraklat",
+      "resume": "Sürdür",
+      "archive_title": "Ajanı arşivle",
+      "archive_description": "Ajanı projelerinden çıkarır. Mevcut atamalar geçmişte korunur.",
+      "archive": "Arşivle",
+      "restore_title": "Ajanı geri yükle",
+      "restore_description": "Ajanı önceki proje erişimiyle yeniden etkinleştirir.",
+      "restore": "Geri yükle",
+      "delete_title": "Ajanı sil",
+      "delete_description": "Ajan kalıcı olarak silinir. Onaylamak için {handle} yazın.",
+      "delete": "Ajanı sil"
+    },
+    "save": {
+      "unsaved": "Kaydedilmemiş değişiklikleriniz var",
+      "change_note_placeholder": "Değişikliği açıklayın (isteğe bağlı)",
+      "discard": "Vazgeç",
+      "save": "Kaydet"
+    },
+    "toasts": {
+      "created": "{name} oluşturuldu",
+      "saved": "Değişiklikler kaydedildi",
+      "saved_version": "{version} sürümü olarak kaydedildi",
+      "archived": "Ajan arşivlendi",
+      "restored": "Ajan geri yüklendi",
+      "deleted": "Ajan silindi",
+      "error": "Bir şeyler ters gitti. Lütfen tekrar deneyin."
+    }
+  }
+}

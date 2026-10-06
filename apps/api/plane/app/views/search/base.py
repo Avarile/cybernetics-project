@@ -39,6 +39,8 @@ from rest_framework.response import Response
 from plane.app.views.base import BaseAPIView
 from plane.app.permissions import WorkspaceUserPermission
 from plane.db.models import (
+    BotTypeEnum,
+    WorkspaceAgent,
     Workspace,
     Project,
     Issue,
@@ -367,9 +369,14 @@ class SearchEndpoint(BaseAPIView):
                     users = (
                         ProjectMember.objects.filter(
                             q,
+                            # Humans plus active agentic members (mentionable, but never notified)
+                            Q(member__is_bot=False)
+                            | Q(
+                                member__bot_type=BotTypeEnum.AGENT,
+                                member__agent_profile__status=WorkspaceAgent.Status.ACTIVE,
+                            ),
                             is_active=True,
                             workspace__slug=slug,
-                            member__is_bot=False,
                             project_id=project_id,
                         )
                         # Uploaded avatar assets are served via the static asset URL;

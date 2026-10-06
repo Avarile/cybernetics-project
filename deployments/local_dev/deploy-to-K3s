@@ -1,0 +1,420 @@
+# Deploying Cybernetics Projects to K3s-server
+
+This runbook covers building the `cybernetics-project-*` images on this dev machine,
+shipping them to the k3s node, and rolling them out to the `plane` namespace. Each
+phase is one bash block. Paste the blocks in order into **one terminal**: later blocks
+use the variables set by earlier ones. The release plan is also saved to
+`~/.cyb-release`, so a new terminal can resume with `source ~/.cyb-release`.
+
+Only one step needs you at the keyboard: phase 5, the containerd import. It runs
+`sudo` on the server and asks for your password. Everything else runs unattended.
+
+The server-side runbook (cluster layout, domain/TLS, database resets) lives on the
+server at `~/dev-ops/k3s-deployment/apps/plane/readme.md`. This file is the dev-machine
+counterpart, and it follows the same release procedure.
+
+---
+
+## 1. How the deployment works
+
+```
+dev machine                                   K3s-server (k8s-micro-server, 192.168.0.103)
+───────────                                   ──────────────────────────────────────────────
+docker build ─▶ cybernetics-project-*:<tag>
+docker save | zstd ──── ssh ────────────────▶ ~/cyb-<tag>.tar.zst
+                                              sudo k3s ctr -n k8s.io images import  (you)
+                                              sed new tags into ~/dev-ops/k3s-deployment/apps/plane/*.yaml
+                                              migrator Job (backend only)
+                                              kubectl apply -k apps/plane/
+                                              host Caddy :443 ─▶ NodePort 30808 ─▶ plane/proxy ─▶ pods
+```
+
+- **No registry.** Every `cybernetics-project-*` Deployment uses `imagePullPolicy: Never`.
+  An image has to be imported into the node's containerd (namespace `k8s.io`) before a
+  rollout, otherwise the pod fails with `ErrImageNeverPull`.
+- **Deployments use `strategy: Recreate`.** A rollout stops the old pod before starting
+  the new one, so expect 30–90 seconds of downtime per rolled-out deployment.
+- **The manifests are the source of truth.** Rollouts edit the image tags in the
+  kustomize repo and run `kubectl apply -k`. Never use `kubectl set image`: the
+  next `apply -k` would silently revert it.
+- **Tag format:** `release.<UTC timestamp>.1`, for example `release.2026-10-06T11-56-45Z.1`.
+  All components built in one release share the same tag.
+
+### Component matrix
+
+| Component | Image | Dockerfile | Build context | Server manifest(s) | Deployments | Needs migrator |
+|---|---|---|---|---|---|---|
+| `backend` | `cybernetics-project-backend` | `apps/api/Dockerfile.api` | `apps/api` | `backend.yaml`, `migrator-job.yaml` | `api`, `worker`, `beat-worker` | **yes** |
+| `web` | `cybernetics-project-web` | `apps/web/Dockerfile.web` | `.` | `frontend.yaml` | `web` | no |
+| `space` | `cybernetics-project-space` | `apps/space/Dockerfile.space` | `.` | `frontend.yaml` | `space` | no |
+| `admin` | `cybernetics-project-admin` | `apps/admin/Dockerfile.admin` | `.` | `frontend.yaml` | `admin` | no |
+| `live` | `cybernetics-project-live` | `apps/live/Dockerfile.live` | `.` | `realtime.yaml` | `live` | no |
+| `proxy` | `cybernetics-project-proxy` | `apps/proxy/Dockerfile.ce` | `apps/proxy` | `proxy.yaml` | `proxy` | no |
+
+`iframely` uses the upstream `makeplane/iframely` image and is not built here.
+
+### Which components to ship
+
+| You changed… | Ship |
+|---|---|
+| `apps/api/**` (Django, Celery, MCP server) | `backend` |
+| `apps/web/**`, or `packages/**` used by web (constants, i18n, propel, ui, …) | `web` |
+| `apps/space/**`, `apps/admin/**`, `apps/live/**` | the matching component |
+| `packages/**` used by several apps | every app that imports the changed package |
+| `apps/proxy/Caddyfile.ce` | `proxy` |
+| A new backend endpoint and the UI that calls it | `backend` **and** `web`, in the same release |
+
+Not sure? Compare against the last release's commit, which phase 2 prints. Look at
+`git diff --stat <last-release-commit>..HEAD -- apps packages`.
+
+---
+
+## 2. Prerequisites (one-off)
+
+- Docker, `zstd`, `curl` and `python3` on this machine.
+- An SSH alias `K3s-server` in `~/.ssh/config` with key-based login (`BatchMode` must work).
+- Your user on the server can run `kubectl` without sudo (kubeconfig in `~/.kube`).
+- Your server password, for the `sudo` import in phase 5.
+- Optional: a Plane API token in `PLANE_TOKEN`, for the MCP check in phase 7.
+
+---
+
+## 3. Phase-by-phase
+
+### Phase 0: preflight checks
+
+Checks tools, SSH, kubectl, disk space and that the working tree is clean. Stops at the first
+problem.
+
+```bash
+cd "$(git rev-parse --show-toplevel)"
+for cmd in docker zstd curl python3 ssh git; do
+  command -v "$cmd" >/dev/null || { echo "missing: $cmd"; false; }
+done
+docker info >/dev/null && echo "docker: ok"
+ssh -o BatchMode=yes -o ConnectTimeout=15 K3s-server 'kubectl -n plane get deploy >/dev/null && echo "ssh + kubectl: ok"; df -h ~ | tail -1'
+git status --short -- apps packages | grep -v '^??' && echo "WARNING: uncommitted changes in apps/ or packages/ will be baked into the images" || echo "git: tracked files clean"
+echo "HEAD: $(git log -1 --format='%h %s')"
+```
+
+### Phase 1: plan the release
+
+Set **which components** to ship (space-separated, see the matrix). This block fixes the
+tag, defines the component mapping, and saves the plan to `~/.cyb-release`.
+
+```bash
+cd "$(git rev-parse --show-toplevel)"
+COMPONENTS="backend web"                       # <- edit: any of backend web space admin live proxy
+T="release.$(date -u +%Y-%m-%dT%H-%M-%SZ).1"
+COMMIT="$(git rev-parse --short HEAD)"
+
+cat > ~/.cyb-release <<EOF
+export T="$T" COMPONENTS="$COMPONENTS" COMMIT="$COMMIT" REPO="$PWD"
+dockerfile_of() { case "\$1" in backend) echo apps/api/Dockerfile.api;; web) echo apps/web/Dockerfile.web;;
+  space) echo apps/space/Dockerfile.space;; admin) echo apps/admin/Dockerfile.admin;;
+  live) echo apps/live/Dockerfile.live;; proxy) echo apps/proxy/Dockerfile.ce;; *) return 1;; esac; }
+context_of() { case "\$1" in backend) echo apps/api;; proxy) echo apps/proxy;; web|space|admin|live) echo .;; *) return 1;; esac; }
+images_of() { local c; for c in \$COMPONENTS; do printf 'cybernetics-project-%s:%s ' "\$c" "\$T"; done; }
+EOF
+source ~/.cyb-release
+for c in $COMPONENTS; do dockerfile_of "$c" >/dev/null || { echo "unknown component: $c"; false; }; done
+echo "release $T  commit $COMMIT  components: $COMPONENTS"
+echo "currently deployed:"
+ssh -o BatchMode=yes K3s-server 'kubectl -n plane get deploy -o custom-columns=NAME:.metadata.name,IMAGE:.spec.template.spec.containers[0].image --no-headers'
+```
+
+### Phase 2: build the images
+
+Builds every planned component. A failed build stops the loop. Logs are written to
+`/tmp/cyb-build-<component>.log`.
+
+```bash
+source ~/.cyb-release && cd "$REPO"
+for c in $COMPONENTS; do
+  echo "== building $c -> cybernetics-project-$c:$T"
+  if ! docker build -f "$(dockerfile_of "$c")" -t "cybernetics-project-$c:$T" \
+      --label "org.opencontainers.image.revision=$COMMIT" "$(context_of "$c")" \
+      > "/tmp/cyb-build-$c.log" 2>&1; then
+    echo "   BUILD FAILED: $c (full log: /tmp/cyb-build-$c.log)"; tail -20 "/tmp/cyb-build-$c.log"
+    break
+  fi
+  echo "   ok"
+done
+docker images --format '{{.Repository}}:{{.Tag}}  {{.Size}}' | grep -F "$T"
+```
+
+### Phase 3: smoke-test the images locally
+
+These checks catch a broken image before it reaches the server. The backend test boots
+Django with the test settings and builds the MCP server. It needs no database.
+
+```bash
+source ~/.cyb-release
+for c in $COMPONENTS; do
+  case "$c" in
+    backend)
+      docker run --rm --entrypoint sh -e DJANGO_SETTINGS_MODULE=plane.settings.test \
+        -e SECRET_KEY=smoke -e REDIS_URL=redis://localhost:6379 "cybernetics-project-backend:$T" -c '
+        python manage.py check >/dev/null && echo "   backend: manage.py check ok"
+        python -c "
+import asyncio, django; django.setup()
+from django.conf import settings; settings.MCP_READ_ONLY=False; settings.MCP_TOOLSETS=[]
+from plane.mcp.server import build_server
+print(\"   backend: django ok, MCP tools:\", len(asyncio.run(build_server().list_tools())))"' ;;
+    web|space|admin)
+      docker run --rm --entrypoint sh "cybernetics-project-$c:$T" -c \
+        'test -s /usr/share/nginx/html/index.html && echo "   '"$c"': index.html ok, $(find /usr/share/nginx/html -name "*.js" | wc -l) js files"' ;;
+    *)
+      docker image inspect "cybernetics-project-$c:$T" >/dev/null && echo "   $c: image present" ;;
+  esac
+done
+```
+
+To check that a particular change made it into the web bundle, grep for a new string:
+`docker run --rm --entrypoint sh cybernetics-project-web:$T -c 'grep -rl "<new string>" /usr/share/nginx/html | head -1'`
+
+### Phase 4: ship to the server
+
+Streams the images, zstd-compressed, straight into a tarball on the server, then
+checks the archive. The backend and web images together compress to about 160 MB.
+
+```bash
+source ~/.cyb-release
+set -o pipefail
+docker save $(images_of) | zstd -T0 -3 -q | ssh -o BatchMode=yes K3s-server "cat > ~/cyb-$T.tar.zst" \
+  && ssh -o BatchMode=yes K3s-server "zstd -t -q ~/cyb-$T.tar.zst && ls -lh ~/cyb-$T.tar.zst && echo integrity-ok"
+set +o pipefail
+```
+
+### Phase 5: import into containerd (you, needs your password)
+
+This step needs `sudo`, so you run it yourself. Print the exact command:
+
+```bash
+source ~/.cyb-release
+echo "ssh -t K3s-server 'zstd -dc ~/cyb-$T.tar.zst | sudo k3s ctr -n k8s.io images import -'"
+```
+
+Run the printed command in a terminal. From inside Claude Code, prefix it with `! `. It
+prints one `unpacking docker.io/library/cybernetics-project-…` line per image.
+
+Then confirm the node has the images. This uses kubectl, so no sudo:
+
+```bash
+source ~/.cyb-release
+ssh -o BatchMode=yes K3s-server "kubectl get node k8s-micro-server -o jsonpath='{range .status.images[*]}{.names}{\"\n\"}{end}'" \
+  | grep -o "cybernetics-project-[a-z]*:$T" | sort -u
+# Expect one line per component in $COMPONENTS
+```
+
+### Phase 6: roll out
+
+This block runs entirely on the server. In order, it:
+
+1. **Records the release.** Copies the current manifests to `~/plane-releases/<tag>/` (the
+   rollback point) and writes a `release.txt` with the old and new images.
+2. **Bumps the tags.** Rewrites the image tag of each component in its manifest(s), and
+   fails if any manifest wasn't updated. The sed expression matches `cybernetics-project-<c>:<anything>`,
+   so a hand-edited ad-hoc name (like the old `plane-web:6-oct-2026`) has to be renamed
+   first.
+3. **Checks the node.** Every new image must be on the node, otherwise it aborts and
+   restores the manifests.
+4. **Shows the diff.** Runs `kubectl diff -k` and prints only the changed `image:` lines, plus a
+   count of any *other* changed lines. Other changes mean the live cluster and the repo
+   have drifted; read them before continuing.
+5. **Migrates.** If `backend` is in the release, deletes and re-creates the `migrator` Job and
+   waits for it to complete (up to 15 minutes). A failed migration stops the rollout before
+   any app pod is replaced.
+6. **Rolls out.** Runs `kubectl apply -k apps/plane/` and waits for each affected deployment.
+
+Set `DRY_RUN=1` to stop after step 4. A dry run restores the manifests and leaves the
+cluster unchanged. Always do a dry run first.
+
+```bash
+source ~/.cyb-release
+DRY_RUN=1                                   # <- set to 0 for the real rollout
+ssh -o BatchMode=yes K3s-server "DRY_RUN=$DRY_RUN bash -s -- '$T' $COMPONENTS" <<'REMOTE'
+set -euo pipefail
+T="$1"; shift; COMPONENTS="$*"
+cd ~/dev-ops/k3s-deployment
+APP=apps/plane
+REL=~/plane-releases/$T
+
+manifests_of() { case "$1" in backend) echo "backend.yaml migrator-job.yaml";; web|space|admin) echo frontend.yaml;;
+                 live) echo realtime.yaml;; proxy) echo proxy.yaml;; *) return 1;; esac; }
+deploys_of()   { case "$1" in backend) echo "api worker beat-worker";; *) echo "$1";; esac; }
+restore()      { cp "$REL"/*.yaml "$APP"/; echo "   manifests restored from $REL"; }
+
+echo "== 1. recording release in $REL"
+mkdir -p "$REL"
+cp "$APP"/*.yaml "$REL"/
+{ echo "release: $T"; echo "date: $(date -u +%FT%TZ)"; echo "components: $COMPONENTS"
+  echo "previous images:"; grep -h "image: cybernetics-project-" "$APP"/*.yaml | sort -u | sed 's/^ */  /'; } > "$REL/release.txt"
+
+echo "== 2. bumping image tags"
+for c in $COMPONENTS; do
+  for f in $(manifests_of "$c"); do
+    sed -i -E "s#(image: cybernetics-project-$c:)[^[:space:]\"']+#\1$T#" "$APP/$f"
+    grep -q "image: cybernetics-project-$c:$T" "$APP/$f" || { echo "   tag not set for $c in $f"; restore; exit 1; }
+    echo "   $c -> $f"
+  done
+done
+
+echo "== 3. checking images on the node"
+NODE_IMAGES="$(kubectl get nodes -o jsonpath='{range .items[*].status.images[*]}{.names}{"\n"}{end}')"
+for c in $COMPONENTS; do
+  grep -q "cybernetics-project-$c:$T" <<<"$NODE_IMAGES" || { echo "   MISSING on node: cybernetics-project-$c:$T (run the phase 5 import)"; restore; exit 1; }
+  echo "   present: cybernetics-project-$c:$T"
+done
+
+echo "== 4. kubectl diff"
+DIFF="$(kubectl diff -k "$APP"/ 2>&1 || true)"
+grep -E '^[-+] +image:' <<<"$DIFF" || echo "   (no image changes?)"
+OTHER="$( { grep -E '^[-+][^-+]' <<<"$DIFF" || true; } \
+  | { grep -v -E 'image:|generation:|resourceVersion|managedFields|time:|^[-+] +f:' || true; } | wc -l)"
+if [ "$OTHER" -gt 0 ]; then
+  echo "   NOTE: $OTHER other changed line(s): the cluster has drifted from the repo; review with: kubectl diff -k $APP/"
+fi
+
+if [ "${DRY_RUN:-1}" = "1" ]; then
+  restore; rm -rf "$REL"; echo "== DRY RUN complete, nothing applied"; exit 0
+fi
+
+if grep -qw backend <<<"$COMPONENTS"; then
+  echo "== 5. running migrations"
+  kubectl delete job migrator -n plane --ignore-not-found
+  kubectl apply -f "$APP/migrator-job.yaml"
+  if ! kubectl wait --for=condition=complete job/migrator -n plane --timeout=900s; then
+    kubectl -n plane logs job/migrator --tail=40 || true
+    echo "   MIGRATION FAILED: app pods were NOT replaced. Manifests still carry the new tag;"
+    echo "   restore them with: cp $REL/*.yaml ~/dev-ops/k3s-deployment/$APP/"
+    exit 1
+  fi
+  kubectl -n plane logs job/migrator --tail=5
+fi
+
+echo "== 6. applying and rolling out"
+kubectl apply -k "$APP"/ | grep -v unchanged || true
+for c in $COMPONENTS; do
+  for d in $(deploys_of "$c"); do kubectl -n plane rollout status "deploy/$d" --timeout=300s; done
+done
+kubectl -n plane get deploy -o custom-columns=NAME:.metadata.name,READY:.status.readyReplicas,IMAGE:.spec.template.spec.containers[0].image
+echo "== rollout complete; rollback point: $REL"
+REMOTE
+```
+
+### Phase 7: verify
+
+```bash
+source ~/.cyb-release
+URL=https://projects.avarile.com
+echo "web:       $(curl -s -o /dev/null -w '%{http_code}' $URL/)"                  # 200
+echo "instances: $(curl -s -o /dev/null -w '%{http_code}' $URL/api/instances/)"    # 200
+ssh -o BatchMode=yes K3s-server 'kubectl -n plane get pods --no-headers | grep -v -E "Running|Completed" || echo "pods: all Running"'
+ssh -o BatchMode=yes K3s-server 'kubectl -n plane logs deploy/api --since=5m | grep -i -E "traceback|exception|\"levelname\": \"ERROR\"" | head -10 || true'
+
+# MCP endpoint (only when PLANE_TOKEN is set), expects the server's tool count
+if [ -n "${PLANE_TOKEN:-}" ]; then
+  curl -s -X POST "$URL/api/mcp" -H "Authorization: Bearer $PLANE_TOKEN" \
+    -H 'Content-Type: application/json' -H 'Accept: application/json, text/event-stream' \
+    -H 'MCP-Protocol-Version: 2025-06-18' -d '{"jsonrpc":"2.0","id":1,"method":"tools/list"}' \
+    | python3 -c 'import json,sys; print("mcp tools:", len(json.load(sys.stdin)["result"]["tools"]))'
+fi
+```
+
+If anything looks wrong, go to [Rollback](#4-rollback). The rollback takes about a minute.
+
+### Phase 8: clean up
+
+```bash
+source ~/.cyb-release
+ssh -o BatchMode=yes K3s-server "rm -f ~/cyb-$T.tar.zst && echo 'server tarball removed'"
+# Record the release in the server's kustomize repo (commit the bumped tags):
+ssh -o BatchMode=yes K3s-server "cd ~/dev-ops/k3s-deployment && git add apps/plane && git commit -q -m 'plane: release $T ($COMMIT)' && git log -1 --oneline"
+```
+
+Old images are deliberately kept, so the previous release can be rolled back. To free
+space now and then, remove images older than the last two releases.
+
+On this machine:
+
+```bash
+docker images --format '{{.Repository}}:{{.Tag}}' | grep '^cybernetics-project-' | sort   # pick old tags, then:
+# docker rmi cybernetics-project-backend:release.<old>.1 ...
+```
+
+On the server, this needs sudo, so run it yourself:
+
+```bash
+ssh -t K3s-server 'sudo k3s crictl images | grep cybernetics-project'
+# ssh -t K3s-server 'sudo k3s crictl rmi docker.io/library/cybernetics-project-backend:release.<old>.1'
+```
+
+Never remove an image that a Deployment still references, or that you may roll back to.
+
+---
+
+## 4. Rollback
+
+Every rollout saves the manifests it replaced in `~/plane-releases/<tag>/`. Rolling
+back puts them back and re-applies them. The previous images are still in containerd,
+so there's nothing to rebuild or import.
+
+```bash
+ROLLBACK_TAG="release.YYYY-MM-DDTHH-MM-SSZ.1"   # <- the release to undo (ls ~/plane-releases on the server)
+ssh -o BatchMode=yes K3s-server "bash -s -- '$ROLLBACK_TAG'" <<'REMOTE'
+set -euo pipefail
+REL=~/plane-releases/$1
+[ -d "$REL" ] || { echo "no rollback record at $REL"; ls ~/plane-releases; exit 1; }
+cat "$REL/release.txt"
+cd ~/dev-ops/k3s-deployment
+cp "$REL"/*.yaml apps/plane/
+kubectl apply -k apps/plane/ | grep -v unchanged || true
+for d in api worker beat-worker web space admin live proxy; do kubectl -n plane rollout status deploy/$d --timeout=300s; done
+kubectl -n plane get deploy -o custom-columns=NAME:.metadata.name,IMAGE:.spec.template.spec.containers[0].image
+REMOTE
+```
+
+**Migrations are not reverted.** If the release ran a schema migration, the old backend
+must still work with the new schema. Additive migrations are fine. For a destructive
+migration, reverse it before rolling back:
+`kubectl -n plane exec deploy/api -- python manage.py migrate db <previous_migration>`.
+
+---
+
+## 5. Troubleshooting
+
+| Symptom | Cause | Fix |
+|---|---|---|
+| Pod `ErrImageNeverPull` | The image wasn't imported into containerd, or the tag in the manifest has a typo | Re-run phase 5 and check with the kubectl image list; compare against the manifest tag |
+| Phase 6 says `MISSING on node` | The import didn't run, or imported into the wrong containerd namespace | The import must use `-n k8s.io`; re-run phase 5 |
+| Phase 6 says `tag not set for <c>` | The manifest uses a non-standard image name | Rename it to `cybernetics-project-<c>:<anything>` in the manifest, then re-run |
+| New endpoint returns `{"error": "Page not found."}` | The backend image wasn't updated, or the route isn't registered in `apps/api/plane/api/urls/__init__.py` | Check `kubectl -n plane get deploy api -o wide`; check URL registration |
+| Migrator Job fails | A broken migration, or the database is unreachable | `kubectl -n plane logs job/migrator`; the app pods are untouched, so fix and re-run |
+| `rollout status` times out | The new pod is crash-looping | `kubectl -n plane describe pod -l app=<deploy>` and `kubectl -n plane logs deploy/<deploy> --previous` |
+| UI calls fail with CORS errors | `WEB_URL` / `CORS_ALLOWED_ORIGINS` in `plane-config` don't match `https://projects.avarile.com` | Fix `configmap.yaml`, `kubectl apply -k`, then `kubectl -n plane rollout restart deploy` |
+| MCP returns 401 | The token was revoked or has expired | Create a new token in Profile → API tokens |
+| MCP has fewer tools than expected | `MCP_READ_ONLY=1`, or `MCP_TOOLSETS` limits the groups in `plane-config` | Check `kubectl -n plane get cm plane-config -o yaml \| grep MCP_` |
+| Phase 4 is slow or stalls | Upload bandwidth to the server | Ship fewer components; zstd level `-3` is a good balance (`-19` is much slower) |
+| `kubectl diff` shows unexpected other changes | Someone edited live objects or the repo without applying | Review `kubectl diff -k apps/plane/` before the real rollout; commit or revert the drift |
+
+Useful commands on the server:
+
+```bash
+kubectl -n plane get deploy -o wide                     # images per deployment
+kubectl -n plane get pods -o wide
+kubectl -n plane logs deploy/api --tail=100 -f           # API (JSON logs; MCP lines have name "mcp.*" / "plane.mcp")
+kubectl -n plane logs deploy/worker --tail=100
+kubectl -n plane get cm plane-config -o yaml             # non-secret config (MCP_*, WEB_URL, …)
+ls ~/plane-releases/                                     # rollback points
+```
+
+---
+
+## 6. Release log
+
+Add one line per release. The newest goes on top.
+
+| Tag | Commit | Components | Notes |
+|---|---|---|---|
+| `release.2026-10-06T11-56-45Z.1` | `a62f105547` | backend, web | MCP expansion (33 → 85 tools); estimate routes registered; default Intake on project create. Deployed by hand before this runbook existed: its rollback copies are `~/backend.yaml.pre-…`, `~/frontend.yaml.pre-…` and `~/migrator-job.yaml.pre-…` on the server (previous backend `release.2026-09-23T23-29-54Z.1`, previous web `plane-web:6-oct-2026`). |
