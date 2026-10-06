@@ -417,4 +417,5 @@ Add one line per release. The newest goes on top.
 
 | Tag | Commit | Components | Notes |
 |---|---|---|---|
+| `release.2026-10-06T22-14-16Z.1` | `29db379364` | backend, web | Agentic members: migration `0123_workspace_agent`, `/api/v1/.../agents/` (context, task brief), MCP 85 → 96 tools + `agent_persona` prompt + `plane://` resources, Agents page; react-markdown 8 → 10. Server repo commit `404b9cc`. |
 | `release.2026-10-06T11-56-45Z.1` | `a62f105547` | backend, web | MCP expansion (33 → 85 tools); estimate routes registered; default Intake on project create. Deployed by hand before this runbook existed: its rollback copies are `~/backend.yaml.pre-…`, `~/frontend.yaml.pre-…` and `~/migrator-job.yaml.pre-…` on the server (previous backend `release.2026-09-23T23-29-54Z.1`, previous web `plane-web:6-oct-2026`). |
