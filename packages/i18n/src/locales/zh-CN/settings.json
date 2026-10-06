@@ -135,12 +135,16 @@
         },
         "groups": {
           "context": "账户",
-          "projects": "项目与元数据",
+          "projects": "项目",
+          "project_setup": "状态与标签",
+          "members": "成员与邀请",
           "work_items": "工作项",
           "work_item_extras": "评论、链接与历史",
           "cycles": "周期",
           "modules": "模块",
-          "intake": "Intake"
+          "intake": "Intake",
+          "estimates": "估算",
+          "stickies": "Stickies"
         }
       }
     }

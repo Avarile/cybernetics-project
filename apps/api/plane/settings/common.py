@@ -196,6 +196,8 @@ MCP_READ_ONLY = os.environ.get("MCP_READ_ONLY", "0") == "1"
 # Comma separated Host header allowlist for DNS-rebinding protection; defaults to ALLOWED_HOSTS
 MCP_ALLOWED_HOSTS = [h.strip() for h in os.environ.get("MCP_ALLOWED_HOSTS", "").split(",") if h.strip()]
 MCP_LOOPBACK_TIMEOUT = float(os.environ.get("MCP_LOOPBACK_TIMEOUT", "30"))
+# Comma separated tool groups to expose (see plane.mcp.tools.TOOL_GROUPS); empty or "all" exposes every group
+MCP_TOOLSETS = [g.strip() for g in os.environ.get("MCP_TOOLSETS", "all").split(",") if g.strip() and g.strip() != "all"]
 
 # Django Auth Backend
 AUTHENTICATION_BACKENDS = ("django.contrib.auth.backends.ModelBackend",)  # default

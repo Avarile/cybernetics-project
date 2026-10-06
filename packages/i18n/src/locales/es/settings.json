@@ -135,12 +135,16 @@
         },
         "groups": {
           "context": "Cuenta",
-          "projects": "Proyectos y metadatos",
+          "projects": "Proyectos",
+          "project_setup": "Estados y etiquetas",
+          "members": "Miembros e invitaciones",
           "work_items": "Elementos de trabajo",
           "work_item_extras": "Comentarios, enlaces e historial",
           "cycles": "Ciclos",
           "modules": "Módulos",
-          "intake": "Intake"
+          "intake": "Intake",
+          "estimates": "Estimaciones",
+          "stickies": "Stickies"
         }
       }
     }

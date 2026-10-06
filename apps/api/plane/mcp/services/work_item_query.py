@@ -33,6 +33,7 @@ LIST_FIELDS = [
     "project",
     "state",
     "priority",
+    "estimate_point",
     "assignees",
     "labels",
     "parent",
@@ -58,13 +59,31 @@ class WorkItemQuery:
     cycle_id: Optional[str] = None
     module_id: Optional[str] = None
     name_contains: Optional[str] = None
+    parent_id: Optional[str] = None  # a work item id, or "none" for top-level items only
+    estimate_point_ids: list[str] = field(default_factory=list)
+    created_by: Optional[str] = None  # a user id, or "me"
+    due_after: Optional[str] = None
+    due_before: Optional[str] = None
+    start_after: Optional[str] = None
+    start_before: Optional[str] = None
     order_by: str = "-updated_at"
     limit: int = 25
     offset: int = 0
 
 
-def build_filter_params(query: WorkItemQuery) -> dict:
-    """Translate the tool arguments into the query-param shape ``issue_filters`` expects."""
+def date_range(after: Optional[str], before: Optional[str]) -> str:
+    """Encode an inclusive date range in ``issue_filters``' ``"<date>;after,<date>;before"`` syntax."""
+    parts = [f"{after};after" if after else "", f"{before};before" if before else ""]
+    return ",".join(part for part in parts if part)
+
+
+def build_filter_params(query: WorkItemQuery, user_id: Optional[str] = None) -> dict:
+    """Translate the tool arguments into the query-param shape ``issue_filters`` expects.
+
+    ``user_id`` resolves ``created_by="me"``. ``parent_id="none"`` is not expressible here and is
+    applied by ``query_work_items`` instead.
+    """
+    created_by = user_id if query.created_by == "me" else query.created_by
     candidates = {
         "state": ",".join(query.state_ids),
         "state_group": ",".join(query.state_groups),
@@ -73,6 +92,11 @@ def build_filter_params(query: WorkItemQuery) -> dict:
         "cycle": query.cycle_id or "",
         "module": query.module_id or "",
         "name": query.name_contains or "",
+        "parent": query.parent_id if query.parent_id and query.parent_id != "none" else "",
+        "estimate_point": ",".join(query.estimate_point_ids),
+        "created_by": created_by or "",
+        "target_date": date_range(query.due_after, query.due_before),
+        "start_date": date_range(query.start_after, query.start_before),
     }
     return {key: value for key, value in candidates.items() if value}
 
@@ -110,7 +134,10 @@ def query_work_items(user_id: str, token: str, query: WorkItemQuery) -> dict:
         project__project_projectmember__is_active=True,
         project__project_projectmember__deleted_at__isnull=True,
         project__archived_at__isnull=True,
-    ).filter(**issue_filters(build_filter_params(query), "GET"))
+    ).filter(**issue_filters(build_filter_params(query, user_id), "GET"))
+
+    if query.parent_id == "none":
+        queryset = queryset.filter(parent__isnull=True)
 
     if query.assignees:
         queryset = queryset.filter(assignee_filter(query.assignees, user_id))

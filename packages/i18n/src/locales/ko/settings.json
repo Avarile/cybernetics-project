@@ -135,12 +135,16 @@
         },
         "groups": {
           "context": "계정",
-          "projects": "프로젝트 및 메타데이터",
+          "projects": "프로젝트",
+          "project_setup": "상태 및 레이블",
+          "members": "멤버 및 초대",
           "work_items": "작업 항목",
           "work_item_extras": "댓글, 링크, 기록",
           "cycles": "사이클",
           "modules": "모듈",
-          "intake": "Intake"
+          "intake": "Intake",
+          "estimates": "추정",
+          "stickies": "Stickies"
         }
       }
     }

@@ -135,12 +135,16 @@
         },
         "groups": {
           "context": "Tài khoản",
-          "projects": "Dự án và siêu dữ liệu",
+          "projects": "Dự án",
+          "project_setup": "Trạng thái và nhãn",
+          "members": "Thành viên và lời mời",
           "work_items": "Mục công việc",
           "work_item_extras": "Bình luận, liên kết và lịch sử",
           "cycles": "Chu kỳ",
           "modules": "Mô-đun",
-          "intake": "Intake"
+          "intake": "Intake",
+          "estimates": "Ước tính",
+          "stickies": "Stickies"
         }
       }
     }

@@ -27,8 +27,31 @@ WorkItemKey = Annotated[
 ]
 CycleId = Annotated[UUID, Field(description="Cycle ID (see list_cycles)")]
 ModuleId = Annotated[UUID, Field(description="Module ID (see list_modules)")]
+StateId = Annotated[UUID, Field(description="State ID (see list_states)")]
+LabelId = Annotated[UUID, Field(description="Label ID (see list_labels)")]
+UserId = Annotated[UUID, Field(description="User ID (see list_workspace_members / list_project_members)")]
+CommentId = Annotated[UUID, Field(description="Comment ID (see list_work_item_comments)")]
+LinkId = Annotated[UUID, Field(description="Link ID (see list_work_item_links)")]
+AttachmentId = Annotated[UUID, Field(description="Attachment ID (see list_work_item_attachments)")]
+EstimatePointId = Annotated[UUID, Field(description="Estimate point ID (see list_estimate_points)")]
+InvitationId = Annotated[UUID, Field(description="Invitation ID (see list_workspace_invitations)")]
+StickyId = Annotated[UUID, Field(description="Sticky ID (see list_stickies)")]
+ProjectIdentifier = Annotated[
+    str,
+    Field(
+        description="Short uppercase project key used in work item keys, e.g. 'WEB' for WEB-123",
+        pattern=r"^[A-Z0-9]+$",
+        min_length=1,
+        max_length=12,
+    ),
+]
 
 Priority = Literal["urgent", "high", "medium", "low", "none"]
+MemberRole = Literal["admin", "member", "guest"]
+# Plane's numeric role values (WorkspaceMember / ProjectMember / WorkspaceMemberInvite.role)
+ROLE_VALUES = {"admin": 20, "member": 15, "guest": 5}
+EstimateType = Literal["categories", "points"]
+HexColor = Annotated[str, Field(description="Hex color, e.g. '#ff7700'", pattern=r"^#[0-9A-Fa-f]{6}$")]
 StateGroup = Literal["backlog", "unstarted", "started", "completed", "cancelled"]
 CycleView = Literal["all", "current", "upcoming", "completed", "draft", "incomplete"]
 ModuleStatus = Literal["backlog", "planned", "in-progress", "paused", "completed", "cancelled"]

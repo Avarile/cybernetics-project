@@ -44,7 +44,7 @@ class TestParseResponse:
             (400, {"name": ["This field is required."]}, None, 'Request rejected (400): {"name"'),
             (403, {"detail": "nope"}, None, "Permission denied (403)"),
             (404, {"error": "missing"}, None, "Not found (404)"),
-            (409, {"error": "duplicate", "id": "x"}, None, "Request rejected (409)"),
+            (409, {"error": "duplicate", "id": "x"}, None, 'Conflict (409), it already exists: {"error": "duplicate"'),
             (401, {"detail": "bad"}, None, "The Plane API token is no longer valid"),
             (429, {"error": "slow down"}, {"Retry-After": "42"}, "retry after: 42"),
             (500, {"error": "boom"}, None, "failed with status 500"),

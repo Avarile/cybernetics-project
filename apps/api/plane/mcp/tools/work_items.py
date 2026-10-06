@@ -24,6 +24,7 @@ from plane.mcp.auth import get_caller
 from plane.mcp.client import api
 from plane.mcp.schemas import (
     DateString,
+    EstimatePointId,
     HtmlText,
     Priority,
     ProjectId,
@@ -62,6 +63,23 @@ AssigneeIds = Annotated[Optional[list[UUID]], Field(description="User ids (see l
 LabelIds = Annotated[Optional[list[UUID]], Field(description="Label ids (see list_labels)")]
 StateId = Annotated[Optional[UUID], Field(description="State id (see list_states)")]
 ParentId = Annotated[Optional[UUID], Field(description="Parent work item id, to create a sub-work item")]
+EstimatePointArg = Annotated[
+    Optional[EstimatePointId], Field(description="Estimate point id (see list_estimate_points)")
+]
+ParentFilter = Annotated[
+    str,
+    Field(
+        description="A work item id to list its sub-work items, or 'none' for top-level work items only",
+        pattern=r"^(none|[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})$",
+    ),
+]
+CreatorFilter = Annotated[
+    str,
+    Field(
+        description="A user id, or 'me' for work items you created",
+        pattern=r"^(me|[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})$",
+    ),
+]
 
 
 async def list_work_items(
@@ -77,6 +95,13 @@ async def list_work_items(
     cycle_id: Optional[UUID] = None,
     module_id: Optional[UUID] = None,
     name_contains: Optional[str] = None,
+    parent_id: Optional[ParentFilter] = None,
+    estimate_point_ids: Optional[list[UUID]] = None,
+    created_by: Optional[CreatorFilter] = None,
+    due_after: Annotated[Optional[DateString], Field(description="Target date on or after (YYYY-MM-DD)")] = None,
+    due_before: Annotated[Optional[DateString], Field(description="Target date on or before (YYYY-MM-DD)")] = None,
+    start_after: Annotated[Optional[DateString], Field(description="Start date on or after (YYYY-MM-DD)")] = None,
+    start_before: Annotated[Optional[DateString], Field(description="Start date on or before (YYYY-MM-DD)")] = None,
     order_by: OrderBy = "-updated_at",
     limit: Annotated[int, Field(ge=1, le=100)] = 25,
     offset: Annotated[int, Field(ge=0)] = 0,
@@ -84,8 +109,9 @@ async def list_work_items(
     """
     List work items the current user can see, with optional filters. Filters combine with AND;
     values inside one filter combine with OR. For example assignees=['me'] and
-    state_groups=['unstarted', 'started'] lists the user's open work. Returns a page of results,
-    the total count and next_offset.
+    state_groups=['unstarted', 'started'] lists the user's open work, and adding
+    due_before=<yesterday> finds what is overdue. Returns a page of results, the total count
+    and next_offset.
     """
     caller = get_caller()
     query = WorkItemQuery(
@@ -99,6 +125,13 @@ async def list_work_items(
         cycle_id=str(cycle_id) if cycle_id else None,
         module_id=str(module_id) if module_id else None,
         name_contains=name_contains,
+        parent_id=parent_id.lower() if parent_id else None,
+        estimate_point_ids=[str(v) for v in estimate_point_ids or []],
+        created_by=created_by,
+        due_after=due_after,
+        due_before=due_before,
+        start_after=start_after,
+        start_before=start_before,
         order_by=order_by,
         limit=limit,
         offset=offset,
@@ -152,6 +185,7 @@ async def create_work_item(
     parent_id: ParentId = None,
     start_date: Optional[DateString] = None,
     target_date: Optional[DateString] = None,
+    estimate_point_id: EstimatePointArg = None,
 ) -> dict:
     """Create a work item in a project. Unset fields use the project's defaults."""
     body = compact(
@@ -164,6 +198,7 @@ async def create_work_item(
         parent=parent_id,
         start_date=start_date,
         target_date=target_date,
+        estimate_point=estimate_point_id,
     )
     return await api().post(f"{project_path(workspace_slug, project_id)}/work-items/", body)
 
@@ -181,6 +216,7 @@ async def update_work_item(
     parent_id: ParentId = None,
     start_date: Optional[DateString] = None,
     target_date: Optional[DateString] = None,
+    estimate_point_id: EstimatePointArg = None,
 ) -> dict:
     """
     Update a work item. Only the fields you pass change. assignee_ids and label_ids REPLACE the
@@ -196,6 +232,7 @@ async def update_work_item(
         parent=parent_id,
         start_date=start_date,
         target_date=target_date,
+        estimate_point=estimate_point_id,
     )
     if not body:
         raise ToolError("Pass at least one field to update")

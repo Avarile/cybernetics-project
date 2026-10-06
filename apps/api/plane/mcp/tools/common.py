@@ -8,6 +8,9 @@
 from typing import Any, Optional
 from uuid import UUID
 
+# Third party imports
+from mcp.server.mcpserver.exceptions import ToolError
+
 # Compact projection for work item lists (the public API's ?fields= parameter)
 WORK_ITEM_LIST_FIELDS = "id,sequence_id,name,state,priority,assignees,labels,parent,start_date,target_date,updated_at"
 
@@ -38,3 +41,17 @@ def compact(**values: Any) -> dict:
         return value
 
     return {key: convert(value) for key, value in values.items() if value is not None}
+
+
+def update_body(**values: Any) -> dict:
+    """``compact`` for update tools: raise ToolError when the caller passed nothing to change."""
+    body = compact(**values)
+    if not body:
+        raise ToolError("Pass at least one field to update")
+    return body
+
+
+def check_date_order(start: Optional[str], end: Optional[str], start_name: str, end_name: str) -> None:
+    """Raise ToolError when both dates are set and ``end`` is before ``start`` (compares the YYYY-MM-DD part)."""
+    if start and end and end[:10] < start[:10]:
+        raise ToolError(f"{end_name} must not be before {start_name}")

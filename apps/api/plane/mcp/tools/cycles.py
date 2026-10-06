@@ -13,12 +13,20 @@ from typing import Annotated, Optional
 from uuid import UUID
 
 # Third party imports
+from mcp.server.mcpserver.exceptions import ToolError
 from pydantic import Field
 
 # Module imports
 from plane.mcp.client import api
 from plane.mcp.schemas import Cursor, CycleId, CycleView, PerPage, ProjectId, WorkItemId, WorkspaceSlug
-from plane.mcp.tools.common import WORK_ITEM_LIST_FIELDS, compact, page_params, project_path
+from plane.mcp.tools.common import (
+    WORK_ITEM_LIST_FIELDS,
+    check_date_order,
+    compact,
+    page_params,
+    project_path,
+    update_body,
+)
 
 CycleDate = Annotated[
     Optional[str],
@@ -58,6 +66,9 @@ async def create_cycle(
     end_date: CycleDate = None,
 ) -> dict:
     """Create a cycle. Pass both start_date and end_date, or neither (a draft cycle)."""
+    if bool(start_date) != bool(end_date):
+        raise ToolError("Pass both start_date and end_date, or neither (a draft cycle)")
+    check_date_order(start_date, end_date, "start_date", "end_date")
     body = compact(name=name, description=description, start_date=start_date, end_date=end_date)
     return await api().post(f"{cycle_path(workspace_slug, project_id)}/", body)
 
@@ -95,6 +106,59 @@ async def remove_work_item_from_cycle(
     return await api().delete(f"{cycle_path(workspace_slug, project_id, cycle_id)}/cycle-issues/{work_item_id}/")
 
 
+async def update_cycle(
+    workspace_slug: WorkspaceSlug,
+    project_id: ProjectId,
+    cycle_id: CycleId,
+    name: Annotated[Optional[str], Field(min_length=1, max_length=255)] = None,
+    description: Optional[str] = None,
+    start_date: CycleDate = None,
+    end_date: CycleDate = None,
+    owner_id: Annotated[Optional[UUID], Field(description="User id of the cycle owner")] = None,
+) -> dict:
+    """Update a cycle. Only the fields you pass change. Completed cycles cannot be edited."""
+    check_date_order(start_date, end_date, "start_date", "end_date")
+    body = update_body(name=name, description=description, start_date=start_date, end_date=end_date, owned_by=owner_id)
+    return await api().patch(f"{cycle_path(workspace_slug, project_id, cycle_id)}/", body)
+
+
+async def delete_cycle(workspace_slug: WorkspaceSlug, project_id: ProjectId, cycle_id: CycleId) -> dict:
+    """Delete a cycle. Its work items are kept, they are only removed from the cycle."""
+    return await api().delete(f"{cycle_path(workspace_slug, project_id, cycle_id)}/")
+
+
+async def transfer_cycle_work_items(
+    workspace_slug: WorkspaceSlug,
+    project_id: ProjectId,
+    cycle_id: CycleId,
+    new_cycle_id: Annotated[UUID, Field(description="Cycle to move the unfinished work items into")],
+) -> dict:
+    """
+    Move a finished cycle's unfinished work items into another cycle (sprint rollover).
+    Completed and cancelled work items stay. The source cycle must have ended.
+    """
+    path = f"{cycle_path(workspace_slug, project_id, cycle_id)}/transfer-issues/"
+    return await api().post(path, {"new_cycle_id": str(new_cycle_id)})
+
+
+async def archive_cycle(workspace_slug: WorkspaceSlug, project_id: ProjectId, cycle_id: CycleId) -> dict:
+    """Archive a cycle. Only cycles whose end date has passed can be archived."""
+    return await api().post(f"{cycle_path(workspace_slug, project_id, cycle_id)}/archive/", {})
+
+
+async def unarchive_cycle(workspace_slug: WorkspaceSlug, project_id: ProjectId, cycle_id: CycleId) -> dict:
+    """Restore an archived cycle."""
+    return await api().delete(f"{project_path(workspace_slug, project_id)}/archived-cycles/{cycle_id}/unarchive/")
+
+
+async def list_archived_cycles(
+    workspace_slug: WorkspaceSlug, project_id: ProjectId, cursor: Cursor = None, per_page: PerPage = 50
+) -> dict:
+    """List a project's archived cycles."""
+    path = f"{project_path(workspace_slug, project_id)}/archived-cycles/"
+    return await api().get(path, params=page_params(cursor, per_page))
+
+
 def register(tool) -> None:
     """Register this module's tools with their read-only/destructive/idempotent hints."""
     tool(read_only=True, title="List cycles")(list_cycles)
@@ -105,3 +169,9 @@ def register(tool) -> None:
     tool(read_only=False, destructive=True, idempotent=True, title="Remove work item from cycle")(
         remove_work_item_from_cycle
     )
+    tool(read_only=False, idempotent=True, title="Update cycle")(update_cycle)
+    tool(read_only=False, destructive=True, idempotent=True, title="Delete cycle")(delete_cycle)
+    tool(read_only=False, title="Transfer cycle work items")(transfer_cycle_work_items)
+    tool(read_only=False, idempotent=True, title="Archive cycle")(archive_cycle)
+    tool(read_only=False, idempotent=True, title="Unarchive cycle")(unarchive_cycle)
+    tool(read_only=True, title="List archived cycles")(list_archived_cycles)

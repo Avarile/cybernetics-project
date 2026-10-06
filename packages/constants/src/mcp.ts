@@ -23,11 +23,15 @@ export type TMCPToolMode = "read" | "write" | "destructive";
 export type TMCPToolGroup =
   | "context"
   | "projects"
+  | "project_setup"
+  | "members"
   | "work_items"
   | "work_item_extras"
   | "cycles"
   | "modules"
-  | "intake";
+  | "intake"
+  | "estimates"
+  | "stickies";
 
 export type TMCPTool = {
   name: string;
@@ -41,21 +45,29 @@ export type TMCPTool = {
 export const MCP_TOOL_GROUPS: TMCPToolGroup[] = [
   "context",
   "projects",
+  "project_setup",
+  "members",
   "work_items",
   "work_item_extras",
   "cycles",
   "modules",
   "intake",
+  "estimates",
+  "stickies",
 ];
 
 export const MCP_TOOL_GROUP_LABELS: Record<TMCPToolGroup, string> = {
   context: "account_settings.mcp.tools.groups.context",
   projects: "account_settings.mcp.tools.groups.projects",
+  project_setup: "account_settings.mcp.tools.groups.project_setup",
+  members: "account_settings.mcp.tools.groups.members",
   work_items: "account_settings.mcp.tools.groups.work_items",
   work_item_extras: "account_settings.mcp.tools.groups.work_item_extras",
   cycles: "account_settings.mcp.tools.groups.cycles",
   modules: "account_settings.mcp.tools.groups.modules",
   intake: "account_settings.mcp.tools.groups.intake",
+  estimates: "account_settings.mcp.tools.groups.estimates",
+  stickies: "account_settings.mcp.tools.groups.stickies",
 };
 
 export const MCP_TOOLS: TMCPTool[] = [
@@ -90,34 +102,136 @@ export const MCP_TOOLS: TMCPTool[] = [
     description: "Get the full details of a project.",
   },
   {
-    name: "list_states",
+    name: "get_project_summary",
     group: "projects",
+    mode: "read",
+    description: "Get a project's counts (members, states, labels, cycles, modules, work items, intake items).",
+  },
+  {
+    name: "create_project",
+    group: "projects",
+    mode: "write",
+    description: "Create a project. You become its admin and it gets the default workflow states (Backlog, Todo, In Progress, Done, Cancelled). Cycles and modules are enabled unless turned off; enable intake to accept triage submissions. Workspace guests cannot create projects.",
+  },
+  {
+    name: "update_project",
+    group: "projects",
+    mode: "write",
+    description: "Update a project's settings. Only the fields you pass change. Archived projects cannot be edited.",
+  },
+  {
+    name: "delete_project",
+    group: "projects",
+    mode: "destructive",
+    description: "Permanently delete a project and everything in it (work items, cycles, modules, ...). This cannot be undone. Pass the project's identifier as confirm_identifier; the call is refused if it does not match. Only project admins can do this.",
+  },
+  {
+    name: "archive_project",
+    group: "projects",
+    mode: "write",
+    description: "Archive a project: it is hidden from active project lists and becomes read-only.",
+  },
+  {
+    name: "unarchive_project",
+    group: "projects",
+    mode: "write",
+    description: "Restore an archived project.",
+  },
+  {
+    name: "list_states",
+    group: "project_setup",
     mode: "read",
     description: "List a project's workflow states (id, name, group). Use the id as state_id for work items.",
   },
   {
+    name: "create_state",
+    group: "project_setup",
+    mode: "write",
+    description: "Add a workflow state to a project. The group decides how it counts towards progress.",
+  },
+  {
+    name: "update_state",
+    group: "project_setup",
+    mode: "write",
+    description: "Update a workflow state. Only the fields you pass change.",
+  },
+  {
+    name: "delete_state",
+    group: "project_setup",
+    mode: "destructive",
+    description: "Delete a workflow state. The default state and states that still have work items cannot be deleted.",
+  },
+  {
     name: "list_labels",
-    group: "projects",
+    group: "project_setup",
     mode: "read",
     description: "List a project's labels (id, name, color, parent). Use the ids as label_ids for work items.",
   },
   {
+    name: "create_label",
+    group: "project_setup",
+    mode: "write",
+    description: "Create a label in a project.",
+  },
+  {
+    name: "update_label",
+    group: "project_setup",
+    mode: "write",
+    description: "Update a label. Only the fields you pass change.",
+  },
+  {
+    name: "delete_label",
+    group: "project_setup",
+    mode: "destructive",
+    description: "Delete a label. It is removed from every work item that has it.",
+  },
+  {
     name: "list_project_members",
-    group: "projects",
+    group: "members",
     mode: "read",
     description: "List a project's members. Use their user ids as assignee_ids for work items.",
   },
   {
-    name: "create_label",
-    group: "projects",
+    name: "add_project_member",
+    group: "members",
     mode: "write",
-    description: "Create a label in a project.",
+    description: "Add a workspace member to a project. Only project admins can do this.",
+  },
+  {
+    name: "update_project_member",
+    group: "members",
+    mode: "write",
+    description: "Change a project member's role. Only project admins can do this.",
+  },
+  {
+    name: "remove_project_member",
+    group: "members",
+    mode: "destructive",
+    description: "Remove a member from a project (they stay in the workspace). Only project admins can do this.",
+  },
+  {
+    name: "list_workspace_invitations",
+    group: "members",
+    mode: "read",
+    description: "List pending workspace invitations (email, role, whether accepted). Workspace admins only.",
+  },
+  {
+    name: "invite_workspace_member",
+    group: "members",
+    mode: "write",
+    description: "Invite someone to the workspace by email. This records the invitation; it does not send an email itself. Workspace admins only.",
+  },
+  {
+    name: "cancel_workspace_invitation",
+    group: "members",
+    mode: "destructive",
+    description: "Cancel a workspace invitation. Workspace admins only.",
   },
   {
     name: "list_work_items",
     group: "work_items",
     mode: "read",
-    description: "List work items the current user can see, with optional filters. Filters combine with AND; values inside one filter combine with OR. For example assignees=['me'] and state_groups=['unstarted', 'started'] lists the user's open work. Returns a page of results, the total count and next_offset.",
+    description: "List work items the current user can see, with optional filters. Filters combine with AND; values inside one filter combine with OR. For example assignees=['me'] and state_groups=['unstarted', 'started'] lists the user's open work, and adding due_before=<yesterday> finds what is overdue. Returns a page of results, the total count and next_offset.",
   },
   {
     name: "search_work_items",
@@ -174,6 +288,48 @@ export const MCP_TOOLS: TMCPTool[] = [
     description: "Attach an external link (pull request, document, ...) to a work item.",
   },
   {
+    name: "update_work_item_comment",
+    group: "work_item_extras",
+    mode: "write",
+    description: "Replace a comment's text.",
+  },
+  {
+    name: "delete_work_item_comment",
+    group: "work_item_extras",
+    mode: "destructive",
+    description: "Delete a comment from a work item.",
+  },
+  {
+    name: "list_work_item_links",
+    group: "work_item_extras",
+    mode: "read",
+    description: "List the external links attached to a work item.",
+  },
+  {
+    name: "update_work_item_link",
+    group: "work_item_extras",
+    mode: "write",
+    description: "Change a link's URL or title.",
+  },
+  {
+    name: "delete_work_item_link",
+    group: "work_item_extras",
+    mode: "destructive",
+    description: "Remove a link from a work item.",
+  },
+  {
+    name: "list_work_item_attachments",
+    group: "work_item_extras",
+    mode: "read",
+    description: "List a work item's file attachments (name, size, type, uploader). Uploading is not supported here.",
+  },
+  {
+    name: "delete_work_item_attachment",
+    group: "work_item_extras",
+    mode: "destructive",
+    description: "Delete a file attachment from a work item.",
+  },
+  {
     name: "list_work_item_relations",
     group: "work_item_extras",
     mode: "read",
@@ -222,6 +378,42 @@ export const MCP_TOOLS: TMCPTool[] = [
     description: "Remove a work item from a cycle (the work item itself is kept).",
   },
   {
+    name: "update_cycle",
+    group: "cycles",
+    mode: "write",
+    description: "Update a cycle. Only the fields you pass change. Completed cycles cannot be edited.",
+  },
+  {
+    name: "delete_cycle",
+    group: "cycles",
+    mode: "destructive",
+    description: "Delete a cycle. Its work items are kept, they are only removed from the cycle.",
+  },
+  {
+    name: "transfer_cycle_work_items",
+    group: "cycles",
+    mode: "write",
+    description: "Move a finished cycle's unfinished work items into another cycle (sprint rollover). Completed and cancelled work items stay. The source cycle must have ended.",
+  },
+  {
+    name: "archive_cycle",
+    group: "cycles",
+    mode: "write",
+    description: "Archive a cycle. Only cycles whose end date has passed can be archived.",
+  },
+  {
+    name: "unarchive_cycle",
+    group: "cycles",
+    mode: "write",
+    description: "Restore an archived cycle.",
+  },
+  {
+    name: "list_archived_cycles",
+    group: "cycles",
+    mode: "read",
+    description: "List a project's archived cycles.",
+  },
+  {
     name: "list_modules",
     group: "modules",
     mode: "read",
@@ -252,10 +444,141 @@ export const MCP_TOOLS: TMCPTool[] = [
     description: "Remove a work item from a module (the work item itself is kept).",
   },
   {
+    name: "get_module",
+    group: "modules",
+    mode: "read",
+    description: "Get a module with its status, dates, lead, members and progress counters.",
+  },
+  {
+    name: "update_module",
+    group: "modules",
+    mode: "write",
+    description: "Update a module. Only the fields you pass change.",
+  },
+  {
+    name: "delete_module",
+    group: "modules",
+    mode: "destructive",
+    description: "Delete a module. Its work items are kept, they are only removed from the module.",
+  },
+  {
+    name: "archive_module",
+    group: "modules",
+    mode: "write",
+    description: "Archive a module. Only modules with status 'completed' or 'cancelled' can be archived.",
+  },
+  {
+    name: "unarchive_module",
+    group: "modules",
+    mode: "write",
+    description: "Restore an archived module.",
+  },
+  {
+    name: "list_archived_modules",
+    group: "modules",
+    mode: "read",
+    description: "List a project's archived modules.",
+  },
+  {
     name: "create_intake_work_item",
     group: "intake",
     mode: "write",
     description: "Submit a work item to a project's intake queue for triage (for example a bug report). The project must have intake enabled.",
   },
+  {
+    name: "list_intake_work_items",
+    group: "intake",
+    mode: "read",
+    description: "List the items in a project's intake queue with their triage status.",
+  },
+  {
+    name: "get_intake_work_item",
+    group: "intake",
+    mode: "read",
+    description: "Get one intake item with its triage status and work item details.",
+  },
+  {
+    name: "triage_intake_work_item",
+    group: "intake",
+    mode: "write",
+    description: "Triage an intake item: 'accept' moves it into the project as a regular work item, 'reject' declines it, 'snooze' hides it until snoozed_till, 'duplicate' marks it as a duplicate of duplicate_of_id, 'pending' puts it back in the queue. Only project admins can triage.",
+  },
+  {
+    name: "delete_intake_work_item",
+    group: "intake",
+    mode: "destructive",
+    description: "Delete an intake item. Its work item is deleted too unless it was already accepted.",
+  },
+  {
+    name: "get_estimate",
+    group: "estimates",
+    mode: "read",
+    description: "Get the project's estimate system (id, name, type). Fails with 404 if it has none.",
+  },
+  {
+    name: "create_estimate",
+    group: "estimates",
+    mode: "write",
+    description: "Create the project's estimate system, then add its values with create_estimate_points and activate it with update_project(estimate_id=...). A project can only have one estimate.",
+  },
+  {
+    name: "update_estimate",
+    group: "estimates",
+    mode: "write",
+    description: "Rename the project's estimate or change its description.",
+  },
+  {
+    name: "delete_estimate",
+    group: "estimates",
+    mode: "destructive",
+    description: "Delete the project's estimate system and all of its points.",
+  },
+  {
+    name: "list_estimate_points",
+    group: "estimates",
+    mode: "read",
+    description: "List an estimate's points. Use their ids as estimate_point_id for work items.",
+  },
+  {
+    name: "create_estimate_points",
+    group: "estimates",
+    mode: "write",
+    description: "Add points to an estimate in one call, e.g. [{key: 0, value: '1'}, {key: 1, value: '2'}].",
+  },
+  {
+    name: "update_estimate_point",
+    group: "estimates",
+    mode: "write",
+    description: "Change an estimate point's value, position or description.",
+  },
+  {
+    name: "delete_estimate_point",
+    group: "estimates",
+    mode: "destructive",
+    description: "Delete an estimate point.",
+  },
+  {
+    name: "list_stickies",
+    group: "stickies",
+    mode: "read",
+    description: "List your stickies (personal notes) in a workspace.",
+  },
+  {
+    name: "create_sticky",
+    group: "stickies",
+    mode: "write",
+    description: "Create a sticky (a personal note visible only to you).",
+  },
+  {
+    name: "update_sticky",
+    group: "stickies",
+    mode: "write",
+    description: "Update a sticky. Only the fields you pass change.",
+  },
+  {
+    name: "delete_sticky",
+    group: "stickies",
+    mode: "destructive",
+    description: "Delete a sticky.",
+  },
 ];
-

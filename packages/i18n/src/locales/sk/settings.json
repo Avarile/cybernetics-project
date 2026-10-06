@@ -135,12 +135,16 @@
         },
         "groups": {
           "context": "Účet",
-          "projects": "Projekty a metadáta",
+          "projects": "Projekty",
+          "project_setup": "Stavy a štítky",
+          "members": "Členovia a pozvánky",
           "work_items": "Pracovné položky",
           "work_item_extras": "Komentáre, odkazy a história",
           "cycles": "Cykly",
           "modules": "Moduly",
-          "intake": "Intake"
+          "intake": "Intake",
+          "estimates": "Odhady",
+          "stickies": "Stickies"
         }
       }
     }

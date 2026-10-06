@@ -135,12 +135,16 @@
         },
         "groups": {
           "context": "Akun",
-          "projects": "Proyek dan metadata",
+          "projects": "Proyek",
+          "project_setup": "Status dan label",
+          "members": "Anggota dan undangan",
           "work_items": "Item kerja",
           "work_item_extras": "Komentar, tautan, dan riwayat",
           "cycles": "Siklus",
           "modules": "Modul",
-          "intake": "Intake"
+          "intake": "Intake",
+          "estimates": "Perkiraan",
+          "stickies": "Stickies"
         }
       }
     }

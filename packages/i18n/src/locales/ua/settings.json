@@ -135,12 +135,16 @@
         },
         "groups": {
           "context": "Акаунт",
-          "projects": "Проєкти та метадані",
+          "projects": "Проєкти",
+          "project_setup": "Стани та мітки",
+          "members": "Учасники та запрошення",
           "work_items": "Робочі одиниці",
           "work_item_extras": "Коментарі, посилання та історія",
           "cycles": "Цикли",
           "modules": "Модулі",
-          "intake": "Intake"
+          "intake": "Intake",
+          "estimates": "Оцінки",
+          "stickies": "Stickies"
         }
       }
     }

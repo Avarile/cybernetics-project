@@ -135,12 +135,16 @@
         },
         "groups": {
           "context": "帳戶",
-          "projects": "專案與中繼資料",
+          "projects": "專案",
+          "project_setup": "狀態與標籤",
+          "members": "成員與邀請",
           "work_items": "工作事項",
           "work_item_extras": "留言、連結與歷程",
           "cycles": "週期",
           "modules": "模組",
-          "intake": "Intake"
+          "intake": "Intake",
+          "estimates": "評估",
+          "stickies": "Stickies"
         }
       }
     }

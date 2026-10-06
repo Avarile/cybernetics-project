@@ -135,12 +135,16 @@
         },
         "groups": {
           "context": "Cont",
-          "projects": "Proiecte și metadate",
+          "projects": "Proiecte",
+          "project_setup": "Stări și etichete",
+          "members": "Membri și invitații",
           "work_items": "Activități",
           "work_item_extras": "Comentarii, linkuri și istoric",
           "cycles": "Cicluri",
           "modules": "Module",
-          "intake": "Intake"
+          "intake": "Intake",
+          "estimates": "Estimări",
+          "stickies": "Stickies"
         }
       }
     }

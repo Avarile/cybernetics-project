@@ -128,6 +128,8 @@ def error_message(response: httpx.Response, data: Any) -> str:
         return f"Permission denied (403): {detail}"
     if status == 404:
         return f"Not found (404): {detail}"
+    if status == 409:
+        return f"Conflict (409), it already exists: {detail}"
     return f"Request rejected ({status}): {detail}"
 
 

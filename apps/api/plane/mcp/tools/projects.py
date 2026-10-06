@@ -2,25 +2,34 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 # See the LICENSE file for details.
 
-"""MCP tools for projects and project metadata (states, labels, members).
+"""MCP tools for the project lifecycle: list, read, create, update, archive and delete projects.
+
+States and labels live in ``project_setup``, members in ``members``.
 
 Note: each tool function's docstring is sent to MCP clients as the tool description,
 so edit those docstrings as user-facing text.
 """
 
 # Python imports
-from typing import Annotated, Optional
+from typing import Annotated, Literal, Optional
 from uuid import UUID
 
 # Third party imports
+from mcp.server.mcpserver.exceptions import ToolError
 from pydantic import Field
 
 # Module imports
 from plane.mcp.client import api
-from plane.mcp.schemas import Cursor, PerPage, ProjectId, WorkspaceSlug
-from plane.mcp.tools.common import compact, page_params, project_path
+from plane.mcp.schemas import Cursor, PerPage, ProjectId, ProjectIdentifier, WorkspaceSlug
+from plane.mcp.tools.common import compact, page_params, project_path, update_body
 
 PROJECT_LIST_FIELDS = "id,identifier,name,description,network,archived_at,created_at"  # compact ?fields= projection for list_projects
+
+ProjectName = Annotated[str, Field(min_length=1, max_length=255)]
+LeadId = Annotated[Optional[UUID], Field(description="User id of the project lead (made a project admin)")]
+DefaultAssigneeId = Annotated[Optional[UUID], Field(description="User id assigned to new work items by default")]
+SummaryField = Literal["members", "states", "labels", "cycles", "modules", "issues", "intakes", "pages"]
+AutoMonths = Annotated[Optional[int], Field(ge=0, le=12, description="Months, 0 to turn off")]
 
 
 async def list_projects(workspace_slug: WorkspaceSlug, cursor: Cursor = None, per_page: PerPage = 50) -> dict:
@@ -34,39 +43,122 @@ async def get_project(workspace_slug: WorkspaceSlug, project_id: ProjectId) -> d
     return await api().get(f"{project_path(workspace_slug, project_id)}/")
 
 
-async def list_states(workspace_slug: WorkspaceSlug, project_id: ProjectId) -> dict:
-    """List a project's workflow states (id, name, group). Use the id as state_id for work items."""
-    return await api().get(f"{project_path(workspace_slug, project_id)}/states/", params={"per_page": 100})
-
-
-async def list_labels(workspace_slug: WorkspaceSlug, project_id: ProjectId) -> dict:
-    """List a project's labels (id, name, color, parent). Use the ids as label_ids for work items."""
-    return await api().get(f"{project_path(workspace_slug, project_id)}/labels/", params={"per_page": 100})
-
-
-async def list_project_members(workspace_slug: WorkspaceSlug, project_id: ProjectId) -> dict:
-    """List a project's members. Use their user ids as assignee_ids for work items."""
-    return await api().get(f"{project_path(workspace_slug, project_id)}/members/")
-
-
-async def create_label(
+async def get_project_summary(
     workspace_slug: WorkspaceSlug,
     project_id: ProjectId,
-    name: Annotated[str, Field(min_length=1, max_length=255)],
-    color: Annotated[Optional[str], Field(description="Hex color, e.g. '#ff7700'")] = None,
-    description: Optional[str] = None,
-    parent_id: Annotated[Optional[UUID], Field(description="Parent label id, to create a nested label")] = None,
+    fields: Annotated[Optional[list[SummaryField]], Field(description="Counts to include; omit for all")] = None,
 ) -> dict:
-    """Create a label in a project."""
-    body = compact(name=name, color=color, description=description, parent=parent_id)
-    return await api().post(f"{project_path(workspace_slug, project_id)}/labels/", body)
+    """Get a project's counts (members, states, labels, cycles, modules, work items, intake items)."""
+    params = {"fields": ",".join(fields) if fields else None}
+    return await api().get(f"{project_path(workspace_slug, project_id)}/summary/", params=params)
+
+
+async def create_project(
+    workspace_slug: WorkspaceSlug,
+    name: ProjectName,
+    identifier: ProjectIdentifier,
+    description: Optional[str] = None,
+    project_lead_id: LeadId = None,
+    default_assignee_id: DefaultAssigneeId = None,
+    cycles_enabled: bool = True,
+    modules_enabled: bool = True,
+    intake_enabled: bool = False,
+    timezone: Annotated[Optional[str], Field(description="IANA timezone, e.g. 'Europe/Berlin'")] = None,
+) -> dict:
+    """
+    Create a project. You become its admin and it gets the default workflow states
+    (Backlog, Todo, In Progress, Done, Cancelled). Cycles and modules are enabled unless
+    turned off; enable intake to accept triage submissions. Workspace guests cannot create projects.
+    """
+    body = compact(
+        name=name,
+        identifier=identifier,
+        description=description,
+        project_lead=project_lead_id,
+        default_assignee=default_assignee_id,
+        cycle_view=cycles_enabled,
+        module_view=modules_enabled,
+        intake_view=intake_enabled,
+        timezone=timezone,
+    )
+    return await api().post(f"workspaces/{workspace_slug}/projects/", body)
+
+
+async def update_project(
+    workspace_slug: WorkspaceSlug,
+    project_id: ProjectId,
+    name: Optional[ProjectName] = None,
+    identifier: Optional[ProjectIdentifier] = None,
+    description: Optional[str] = None,
+    project_lead_id: LeadId = None,
+    default_assignee_id: DefaultAssigneeId = None,
+    cycles_enabled: Optional[bool] = None,
+    modules_enabled: Optional[bool] = None,
+    intake_enabled: Optional[bool] = None,
+    estimate_id: Annotated[
+        Optional[UUID], Field(description="Activate this estimate for the project (see get_estimate)")
+    ] = None,
+    archive_in: Annotated[AutoMonths, Field(description="Auto-archive closed work items after N months")] = None,
+    close_in: Annotated[AutoMonths, Field(description="Auto-close inactive work items after N months")] = None,
+    timezone: Optional[str] = None,
+) -> dict:
+    """Update a project's settings. Only the fields you pass change. Archived projects cannot be edited."""
+    body = update_body(
+        name=name,
+        identifier=identifier,
+        description=description,
+        project_lead=project_lead_id,
+        default_assignee=default_assignee_id,
+        cycle_view=cycles_enabled,
+        module_view=modules_enabled,
+        intake_view=intake_enabled,
+        estimate=estimate_id,
+        archive_in=archive_in,
+        close_in=close_in,
+        timezone=timezone,
+    )
+    return await api().patch(f"{project_path(workspace_slug, project_id)}/", body)
+
+
+async def delete_project(
+    workspace_slug: WorkspaceSlug,
+    project_id: ProjectId,
+    confirm_identifier: Annotated[
+        str, Field(min_length=1, max_length=12, description="The project's identifier, e.g. 'WEB', to confirm")
+    ],
+) -> dict:
+    """
+    Permanently delete a project and everything in it (work items, cycles, modules, ...).
+    This cannot be undone. Pass the project's identifier as confirm_identifier; the call is
+    refused if it does not match. Only project admins can do this.
+    """
+    project = await api().get(f"{project_path(workspace_slug, project_id)}/")
+    actual = str(project.get("identifier", ""))
+    if confirm_identifier.strip().upper() != actual.upper():
+        raise ToolError(
+            f"Refusing to delete: confirm_identifier '{confirm_identifier}' does not match the project's "
+            f"identifier '{actual}'"
+        )
+    return await api().delete(f"{project_path(workspace_slug, project_id)}/")
+
+
+async def archive_project(workspace_slug: WorkspaceSlug, project_id: ProjectId) -> dict:
+    """Archive a project: it is hidden from active project lists and becomes read-only."""
+    return await api().post(f"{project_path(workspace_slug, project_id)}/archive/", {})
+
+
+async def unarchive_project(workspace_slug: WorkspaceSlug, project_id: ProjectId) -> dict:
+    """Restore an archived project."""
+    return await api().delete(f"{project_path(workspace_slug, project_id)}/archive/")
 
 
 def register(tool) -> None:
-    """Register this module's tools."""
+    """Register this module's tools with their read-only/destructive/idempotent hints."""
     tool(read_only=True, title="List projects")(list_projects)
     tool(read_only=True, title="Get project")(get_project)
-    tool(read_only=True, title="List states")(list_states)
-    tool(read_only=True, title="List labels")(list_labels)
-    tool(read_only=True, title="List project members")(list_project_members)
-    tool(read_only=False, title="Create label")(create_label)
+    tool(read_only=True, title="Get project summary")(get_project_summary)
+    tool(read_only=False, title="Create project")(create_project)
+    tool(read_only=False, idempotent=True, title="Update project")(update_project)
+    tool(read_only=False, destructive=True, idempotent=True, title="Delete project")(delete_project)
+    tool(read_only=False, idempotent=True, title="Archive project")(archive_project)
+    tool(read_only=False, idempotent=True, title="Unarchive project")(unarchive_project)

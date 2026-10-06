@@ -90,5 +90,7 @@ LOGGING = {
             "handlers": ["console"],
             "propagate": False,
         },
+        "plane.mcp": {"level": "INFO", "handlers": ["console"], "propagate": False},
+        "mcp": {"level": "INFO", "handlers": ["console"], "propagate": False},
     },
 }

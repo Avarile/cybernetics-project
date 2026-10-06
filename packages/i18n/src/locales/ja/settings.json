@@ -135,12 +135,16 @@
         },
         "groups": {
           "context": "アカウント",
-          "projects": "プロジェクトとメタデータ",
+          "projects": "プロジェクト",
+          "project_setup": "ステータスとラベル",
+          "members": "メンバーと招待",
           "work_items": "作業項目",
           "work_item_extras": "コメント、リンク、履歴",
           "cycles": "サイクル",
           "modules": "モジュール",
-          "intake": "Intake"
+          "intake": "Intake",
+          "estimates": "見積もり",
+          "stickies": "Stickies"
         }
       }
     }

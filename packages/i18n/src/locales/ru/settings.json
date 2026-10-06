@@ -135,12 +135,16 @@
         },
         "groups": {
           "context": "Аккаунт",
-          "projects": "Проекты и метаданные",
+          "projects": "Проекты",
+          "project_setup": "Статусы и метки",
+          "members": "Участники и приглашения",
           "work_items": "Рабочие элементы",
           "work_item_extras": "Комментарии, ссылки и история",
           "cycles": "Циклы",
           "modules": "Модули",
-          "intake": "Intake"
+          "intake": "Intake",
+          "estimates": "Оценки",
+          "stickies": "Stickies"
         }
       }
     }

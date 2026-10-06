@@ -135,12 +135,16 @@
         },
         "groups": {
           "context": "Hesap",
-          "projects": "Projeler ve meta veriler",
+          "projects": "Projeler",
+          "project_setup": "Durumlar ve etiketler",
+          "members": "Üyeler ve davetler",
           "work_items": "İş öğeleri",
           "work_item_extras": "Yorumlar, bağlantılar ve geçmiş",
           "cycles": "Döngüler",
           "modules": "Modüller",
-          "intake": "Intake"
+          "intake": "Intake",
+          "estimates": "Tahminler",
+          "stickies": "Stickies"
         }
       }
     }

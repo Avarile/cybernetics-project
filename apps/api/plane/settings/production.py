@@ -99,5 +99,16 @@ LOGGING = {
             "handlers": ["console"],
             "propagate": False,
         },
+        # MCP server: tool failures at INFO, crash tracebacks at ERROR (also written to the error file)
+        "plane.mcp": {
+            "level": "DEBUG" if DEBUG else "INFO",
+            "handlers": ["console", "file"],
+            "propagate": False,
+        },
+        "mcp": {
+            "level": "DEBUG" if DEBUG else "INFO",
+            "handlers": ["console", "file"],
+            "propagate": False,
+        },
     },
 }
