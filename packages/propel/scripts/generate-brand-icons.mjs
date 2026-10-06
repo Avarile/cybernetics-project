@@ -233,6 +233,21 @@ const run = async () => {
     for (const entry of written) console.log(`  ${entry}`);
   }
 
+  // The lockup component inlines the maskable plate as a data URI; keep it in step
+  // with the icons above, or the auth screens keep showing the old accent.
+  const lockupComponent = resolve(HERE, "../src/icons/brand/cybernetics-lockup.tsx");
+  const plate = (await render("maskable.svg", 192)).toString("base64");
+  const component = readFileSync(lockupComponent, "utf8");
+  const updated = component.replace(
+    /(const ICON_HREF = "data:image\/png;base64,)[^"]+"/,
+    (_, prefix) => `${prefix}${plate}"`
+  );
+  if (updated === component && !component.includes(plate)) {
+    throw new Error("Could not find ICON_HREF in cybernetics-lockup.tsx.");
+  }
+  writeFileSync(lockupComponent, updated);
+  console.log(`\nlockup component:\n  cybernetics-lockup.tsx ICON_HREF (${plate.length.toLocaleString()} chars)`);
+
   // Lockups for contexts that cannot run our components: e-mail, Storybook, OG art.
   const geometry = readLockupGeometry();
   const emailDir = resolve(REPO, "apps/api/plane/static/logos");

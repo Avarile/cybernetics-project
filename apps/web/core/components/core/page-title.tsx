@@ -16,7 +16,7 @@ export function PageHead(props: PageHeadTitleProps) {
 
   useEffect(() => {
     if (title) {
-      document.title = title ?? "Cybernetics | AI First, human focusing, next gen of the task management platform.";
+      document.title = title ?? "Cybernetics | AI First, human focusing, help you with your interact with your agents and teammates.";
     }
   }, [title]);
 
