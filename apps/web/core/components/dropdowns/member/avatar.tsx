@@ -14,6 +14,9 @@ import { cn, getFileURL } from "@plane/utils";
 // helpers
 // hooks
 import { useMember } from "@/hooks/store/use-member";
+import { useAgent } from "@/hooks/store/use-agent";
+// components
+import { AgentMemberAvatar } from "@/components/agents/agent-avatar";
 
 type AvatarProps = {
   showTooltip: boolean;
@@ -26,30 +29,43 @@ export const ButtonAvatars = observer(function ButtonAvatars(props: AvatarProps)
   const { showTooltip, userIds, icon: Icon, size = "md" } = props;
   // store hooks
   const { getUserDetails } = useMember();
+  const { getAgentByBotUserId } = useAgent();
+
+  // Agents show a bot icon (or their emoji) instead of the initial-letter avatar
+  const renderAvatar = (userId: string, extraProps?: { size?: AvatarProps["size"]; showTooltip?: boolean }) => {
+    const userDetails = getUserDetails(userId);
+    const agent = getAgentByBotUserId(userId);
+    if (agent || (userDetails?.is_bot && userDetails.bot_type === "AGENT"))
+      return (
+        <AgentMemberAvatar
+          key={userId}
+          name={agent?.name ?? userDetails?.display_name ?? ""}
+          {...(extraProps as object)}
+        />
+      );
+    return (
+      <Avatar
+        key={userId}
+        src={getFileURL(userDetails?.avatar_url ?? "")}
+        name={userDetails?.display_name}
+        {...(extraProps as object)}
+      />
+    );
+  };
 
   if (Array.isArray(userIds)) {
     if (userIds.length > 0)
       return (
         <AvatarGroup size={size} showTooltip={!showTooltip}>
           {userIds.map((userId) => {
-            const userDetails = getUserDetails(userId);
-
-            if (!userDetails) return;
-            return <Avatar key={userId} src={getFileURL(userDetails.avatar_url)} name={userDetails.display_name} />;
+            if (!getUserDetails(userId)) return;
+            return renderAvatar(userId);
           })}
         </AvatarGroup>
       );
   } else {
     if (userIds) {
-      const userDetails = getUserDetails(userIds);
-      return (
-        <Avatar
-          src={getFileURL(userDetails?.avatar_url ?? "")}
-          name={userDetails?.display_name}
-          size={size}
-          showTooltip={!showTooltip}
-        />
-      );
+      return renderAvatar(userIds, { size, showTooltip: !showTooltip });
     }
   }
 

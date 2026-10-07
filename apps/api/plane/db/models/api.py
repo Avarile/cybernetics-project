@@ -13,7 +13,7 @@ from uuid import uuid4
 
 # Django imports
 from django.db import models
-from django.conf import settingsPlane
+from django.conf import settings
 
 from .base import BaseModel
 
