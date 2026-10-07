@@ -13,7 +13,7 @@ from uuid import uuid4
 
 # Django imports
 from django.db import models
-from django.conf import settings
+from django.conf import settingsPlane
 
 from .base import BaseModel
 
@@ -24,8 +24,8 @@ def generate_label_token():
 
 
 def generate_token():
-    """Generate a new random API token; the ``plane_api_`` prefix makes tokens easy to recognise."""
-    return "plane_api_" + uuid4().hex
+    """Generate a new random API token; the ``cybernetics_project_api_`` prefix makes tokens easy to recognise."""
+    return "cybernetics_project_api_" + uuid4().hex
 
 
 class APIToken(BaseModel):
