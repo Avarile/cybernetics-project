@@ -59,6 +59,9 @@ class UserSerializer(BaseSerializer):
             "is_email_verified",
             "is_active",
             "token_updated_at",
+            # only changed through the two-factor endpoints (password + emailed code)
+            "is_two_factor_email_enabled",
+            "two_factor_enabled_at",
         ]
 
         # If the user has already filled first name or last name then he is onboarded
@@ -92,6 +95,8 @@ class UserMeSerializer(BaseSerializer):
             "is_email_verified",
             "last_login_medium",
             "last_login_time",
+            "is_two_factor_email_enabled",
+            "two_factor_enabled_at",
         ]
         read_only_fields = fields
 

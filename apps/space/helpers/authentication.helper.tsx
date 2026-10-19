@@ -82,6 +82,8 @@ export enum EAuthenticationErrorCodes {
   ADMIN_AUTHENTICATION_FAILED = "5175",
   ADMIN_USER_ALREADY_EXIST = "5180",
   ADMIN_USER_DOES_NOT_EXIST = "5185",
+  // Two-factor authentication (spaces have no code step yet)
+  TWO_FACTOR_SPACE_UNSUPPORTED = "5240",
 }
 
 export type TAuthErrorInfo = {
@@ -336,6 +338,10 @@ const errorCodeMessages: {
       </div>
     ),
   },
+  [EAuthenticationErrorCodes.TWO_FACTOR_SPACE_UNSUPPORTED]: {
+    title: `Two-factor authentication`,
+    message: () => `Your account uses two-factor authentication. Sign in with an email code or Google/GitHub instead.`,
+  },
 };
 
 export const authErrorHandler = (errorCode: EAuthenticationErrorCodes, email?: string): TAuthErrorInfo | undefined => {
@@ -385,6 +391,7 @@ export const authErrorHandler = (errorCode: EAuthenticationErrorCodes, email?: s
     EAuthenticationErrorCodes.ADMIN_USER_ALREADY_EXIST,
     EAuthenticationErrorCodes.ADMIN_USER_DOES_NOT_EXIST,
     EAuthenticationErrorCodes.USER_ACCOUNT_DEACTIVATED,
+    EAuthenticationErrorCodes.TWO_FACTOR_SPACE_UNSUPPORTED,
   ];
 
   if (bannerAlertErrorCodes.includes(errorCode))

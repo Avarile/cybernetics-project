@@ -101,6 +101,15 @@ class SignInAuthSpaceEndpoint(View):
 
         try:
             provider = EmailProvider(request=request, key=email, code=password, is_signup=False)
+            if existing_user.is_two_factor_email_enabled:
+                # Spaces have no code step yet. Refuse only after the password checks out,
+                # so this error doesn't reveal which accounts use two-factor authentication.
+                provider.set_user_data()
+                raise AuthenticationException(
+                    error_code=AUTHENTICATION_ERROR_CODES["TWO_FACTOR_SPACE_UNSUPPORTED"],
+                    error_message="TWO_FACTOR_SPACE_UNSUPPORTED",
+                    payload={"email": str(email)},
+                )
             user = provider.authenticate()
             # Login the user and record his device info
             user_login(request=request, user=user, is_space=True)

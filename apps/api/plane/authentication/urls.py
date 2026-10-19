@@ -53,11 +53,23 @@ from .views import (
     GiteaOauthInitiateEndpoint,
     GiteaCallbackSpaceEndpoint,
     GiteaOauthInitiateSpaceEndpoint,
+    # Two-factor
+    TwoFactorEmailSendCodeEndpoint,
+    TwoFactorEmailEnableEndpoint,
+    TwoFactorEmailDisableEndpoint,
+    SignInTwoFactorEndpoint,
+    SignInTwoFactorResendEndpoint,
 )
 
 urlpatterns = [
     # credentials
     path("sign-in/", SignInAuthEndpoint.as_view(), name="sign-in"),
+    path("sign-in/two-factor/", SignInTwoFactorEndpoint.as_view(), name="sign-in-two-factor"),
+    path(
+        "sign-in/two-factor/resend/",
+        SignInTwoFactorResendEndpoint.as_view(),
+        name="sign-in-two-factor-resend",
+    ),
     path("sign-up/", SignUpAuthEndpoint.as_view(), name="sign-up"),
     path("spaces/sign-in/", SignInAuthSpaceEndpoint.as_view(), name="space-sign-in"),
     path("spaces/sign-up/", SignUpAuthSpaceEndpoint.as_view(), name="space-sign-up"),
@@ -146,6 +158,14 @@ urlpatterns = [
     ),
     path("change-password/", ChangePasswordEndpoint.as_view(), name="forgot-password"),
     path("set-password/", SetUserPasswordEndpoint.as_view(), name="set-password"),
+    # two-factor settings
+    path(
+        "two-factor/email/send-code/",
+        TwoFactorEmailSendCodeEndpoint.as_view(),
+        name="two-factor-email-send-code",
+    ),
+    path("two-factor/email/enable/", TwoFactorEmailEnableEndpoint.as_view(), name="two-factor-email-enable"),
+    path("two-factor/email/disable/", TwoFactorEmailDisableEndpoint.as_view(), name="two-factor-email-disable"),
     ## Gitea Oauth
     path("gitea/", GiteaOauthInitiateEndpoint.as_view(), name="gitea-initiate"),
     path("gitea/callback/", GiteaCallbackEndpoint.as_view(), name="gitea-callback"),

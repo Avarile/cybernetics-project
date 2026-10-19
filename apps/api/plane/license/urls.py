@@ -14,6 +14,8 @@ from plane.license.api.views import (
     EmailCredentialCheckEndpoint,
     InstanceAdminEndpoint,
     InstanceAdminSignInEndpoint,
+    InstanceAdminSignInTwoFactorEndpoint,
+    InstanceAdminSignInTwoFactorResendEndpoint,
     InstanceAdminSignUpEndpoint,
     InstanceConfigurationEndpoint,
     DisableEmailFeatureEndpoint,
@@ -56,6 +58,16 @@ urlpatterns = [
         "admins/sign-in/",
         InstanceAdminSignInEndpoint.as_view(),
         name="instance-admin-sign-in",
+    ),
+    path(
+        "admins/sign-in/two-factor/",
+        InstanceAdminSignInTwoFactorEndpoint.as_view(),
+        name="instance-admin-sign-in-two-factor",
+    ),
+    path(
+        "admins/sign-in/two-factor/resend/",
+        InstanceAdminSignInTwoFactorResendEndpoint.as_view(),
+        name="instance-admin-sign-in-two-factor-resend",
     ),
     path(
         "admins/sign-up/",

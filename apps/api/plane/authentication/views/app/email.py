@@ -22,6 +22,7 @@ from plane.authentication.utils.login import user_login
 from plane.license.models import Instance
 from plane.authentication.utils.host import base_host
 from plane.authentication.utils.redirection_path import get_redirection_path
+from plane.authentication.utils.two_factor_signin import start_challenge
 from plane.authentication.utils.user_auth_workflow import post_user_auth_workflow
 from plane.db.models import User
 from plane.authentication.adapter.error import (
@@ -117,6 +118,17 @@ class SignInAuthEndpoint(View):
                 is_signup=False,
                 callback=post_user_auth_workflow,
             )
+            if existing_user.is_two_factor_email_enabled:
+                # Check the password only; the session starts after the emailed code
+                # (SignInTwoFactorEndpoint), so the redirect carries TWO_FACTOR_REQUIRED.
+                provider.set_user_data()
+                exc = start_challenge(request, existing_user, audience="app", next_path=next_path)
+                url = get_safe_redirect_url(
+                    base_url=base_host(request=request, is_app=True),
+                    next_path=next_path,
+                    params=exc.get_error_dict(),
+                )
+                return HttpResponseRedirect(url)
             user = provider.authenticate()
             # Login the user and record his device info
             user_login(request=request, user=user, is_app=True)

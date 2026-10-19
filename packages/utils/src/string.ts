@@ -160,6 +160,22 @@ export const checkEmailValidity = (email: string): boolean => {
   return isEmailValid;
 };
 
+/**
+ * @returns {string} the email with most of the local part hidden (same rule as the API's mask_email)
+ * @description Used where a code was sent to the user's email, e.g. two-factor authentication
+ * @param {string} email email to mask
+ * @example maskEmail("avarile@gmail.com") => "a•••••e@gmail.com"
+ * @example maskEmail("ab@x.io") => "a•••••@x.io"
+ */
+export const maskEmail = (email: string): string => {
+  const at = email.lastIndexOf("@");
+  if (at <= 0) return email;
+  const local = email.slice(0, at);
+  const domain = email.slice(at);
+  if (local.length <= 2) return `${local[0]}•••••${domain}`;
+  return `${local[0]}•••••${local[local.length - 1]}${domain}`;
+};
+
 export const isEmptyHtmlString = (htmlString: string, allowedHTMLTags: string[] = []) => {
   // Remove HTML tags using sanitize-html
   const cleanText = sanitizeHtml(htmlString, { allowedTags: allowedHTMLTags });

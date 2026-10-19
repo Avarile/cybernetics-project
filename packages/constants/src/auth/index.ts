@@ -65,6 +65,7 @@ export enum EAuthSteps {
   EMAIL = "EMAIL",
   PASSWORD = "PASSWORD",
   UNIQUE_CODE = "UNIQUE_CODE",
+  TWO_FACTOR = "TWO_FACTOR",
 }
 
 export enum EErrorAlertType {
@@ -94,6 +95,14 @@ export enum EAdminAuthErrorCodes {
   ADMIN_USER_ALREADY_EXIST = "5180",
   ADMIN_USER_DOES_NOT_EXIST = "5185",
   ADMIN_USER_DEACTIVATED = "5190",
+  // Two-factor authentication
+  TWO_FACTOR_REQUIRED = "5200",
+  INVALID_TWO_FACTOR_CODE = "5205",
+  EXPIRED_TWO_FACTOR_CODE = "5210",
+  TWO_FACTOR_ATTEMPTS_EXHAUSTED = "5215",
+  TWO_FACTOR_LOCKED = "5220",
+  SMTP_NOT_CONFIGURED = "5025",
+  RATE_LIMIT_EXCEEDED = "5900",
 }
 
 export type TAdminAuthErrorInfo = {

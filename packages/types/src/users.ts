@@ -45,6 +45,9 @@ export interface IUser extends IUserLite {
   is_active: boolean;
   is_email_verified: boolean;
   is_password_autoset: boolean;
+  /** Password sign-ins also need a code emailed to `email`. */
+  is_two_factor_email_enabled?: boolean;
+  two_factor_enabled_at?: string | null;
   is_tour_completed: boolean;
   mobile_number: string | null;
   last_workspace_id: string;

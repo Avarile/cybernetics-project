@@ -22,6 +22,13 @@ from .app.magic import MagicGenerateEndpoint, MagicSignInEndpoint, MagicSignUpEn
 
 from .app.signout import SignOutAuthEndpoint
 
+from .app.two_factor import (
+    TwoFactorEmailDisableEndpoint,
+    TwoFactorEmailEnableEndpoint,
+    TwoFactorEmailSendCodeEndpoint,
+)
+from .app.two_factor_signin import SignInTwoFactorEndpoint, SignInTwoFactorResendEndpoint
+
 
 from .space.email import SignInAuthSpaceEndpoint, SignUpAuthSpaceEndpoint
 

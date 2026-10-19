@@ -17,6 +17,7 @@ import {
   EAuthenticationErrorCodes,
   EErrorAlertType,
   authErrorHandler,
+  twoFactorCodeStepErrors,
 } from "@/helpers/authentication.helper";
 // hooks
 import { useOAuthConfig } from "@/hooks/oauth";
@@ -60,6 +61,11 @@ export const AuthRoot = observer(function AuthRoot(props: TAuthRoot) {
 
   useEffect(() => {
     if (error_code && authMode) {
+      // password accepted and a code emailed (or a wrong code): stay on the code step
+      if (twoFactorCodeStepErrors.includes(error_code.toString() as EAuthenticationErrorCodes)) {
+        setAuthMode(EAuthModes.SIGN_IN);
+        setAuthStep(EAuthSteps.TWO_FACTOR);
+      }
       const errorhandler = authErrorHandler(error_code?.toString() as EAuthenticationErrorCodes);
       if (errorhandler) {
         // password error handler

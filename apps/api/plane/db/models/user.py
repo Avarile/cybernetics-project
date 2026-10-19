@@ -119,6 +119,9 @@ class User(AbstractBaseUser, PermissionsMixin):
     is_email_verified = models.BooleanField(default=False)
     is_password_autoset = models.BooleanField(default=False)
     is_password_reset_required = models.BooleanField(default=False)
+    # email two-factor authentication: password sign-ins also need an emailed code
+    is_two_factor_email_enabled = models.BooleanField(default=False)
+    two_factor_enabled_at = models.DateTimeField(null=True, blank=True)
     # random token generated
     token = models.CharField(max_length=64, blank=True)
 

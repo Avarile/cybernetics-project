@@ -39,6 +39,19 @@ export class AuthService extends APIService {
   }
 
   /**
+   * Emails a new code for the two-factor admin sign-in started in this browser (admin session cookie)
+   * @returns {Promise<void>}
+   * @throws {Error} Throws response data (with ``error_code``) if the request fails
+   */
+  async resendAdminSignInTwoFactorCode(): Promise<void> {
+    return this.post("/api/instances/admins/sign-in/two-factor/resend/", {}, { headers: {} })
+      .then(() => undefined)
+      .catch((error) => {
+        throw error?.response?.data;
+      });
+  }
+
+  /**
    * Checks if an email exists in the system
    * @param {IEmailCheckData} data - Email data to verify
    * @returns {Promise<IEmailCheckResponse>} Response indicating email status

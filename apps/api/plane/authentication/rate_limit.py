@@ -59,6 +59,13 @@ def authentication_throttle_allows(request):
     return throttle.allow_request(request, None)
 
 
+class TwoFactorSetupThrottle(UserRateThrottle):
+    """Per-user limit shared by the turn-on/turn-off two-factor endpoints (each change takes two requests)."""
+
+    rate = "10/hour"
+    scope = "two_factor_setup"
+
+
 class EmailVerificationThrottle(UserRateThrottle):
     """
     Throttle for email verification code generation.

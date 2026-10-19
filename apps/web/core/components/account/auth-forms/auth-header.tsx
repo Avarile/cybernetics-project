@@ -38,6 +38,10 @@ const Titles = {
       header: "Supported by AI.",
       subHeader: "Welcome back to Cybernetics.",
     },
+    [EAuthSteps.TWO_FACTOR]: {
+      header: "Supported by AI.",
+      subHeader: "Welcome back to Cybernetics.",
+    },
   },
   [EAuthModes.SIGN_UP]: {
     [EAuthSteps.EMAIL]: {
@@ -49,6 +53,10 @@ const Titles = {
       subHeader: "Create your Cybernetics account.",
     },
     [EAuthSteps.UNIQUE_CODE]: {
+      header: "Supported by AI.",
+      subHeader: "Create your Cybernetics account.",
+    },
+    [EAuthSteps.TWO_FACTOR]: {
       header: "Supported by AI.",
       subHeader: "Create your Cybernetics account.",
     },

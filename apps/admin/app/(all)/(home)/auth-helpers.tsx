@@ -73,7 +73,42 @@ const errorCodeMessages: {
     title: `User account deactivated`,
     message: () => `User account deactivated. Please contact ${SUPPORT_EMAIL ? SUPPORT_EMAIL : "administrator"}.`,
   },
+  // two-factor authentication
+  [EAdminAuthErrorCodes.TWO_FACTOR_REQUIRED]: {
+    title: `Check your email`,
+    message: () => `Enter the code we emailed you to finish signing in.`,
+  },
+  [EAdminAuthErrorCodes.INVALID_TWO_FACTOR_CODE]: {
+    title: `Invalid code`,
+    message: () => `That code isn't right. Please try again.`,
+  },
+  [EAdminAuthErrorCodes.EXPIRED_TWO_FACTOR_CODE]: {
+    title: `Code expired`,
+    message: () => `Your code expired. Please sign in again.`,
+  },
+  [EAdminAuthErrorCodes.TWO_FACTOR_ATTEMPTS_EXHAUSTED]: {
+    title: `Too many attempts`,
+    message: () => `Too many wrong codes. Sign in again to get a new code.`,
+  },
+  [EAdminAuthErrorCodes.TWO_FACTOR_LOCKED]: {
+    title: `Too many attempts`,
+    message: () => `Too many wrong codes. Please try again in 15 minutes.`,
+  },
+  [EAdminAuthErrorCodes.SMTP_NOT_CONFIGURED]: {
+    title: `SMTP not configured`,
+    message: () => `Your account uses two-factor authentication, but email isn't configured on this instance.`,
+  },
+  [EAdminAuthErrorCodes.RATE_LIMIT_EXCEEDED]: {
+    title: `Too many requests`,
+    message: () => `Please wait a moment and try again.`,
+  },
 };
+
+/** Errors that keep the admin sign-in on the two-factor code step; the others restart sign-in. */
+export const twoFactorCodeStepErrors: string[] = [
+  EAdminAuthErrorCodes.TWO_FACTOR_REQUIRED,
+  EAdminAuthErrorCodes.INVALID_TWO_FACTOR_CODE,
+];
 
 export const authErrorHandler = (errorCode: EAdminAuthErrorCodes, email?: string): TAdminAuthErrorInfo | undefined => {
   const bannerAlertErrorCodes = [
@@ -86,6 +121,12 @@ export const authErrorHandler = (errorCode: EAdminAuthErrorCodes, email?: string
     EAdminAuthErrorCodes.ADMIN_USER_ALREADY_EXIST,
     EAdminAuthErrorCodes.ADMIN_USER_DOES_NOT_EXIST,
     EAdminAuthErrorCodes.ADMIN_USER_DEACTIVATED,
+    EAdminAuthErrorCodes.INVALID_TWO_FACTOR_CODE,
+    EAdminAuthErrorCodes.EXPIRED_TWO_FACTOR_CODE,
+    EAdminAuthErrorCodes.TWO_FACTOR_ATTEMPTS_EXHAUSTED,
+    EAdminAuthErrorCodes.TWO_FACTOR_LOCKED,
+    EAdminAuthErrorCodes.SMTP_NOT_CONFIGURED,
+    EAdminAuthErrorCodes.RATE_LIMIT_EXCEEDED,
   ];
 
   if (bannerAlertErrorCodes.includes(errorCode))

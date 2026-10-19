@@ -22,6 +22,10 @@ from .admin import (
     InstanceAdminSignOutEndpoint,
     InstanceAdminUserSessionEndpoint,
 )
+from .admin_two_factor import (
+    InstanceAdminSignInTwoFactorEndpoint,
+    InstanceAdminSignInTwoFactorResendEndpoint,
+)
 
 
 from .workspace import (

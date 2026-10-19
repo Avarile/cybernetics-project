@@ -19,7 +19,8 @@ import { Banner } from "@/components/common/banner";
 import { FormHeader } from "@/components/instance/form-header";
 import { AuthBanner } from "./auth-banner";
 import { AuthHeader } from "./auth-header";
-import { authErrorHandler } from "./auth-helpers";
+import { authErrorHandler, twoFactorCodeStepErrors } from "./auth-helpers";
+import { InstanceTwoFactorForm } from "./two-factor-form";
 
 // service initialization
 const authService = new AuthService();
@@ -117,81 +118,90 @@ export function InstanceSignInForm() {
             heading="Manage your Plane instance"
             subHeading="Configure instance-wide settings to secure your instance"
           />
-          <form
-            className="space-y-4"
-            method="POST"
-            action={`${API_BASE_URL}/api/instances/admins/sign-in/`}
-            onSubmit={() => setIsSubmitting(true)}
-            onError={() => setIsSubmitting(false)}
-          >
-            {errorData.type && errorData?.message ? (
-              <Banner type="error" message={errorData?.message} />
-            ) : (
-              <>
-                {errorInfo && <AuthBanner bannerData={errorInfo} handleBannerData={(value) => setErrorInfo(value)} />}
-              </>
-            )}
-            <input type="hidden" name="csrfmiddlewaretoken" value={csrfToken} />
+          {errorCode && twoFactorCodeStepErrors.includes(errorCode) ? (
+            // password accepted and a code emailed (or a wrong code): stay on the code step
+            <InstanceTwoFactorForm
+              email={emailParam}
+              errorInfo={errorInfo}
+              setErrorInfo={(value) => setErrorInfo(value)}
+            />
+          ) : (
+            <form
+              className="space-y-4"
+              method="POST"
+              action={`${API_BASE_URL}/api/instances/admins/sign-in/`}
+              onSubmit={() => setIsSubmitting(true)}
+              onError={() => setIsSubmitting(false)}
+            >
+              {errorData.type && errorData?.message ? (
+                <Banner type="error" message={errorData?.message} />
+              ) : (
+                <>
+                  {errorInfo && <AuthBanner bannerData={errorInfo} handleBannerData={(value) => setErrorInfo(value)} />}
+                </>
+              )}
+              <input type="hidden" name="csrfmiddlewaretoken" value={csrfToken} />
 
-            <div className="w-full space-y-1">
-              <label className="text-13 font-medium text-tertiary" htmlFor="email">
-                Email <span className="text-danger-primary">*</span>
-              </label>
-              <Input
-                className="w-full border border-subtle !bg-surface-1 placeholder:text-placeholder"
-                id="email"
-                name="email"
-                type="email"
-                inputSize="md"
-                placeholder="name@company.com"
-                value={formData.email}
-                onChange={(e) => handleFormChange("email", e.target.value)}
-                autoComplete="off"
-                autoFocus
-              />
-            </div>
-
-            <div className="w-full space-y-1">
-              <label className="text-13 font-medium text-tertiary" htmlFor="password">
-                Password <span className="text-danger-primary">*</span>
-              </label>
-              <div className="relative">
+              <div className="w-full space-y-1">
+                <label className="text-13 font-medium text-tertiary" htmlFor="email">
+                  Email <span className="text-danger-primary">*</span>
+                </label>
                 <Input
                   className="w-full border border-subtle !bg-surface-1 placeholder:text-placeholder"
-                  id="password"
-                  name="password"
-                  type={showPassword ? "text" : "password"}
+                  id="email"
+                  name="email"
+                  type="email"
                   inputSize="md"
-                  placeholder="Enter your password"
-                  value={formData.password}
-                  onChange={(e) => handleFormChange("password", e.target.value)}
+                  placeholder="name@company.com"
+                  value={formData.email}
+                  onChange={(e) => handleFormChange("email", e.target.value)}
                   autoComplete="off"
+                  autoFocus
                 />
-                {showPassword ? (
-                  <button
-                    type="button"
-                    className="absolute top-3.5 right-3 flex items-center justify-center text-placeholder"
-                    onClick={() => setShowPassword(false)}
-                  >
-                    <EyeOff className="h-4 w-4" />
-                  </button>
-                ) : (
-                  <button
-                    type="button"
-                    className="absolute top-3.5 right-3 flex items-center justify-center text-placeholder"
-                    onClick={() => setShowPassword(true)}
-                  >
-                    <Eye className="h-4 w-4" />
-                  </button>
-                )}
               </div>
-            </div>
-            <div className="py-2">
-              <Button type="submit" size="xl" className="w-full" disabled={isButtonDisabled}>
-                {isSubmitting ? <Spinner height="20px" width="20px" /> : "Sign in"}
-              </Button>
-            </div>
-          </form>
+
+              <div className="w-full space-y-1">
+                <label className="text-13 font-medium text-tertiary" htmlFor="password">
+                  Password <span className="text-danger-primary">*</span>
+                </label>
+                <div className="relative">
+                  <Input
+                    className="w-full border border-subtle !bg-surface-1 placeholder:text-placeholder"
+                    id="password"
+                    name="password"
+                    type={showPassword ? "text" : "password"}
+                    inputSize="md"
+                    placeholder="Enter your password"
+                    value={formData.password}
+                    onChange={(e) => handleFormChange("password", e.target.value)}
+                    autoComplete="off"
+                  />
+                  {showPassword ? (
+                    <button
+                      type="button"
+                      className="absolute top-3.5 right-3 flex items-center justify-center text-placeholder"
+                      onClick={() => setShowPassword(false)}
+                    >
+                      <EyeOff className="h-4 w-4" />
+                    </button>
+                  ) : (
+                    <button
+                      type="button"
+                      className="absolute top-3.5 right-3 flex items-center justify-center text-placeholder"
+                      onClick={() => setShowPassword(true)}
+                    >
+                      <Eye className="h-4 w-4" />
+                    </button>
+                  )}
+                </div>
+              </div>
+              <div className="py-2">
+                <Button type="submit" size="xl" className="w-full" disabled={isButtonDisabled}>
+                  {isSubmitting ? <Spinner height="20px" width="20px" /> : "Sign in"}
+                </Button>
+              </div>
+            </form>
+          )}
         </div>
       </div>
     </>

@@ -26,6 +26,7 @@ export enum EAuthSteps {
   EMAIL = "EMAIL",
   PASSWORD = "PASSWORD",
   UNIQUE_CODE = "UNIQUE_CODE",
+  TWO_FACTOR = "TWO_FACTOR",
 }
 
 export enum EErrorAlertType {
@@ -98,8 +99,23 @@ export enum EAuthenticationErrorCodes {
   ADMIN_USER_DOES_NOT_EXIST = "5185",
   ADMIN_USER_DEACTIVATED = "5190",
   // Rate limit
+  // Two-factor authentication
+  TWO_FACTOR_REQUIRED = "5200",
+  INVALID_TWO_FACTOR_CODE = "5205",
+  EXPIRED_TWO_FACTOR_CODE = "5210",
+  TWO_FACTOR_ATTEMPTS_EXHAUSTED = "5215",
+  TWO_FACTOR_LOCKED = "5220",
+  TWO_FACTOR_ALREADY_ENABLED = "5225",
+  TWO_FACTOR_NOT_ENABLED = "5230",
+  TWO_FACTOR_PASSWORD_REQUIRED = "5235",
   RATE_LIMIT_EXCEEDED = "5900",
 }
+
+/** Errors that keep the sign-in page on the two-factor code step; the other two-factor errors restart sign-in. */
+export const twoFactorCodeStepErrors = [
+  EAuthenticationErrorCodes.TWO_FACTOR_REQUIRED,
+  EAuthenticationErrorCodes.INVALID_TWO_FACTOR_CODE,
+];
 
 export type TAuthErrorInfo = {
   type: EErrorAlertType;
@@ -370,6 +386,40 @@ const errorCodeMessages: {
     title: "",
     message: () => `Rate limit exceeded. Please try again later.`,
   },
+
+  // two-factor authentication
+  [EAuthenticationErrorCodes.TWO_FACTOR_REQUIRED]: {
+    title: `Check your email`,
+    message: () => `Enter the code we emailed you to finish signing in.`,
+  },
+  [EAuthenticationErrorCodes.INVALID_TWO_FACTOR_CODE]: {
+    title: `Invalid code`,
+    message: () => `That code isn't right. Please try again.`,
+  },
+  [EAuthenticationErrorCodes.EXPIRED_TWO_FACTOR_CODE]: {
+    title: `Code expired`,
+    message: () => `Your code expired. Please sign in again.`,
+  },
+  [EAuthenticationErrorCodes.TWO_FACTOR_ATTEMPTS_EXHAUSTED]: {
+    title: `Too many attempts`,
+    message: () => `Too many wrong codes. Sign in again to get a new code.`,
+  },
+  [EAuthenticationErrorCodes.TWO_FACTOR_LOCKED]: {
+    title: `Too many attempts`,
+    message: () => `Too many wrong codes. Please try again in 15 minutes.`,
+  },
+  [EAuthenticationErrorCodes.TWO_FACTOR_ALREADY_ENABLED]: {
+    title: `Already on`,
+    message: () => `Two-factor authentication is already on.`,
+  },
+  [EAuthenticationErrorCodes.TWO_FACTOR_NOT_ENABLED]: {
+    title: `Already off`,
+    message: () => `Two-factor authentication is already off.`,
+  },
+  [EAuthenticationErrorCodes.TWO_FACTOR_PASSWORD_REQUIRED]: {
+    title: `Password required`,
+    message: () => `Set a password first to use two-factor authentication.`,
+  },
 };
 
 export const authErrorHandler = (errorCode: EAuthenticationErrorCodes, email?: string): TAuthErrorInfo | undefined => {
@@ -425,6 +475,13 @@ export const authErrorHandler = (errorCode: EAuthenticationErrorCodes, email?: s
     EAuthenticationErrorCodes.ADMIN_USER_DEACTIVATED,
     EAuthenticationErrorCodes.RATE_LIMIT_EXCEEDED,
     EAuthenticationErrorCodes.PASSWORD_TOO_WEAK,
+    EAuthenticationErrorCodes.INVALID_TWO_FACTOR_CODE,
+    EAuthenticationErrorCodes.EXPIRED_TWO_FACTOR_CODE,
+    EAuthenticationErrorCodes.TWO_FACTOR_ATTEMPTS_EXHAUSTED,
+    EAuthenticationErrorCodes.TWO_FACTOR_LOCKED,
+    EAuthenticationErrorCodes.TWO_FACTOR_ALREADY_ENABLED,
+    EAuthenticationErrorCodes.TWO_FACTOR_NOT_ENABLED,
+    EAuthenticationErrorCodes.TWO_FACTOR_PASSWORD_REQUIRED,
   ];
 
   if (bannerAlertErrorCodes.includes(errorCode))

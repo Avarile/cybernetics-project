@@ -11,6 +11,8 @@ import type { ICsrfTokenData, IEmailCheckData, IEmailCheckResponse } from "@plan
 // services
 import { APIService } from "@/services/api.service";
 
+export type TTwoFactorAction = "enable" | "disable";
+
 export class AuthService extends APIService {
   constructor() {
     super(API_BASE_URL);
@@ -54,6 +56,40 @@ export class AuthService extends APIService {
   async generateUniqueCode(data: { email: string }): Promise<any> {
     return this.post("/auth/magic-generate/", data, { headers: {} })
       .then((response) => response?.data)
+      .catch((error) => {
+        throw error?.response?.data;
+      });
+  }
+
+  /** Turning two-factor on/off, step 1: re-checks the password and emails a code. */
+  async sendTwoFactorEmailCode(
+    csrfToken: string,
+    data: { action: TTwoFactorAction; password: string }
+  ): Promise<{ token: string; expires_at: string }> {
+    return this.post("/auth/two-factor/email/send-code/", data, { headers: { "X-CSRFTOKEN": csrfToken } })
+      .then((response) => response?.data)
+      .catch((error) => {
+        throw error?.response?.data;
+      });
+  }
+
+  /** Turning two-factor on/off, step 2: confirms with the emailed code. */
+  async confirmTwoFactorEmail(
+    csrfToken: string,
+    action: TTwoFactorAction,
+    data: { token: string; code: string }
+  ): Promise<{ is_two_factor_email_enabled: boolean; two_factor_enabled_at: string | null }> {
+    return this.post(`/auth/two-factor/email/${action}/`, data, { headers: { "X-CSRFTOKEN": csrfToken } })
+      .then((response) => response?.data)
+      .catch((error) => {
+        throw error?.response?.data;
+      });
+  }
+
+  /** Emails a new code for the two-factor sign-in started in this browser. */
+  async resendSignInTwoFactorCode(): Promise<void> {
+    return this.post("/auth/sign-in/two-factor/resend/", {}, { headers: {} })
+      .then(() => undefined)
       .catch((error) => {
         throw error?.response?.data;
       });

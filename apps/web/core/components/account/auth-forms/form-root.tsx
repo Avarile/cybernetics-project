@@ -20,6 +20,7 @@ import { AuthService } from "@/services/auth.service";
 // local components
 import { AuthEmailForm } from "./email";
 import { AuthPasswordForm } from "./password";
+import { AuthTwoFactorCodeForm } from "./two-factor-code";
 import { AuthUniqueCodeForm } from "./unique-code";
 
 type TAuthFormRoot = {
@@ -132,6 +133,9 @@ export const AuthFormRoot = observer(function AuthFormRoot(props: TAuthFormRoot)
         nextPath={nextPath || undefined}
       />
     );
+  }
+  if (authStep === EAuthSteps.TWO_FACTOR) {
+    return <AuthTwoFactorCodeForm email={email} handleEmailClear={handleEmailClear} nextPath={nextPath || undefined} />;
   }
 
   return <></>;

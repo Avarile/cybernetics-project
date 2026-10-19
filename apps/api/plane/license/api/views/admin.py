@@ -45,8 +45,10 @@ from plane.authentication.adapter.error import (
     AUTHENTICATION_ERROR_CODES,
     AuthenticationException,
 )
+from plane.authentication.utils.two_factor_signin import start_challenge
 from plane.utils.ip_address import get_client_ip
 from plane.utils.path_validator import get_safe_redirect_url
+from .admin_two_factor import complete_admin_login
 
 
 class InstanceAdminEndpoint(BaseAPIView):
@@ -409,19 +411,20 @@ class InstanceAdminSignInEndpoint(View):
                 "?" + urlencode(exc.get_error_dict()),
             )
             return HttpResponseRedirect(url)
-        # settings last active for the user
-        user.is_active = True
-        user.last_active = timezone.now()
-        user.last_login_time = timezone.now()
-        user.last_login_ip = get_client_ip(request=request)
-        user.last_login_uagent = request.META.get("HTTP_USER_AGENT")
-        user.token_updated_at = timezone.now()
-        user.save()
 
-        # get tokens for user
-        user_login(request=request, user=user, is_admin=True)
-        url = urljoin(base_host(request=request, is_admin=True), "general/")
-        return HttpResponseRedirect(url)
+        if user.is_two_factor_email_enabled:
+            # the admin session starts after the emailed code (InstanceAdminSignInTwoFactorEndpoint)
+            try:
+                exc = start_challenge(request, user, audience="admin")
+            except AuthenticationException as e:
+                exc = e
+            url = urljoin(
+                base_host(request=request, is_admin=True),
+                "?" + urlencode(exc.get_error_dict()),
+            )
+            return HttpResponseRedirect(url)
+
+        return complete_admin_login(request, user)
 
 
 class InstanceAdminUserMeEndpoint(BaseAPIView):
