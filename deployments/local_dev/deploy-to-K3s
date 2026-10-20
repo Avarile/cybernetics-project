@@ -6,8 +6,25 @@ phase is one bash block. Paste the blocks in order into **one terminal**: later 
 use the variables set by earlier ones. The release plan is also saved to
 `~/.cyb-release`, so a new terminal can resume with `source ~/.cyb-release`.
 
-Only one step needs you at the keyboard: phase 5, the containerd import. It runs
-`sudo` on the server and asks for your password. Everything else runs unattended.
+Two steps need you at the keyboard, because they run `sudo` on the server and ask for
+your password: the containerd import (phase 5) and removing old images from the node
+(phase 8). Everything else runs unattended. From inside Claude Code, run them with the
+`! ` prefix.
+
+| Release step | Phase |
+|---|---|
+| Preflight checks, clean the Docker cache | 0, 0b |
+| Plan: what changed, components, tag, new migrations | 1 |
+| Check for new env vars and config | 1b |
+| Build and smoke-test the images | 2, 3 |
+| Ship and import into containerd | 4, 5 |
+| Bump manifests, migrate, roll out | 6 |
+| Verify | 7 |
+| Clean up old images, record the release | 8 |
+
+Timing: a cold-cache build of backend, web, space and admin takes about 15 minutes
+(backend ~5, web ~3, space ~5, admin ~2). Upload takes about a minute, and the rollout
+2–3 minutes.
 
 The server-side runbook (cluster layout, domain/TLS, database resets) lives on the
 server at `~/dev-ops/k3s-deployment/apps/plane/readme.md`. This file is the dev-machine
@@ -64,8 +81,11 @@ docker save | zstd ──── ssh ──────────────�
 | `apps/proxy/Caddyfile.ce` | `proxy` |
 | A new backend endpoint and the UI that calls it | `backend` **and** `web`, in the same release |
 
-Not sure? Compare against the last release's commit, which phase 2 prints. Look at
-`git diff --stat <last-release-commit>..HEAD -- apps packages`.
+Phase 1 lists what changed since the last release and which apps import each changed
+package. A package change only matters to an app that uses the changed code: for
+example, a new type or helper in `@plane/types` doesn't require rebuilding `live`.
+`space` is a Node server (react-router-serve on port 3000), not a static nginx site
+like `web` and `admin`, which is why its image is about 1.5 GB.
 
 ---
 
@@ -97,9 +117,39 @@ git status --short -- apps packages | grep -v '^??' && echo "WARNING: uncommitte
 echo "HEAD: $(git log -1 --format='%h %s')"
 ```
 
+### Phase 0b: clean the Docker cache
+
+Start each release from an empty build cache, so stale layers can't end up in the images.
+This removes only the build cache and untagged images. Volumes and the images used by the
+local `platform` infra containers stay. The builds that follow are cold (see the timing above).
+
+```bash
+docker system df
+docker builder prune -af | tail -1
+docker image prune -f | tail -1
+```
+
 ### Phase 1: plan the release
 
-Set **which components** to ship (space-separated, see the matrix). This block fixes the
+First see what changed since the last release. The last release's commit is read from
+the top row of the release log (section 6), so keep that log up to date (phase 8).
+
+```bash
+cd "$(git rev-parse --show-toplevel)"
+LAST="$(awk -F'`' '/^\| `release\./{print $4; exit}' deployments/local_dev/deploy-to-K3s)"
+echo "last release commit: $LAST"; git log --oneline "$LAST"..HEAD
+git diff --name-only "$LAST"..HEAD -- apps packages | cut -d/ -f1-2 | sort | uniq -c
+for p in $(git diff --name-only "$LAST"..HEAD -- packages | cut -d/ -f2 | sort -u); do
+  printf '  @plane/%-10s used by:' "$p"
+  for a in web space admin live; do grep -q "\"@plane/$p\"" "apps/$a/package.json" && printf ' %s' "$a"; done; echo
+done
+echo "new migrations:"; git diff --name-only --diff-filter=A "$LAST"..HEAD -- 'apps/api/plane/db/migrations/*.py' | sed 's/^/  /'
+```
+
+Any new migration means `backend` ships, and phase 6 runs the migrator. Read each one now:
+see the note before the phase 6 script.
+
+Then set **which components** to ship (space-separated, see the matrix). This block fixes the
 tag, defines the component mapping, and saves the plan to `~/.cyb-release`.
 
 ```bash
@@ -107,9 +157,10 @@ cd "$(git rev-parse --show-toplevel)"
 COMPONENTS="backend web"                       # <- edit: any of backend web space admin live proxy
 T="release.$(date -u +%Y-%m-%dT%H-%M-%SZ).1"
 COMMIT="$(git rev-parse --short HEAD)"
+LAST="$(awk -F'`' '/^\| `release\./{print $4; exit}' deployments/local_dev/deploy-to-K3s)"
 
 cat > ~/.cyb-release <<EOF
-export T="$T" COMPONENTS="$COMPONENTS" COMMIT="$COMMIT" REPO="$PWD"
+export T="$T" COMPONENTS="$COMPONENTS" COMMIT="$COMMIT" LAST="$LAST" REPO="$PWD"
 dockerfile_of() { case "\$1" in backend) echo apps/api/Dockerfile.api;; web) echo apps/web/Dockerfile.web;;
   space) echo apps/space/Dockerfile.space;; admin) echo apps/admin/Dockerfile.admin;;
   live) echo apps/live/Dockerfile.live;; proxy) echo apps/proxy/Dockerfile.ce;; *) return 1;; esac; }
@@ -122,6 +173,39 @@ echo "release $T  commit $COMMIT  components: $COMPONENTS"
 echo "currently deployed:"
 ssh -o BatchMode=yes K3s-server 'kubectl -n plane get deploy -o custom-columns=NAME:.metadata.name,IMAGE:.spec.template.spec.containers[0].image --no-headers'
 ```
+
+### Phase 1b: check for new env vars and config
+
+Lists the env vars the new code reads, and the keys the cluster already has. Only key
+names are printed, never secret values.
+
+```bash
+source ~/.cyb-release && cd "$REPO"
+echo "new env reads (backend):"
+git diff "$LAST"..HEAD -- apps/api ':!apps/api/plane/tests' | grep '^+' \
+  | grep -oE '(os\.environ\.get|os\.getenv)\("[A-Z0-9_]+"[^)]*\)?|os\.environ\["[A-Z0-9_]+"\]' | sort -u | sed 's/^/  /'
+echo "new build-time vars (frontends):"
+git diff "$LAST"..HEAD -- apps packages | grep '^+' | grep -oE 'VITE_[A-Z0-9_]+' | sort -u | sed 's/^/  /'
+ssh -o BatchMode=yes K3s-server 'echo "plane-config keys:"; kubectl -n plane get cm plane-config -o go-template="{{range \$k,\$v := .data}}  {{\$k}}{{\"\n\"}}{{end}}"
+  echo "plane-secret keys:"; kubectl -n plane get secret plane-secret -o go-template="{{range \$k,\$v := .data}}  {{\$k}}{{\"\n\"}}{{end}}"'
+```
+
+How to read the result:
+
+- **A var with a default in the code** (like `os.environ.get("TWO_FACTOR_CODE_TTL", 600)`)
+  needs no change. Add it to the cluster only if you want a value other than the default.
+- **A var without a default** that isn't in either list has to be added before the
+  rollout. Non-secret values go in `apps/plane/configmap.yaml` on the server, which is
+  part of the kustomization. Secrets go in `apps/plane/secret.yaml`, which is gitignored:
+  apply it with `kubectl apply -f apps/plane/secret.yaml`. Pods don't pick up configmap or
+  secret changes until they restart, and phase 6 only restarts the deployments in the
+  release. For any other deployment, run `kubectl -n plane rollout restart deploy/<name>`.
+- **`VITE_*` vars are baked in at build time.** Set them before phase 2, or the frontend
+  image has to be rebuilt.
+- **Instance settings live in the database, not in env vars.** Production runs with
+  `SKIP_ENV_VAR=True`, so SMTP, sign-in methods and other god-mode settings come from
+  `/god-mode/`, and env values for them are ignored. A feature that sends email (2FA codes,
+  invites, password resets) needs SMTP configured there. Use **Send test email** in god-mode.
 
 ### Phase 2: build the images
 
@@ -161,22 +245,30 @@ import asyncio, django; django.setup()
 from django.conf import settings; settings.MCP_READ_ONLY=False; settings.MCP_TOOLSETS=[]
 from plane.mcp.server import build_server
 print(\"   backend: django ok, MCP tools:\", len(asyncio.run(build_server().list_tools())))"' ;;
-    web|space|admin)
+    web|admin)
       docker run --rm --entrypoint sh "cybernetics-project-$c:$T" -c \
         'test -s /usr/share/nginx/html/index.html && echo "   '"$c"': index.html ok, $(find /usr/share/nginx/html -name "*.js" | wc -l) js files"' ;;
+    space)  # Node server, not nginx: boot it and request /spaces/
+      docker run -d --rm --name cyb-space-smoke -p 127.0.0.1:39300:3000 "cybernetics-project-space:$T" >/dev/null
+      for i in $(seq 30); do code=$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:39300/spaces/); [ "$code" != 000 ] && break; sleep 1; done
+      echo "   space: GET /spaces/ -> $code (expect 200)"; docker stop cyb-space-smoke >/dev/null ;;
     *)
       docker image inspect "cybernetics-project-$c:$T" >/dev/null && echo "   $c: image present" ;;
   esac
 done
 ```
 
-To check that a particular change made it into the web bundle, grep for a new string:
-`docker run --rm --entrypoint sh cybernetics-project-web:$T -c 'grep -rl "<new string>" /usr/share/nginx/html | head -1'`
+To check that a particular change made it into an image, grep for something new. The
+images use BusyBox `grep`, which has no `--include`:
+
+- Web bundle: `docker run --rm --entrypoint sh cybernetics-project-web:$T -c 'grep -rlF "<new string>" /usr/share/nginx/html | head -1'`
+- Backend migration or template: `docker run --rm --entrypoint sh cybernetics-project-backend:$T -c 'ls plane/db/migrations | tail -3; ls templates/emails'`
 
 ### Phase 4: ship to the server
 
 Streams the images, zstd-compressed, straight into a tarball on the server, then
-checks the archive. The backend and web images together compress to about 160 MB.
+checks the archive. Backend and web compress to about 160 MB. With space and admin
+added, it's about 430 MB, roughly a minute over the LAN.
 
 ```bash
 source ~/.cyb-release
@@ -196,16 +288,26 @@ echo "ssh -t K3s-server 'zstd -dc ~/cyb-$T.tar.zst | sudo k3s ctr -n k8s.io imag
 ```
 
 Run the printed command in a terminal. From inside Claude Code, prefix it with `! `. It
-prints one `unpacking docker.io/library/cybernetics-project-…` line per image.
+prints one `docker.io/library/cybernetics project … saved` line per image. Ignore the
+containerd `DEPRECATION` warning about `configs`.
 
-Then confirm the node has the images. This uses kubectl, so no sudo:
+Then confirm the node has the images. This uses kubectl, so no sudo. The kubelet only
+refreshes the node's image list every so often, so this retries for up to a minute:
 
 ```bash
 source ~/.cyb-release
-ssh -o BatchMode=yes K3s-server "kubectl get node k8s-micro-server -o jsonpath='{range .status.images[*]}{.names}{\"\n\"}{end}'" \
-  | grep -o "cybernetics-project-[a-z]*:$T" | sort -u
-# Expect one line per component in $COMPONENTS
+for i in $(seq 6); do
+  FOUND="$(ssh -o BatchMode=yes K3s-server "kubectl get nodes -o jsonpath='{range .items[*].status.images[*]}{.names}{\"\n\"}{end}'" \
+    | grep -o "cybernetics-project-[a-z]*:$T" | sort -u)"
+  [ "$(grep -c . <<<"$FOUND")" -ge "$(wc -w <<<"$COMPONENTS")" ] && break; sleep 10
+done
+echo "$FOUND"   # expect one line per component in $COMPONENTS
 ```
+
+The node's image list holds at most **50 images**, largest first. With many old images on
+the node, a newly imported image may never show up, even though the import worked.
+Confirm with `ssh -t K3s-server "sudo k3s crictl images | grep $T"`, and keep the node
+tidy (phase 8).
 
 ### Phase 6: roll out
 
@@ -218,7 +320,9 @@ This block runs entirely on the server. In order, it:
    so a hand-edited ad-hoc name (like the old `plane-web:6-oct-2026`) has to be renamed
    first.
 3. **Checks the node.** Every new image must be on the node, otherwise it aborts and
-   restores the manifests.
+   restores the manifests. It retries for a minute while the node's image list catches
+   up. If `crictl` shows an image but the node list never does (the 50-image limit, see
+   phase 5), set `SKIP_NODE_CHECK=1`.
 4. **Shows the diff.** Runs `kubectl diff -k` and prints only the changed `image:` lines, plus a
    count of any *other* changed lines. Other changes mean the live cluster and the repo
    have drifted; read them before continuing.
@@ -228,12 +332,19 @@ This block runs entirely on the server. In order, it:
 6. **Rolls out.** Runs `kubectl apply -k apps/plane/` and waits for each affected deployment.
 
 Set `DRY_RUN=1` to stop after step 4. A dry run restores the manifests and leaves the
-cluster unchanged. Always do a dry run first.
+cluster unchanged. Always do a dry run first. The diff should show only `image:` lines:
+one per component, plus `worker`, `beat-worker` and `migrator` for backend.
+
+**Before the real run, read every new migration** (phase 1 lists them). Additive
+operations (`AddField`, `CreateModel`, `AddIndex`) are safe to apply while the old pods
+are still running. Anything that drops, renames or rewrites data needs a plan for rolling
+back, so read [Rollback](#4-rollback) first. To check what production has applied:
+`ssh K3s-server 'kubectl -n plane exec deploy/api -- python manage.py showmigrations db | tail -3'`.
 
 ```bash
 source ~/.cyb-release
 DRY_RUN=1                                   # <- set to 0 for the real rollout
-ssh -o BatchMode=yes K3s-server "DRY_RUN=$DRY_RUN bash -s -- '$T' $COMPONENTS" <<'REMOTE'
+ssh -o BatchMode=yes K3s-server "DRY_RUN=$DRY_RUN SKIP_NODE_CHECK=${SKIP_NODE_CHECK:-0} bash -s -- '$T' $COMPONENTS" <<'REMOTE'
 set -euo pipefail
 T="$1"; shift; COMPONENTS="$*"
 cd ~/dev-ops/k3s-deployment
@@ -246,6 +357,8 @@ deploys_of()   { case "$1" in backend) echo "api worker beat-worker";; *) echo "
 restore()      { cp "$REL"/*.yaml "$APP"/; echo "   manifests restored from $REL"; }
 
 echo "== 1. recording release in $REL"
+# A finished rollout leaves its rollback copy here; re-using the tag would overwrite it
+[ -e "$REL" ] && { echo "   $REL already exists: $T was already rolled out. Plan a new tag (phase 1)"; exit 1; }
 mkdir -p "$REL"
 cp "$APP"/*.yaml "$REL"/
 { echo "release: $T"; echo "date: $(date -u +%FT%TZ)"; echo "components: $COMPONENTS"
@@ -261,10 +374,12 @@ for c in $COMPONENTS; do
 done
 
 echo "== 3. checking images on the node"
-NODE_IMAGES="$(kubectl get nodes -o jsonpath='{range .items[*].status.images[*]}{.names}{"\n"}{end}')"
+on_node() { kubectl get nodes -o jsonpath='{range .items[*].status.images[*]}{.names}{"\n"}{end}' | grep -q "cybernetics-project-$1:$T"; }
 for c in $COMPONENTS; do
-  grep -q "cybernetics-project-$c:$T" <<<"$NODE_IMAGES" || { echo "   MISSING on node: cybernetics-project-$c:$T (run the phase 5 import)"; restore; exit 1; }
-  echo "   present: cybernetics-project-$c:$T"
+  for i in 1 2 3 4 5 6; do on_node "$c" && break; sleep 10; done
+  if on_node "$c"; then echo "   present: cybernetics-project-$c:$T"
+  elif [ "${SKIP_NODE_CHECK:-0}" = "1" ]; then echo "   not listed, continuing (SKIP_NODE_CHECK=1): cybernetics-project-$c:$T"
+  else echo "   MISSING on node: cybernetics-project-$c:$T (run the phase 5 import)"; restore; exit 1; fi
 done
 
 echo "== 4. kubectl diff"
@@ -312,6 +427,8 @@ echo "web:       $(curl -s -o /dev/null -w '%{http_code}' $URL/)"               
 echo "instances: $(curl -s -o /dev/null -w '%{http_code}' $URL/api/instances/)"    # 200
 ssh -o BatchMode=yes K3s-server 'kubectl -n plane get pods --no-headers | grep -v -E "Running|Completed" || echo "pods: all Running"'
 ssh -o BatchMode=yes K3s-server 'kubectl -n plane logs deploy/api --since=5m | grep -i -E "traceback|exception|\"levelname\": \"ERROR\"" | head -10 || true'
+ssh -o BatchMode=yes K3s-server 'kubectl -n plane get pods --no-headers -o custom-columns=NAME:.metadata.name,RESTARTS:.status.containerStatuses[0].restartCount,CREATED:.metadata.creationTimestamp'
+ssh -o BatchMode=yes K3s-server 'kubectl -n plane logs deploy/worker --since=10m | grep -c "\. plane\.bgtasks\." | sed "s/^/worker: tasks registered: /"'
 
 # MCP endpoint (only when PLANE_TOKEN is set), expects the server's tool count
 if [ -n "${PLANE_TOKEN:-}" ]; then
@@ -321,6 +438,19 @@ if [ -n "${PLANE_TOKEN:-}" ]; then
     | python3 -c 'import json,sys; print("mcp tools:", len(json.load(sys.stdin)["result"]["tools"]))'
 fi
 ```
+
+The pods in the release should have a fresh `CREATED` time and 0 restarts.
+
+**Probe new routes.** POST to each new endpoint without logging in, for example
+`curl -s -o /dev/null -w '%{http_code}' -X POST https://projects.avarile.com/auth/<new-route>/`.
+A 400, 401 or 403 response means the route is deployed. So does Django's CSRF page, which
+comes back as HTTP 200 with the title "CSRF Verification Failed". A 404 means the route
+isn't deployed or isn't registered.
+
+**Then use the feature itself in the browser.** Email (2FA codes, invites, password resets)
+is sent by the Celery **worker**, not the API, so keep
+`ssh K3s-server 'kubectl -n plane logs deploy/worker -f'` open while you trigger it. You
+should see the task received, then `Email sent successfully.`
 
 If anything looks wrong, go to [Rollback](#4-rollback). The rollback takes about a minute.
 
@@ -333,24 +463,38 @@ ssh -o BatchMode=yes K3s-server "rm -f ~/cyb-$T.tar.zst && echo 'server tarball 
 ssh -o BatchMode=yes K3s-server "cd ~/dev-ops/k3s-deployment && git add apps/plane && git commit -q -m 'plane: release $T ($COMMIT)' && git log -1 --oneline"
 ```
 
-Old images are deliberately kept, so the previous release can be rolled back. To free
-space now and then, remove images older than the last two releases.
+Then add a row for the release to the release log (section 6), newest on top, and commit
+it. Phase 1 of the next release reads its commit from that row.
 
-On this machine:
+**Old images.** After every release, keep the current and the previous release of each
+component and remove the rest. The previous release is the rollback point, and its images
+must stay on the node. Besides saving disk space, this keeps the node under the 50-image
+limit of its image list (phase 5).
+
+On this machine, keep only this release's images, and clear the build cache and logs. A
+rollback uses the images on the node, so nothing older is needed here:
 
 ```bash
-docker images --format '{{.Repository}}:{{.Tag}}' | grep '^cybernetics-project-' | sort   # pick old tags, then:
-# docker rmi cybernetics-project-backend:release.<old>.1 ...
+source ~/.cyb-release
+docker images --format '{{.Repository}}:{{.Tag}}' | grep '^cybernetics-project-' | grep -vF ":$T" | xargs -r docker rmi
+docker builder prune -f | tail -1; rm -f /tmp/cyb-build-*.log
 ```
 
-On the server, this needs sudo, so run it yourself:
+On the node, the next block *prints* a removal command covering every tag older than the
+newest two of each image. Tags sort chronologically. Check the list against the deployed
+images (`kubectl -n plane get deploy -o wide`), then run the printed command yourself with
+`! `, because it needs sudo:
 
 ```bash
-ssh -t K3s-server 'sudo k3s crictl images | grep cybernetics-project'
-# ssh -t K3s-server 'sudo k3s crictl rmi docker.io/library/cybernetics-project-backend:release.<old>.1'
+ssh -o BatchMode=yes K3s-server "kubectl get nodes -o jsonpath='{range .items[*].status.images[*]}{.names}{\"\n\"}{end}'" \
+  | grep -oE 'cybernetics-project-[a-z]+:release\.[^",]+' | sort -u \
+  | awk -F: '{n[$1]++; t[$1,n[$1]]=$0} END {for (r in n) for (i=1;i<=n[r]-2;i++) print "docker.io/library/" t[r,i]}' \
+  | xargs -r echo "ssh -t K3s-server sudo k3s crictl rmi"     # no output: nothing to remove
 ```
 
 Never remove an image that a Deployment still references, or that you may roll back to.
+The node list can lag for a minute after a removal. `crictl`'s `Deleted:` lines are what
+count.
 
 ---
 
@@ -380,6 +524,13 @@ must still work with the new schema. Additive migrations are fine. For a destruc
 migration, reverse it before rolling back:
 `kubectl -n plane exec deploy/api -- python manage.py migrate db <previous_migration>`.
 
+An `AddField` with a default isn't fully safe either. Django (4.2) fills the column and
+then drops the database default. The old backend can still read the table, but its
+inserts fail with a NOT NULL error, because it doesn't know about the column. For
+example, after `0124_user_two_factor_email`, the old backend couldn't create users. If
+the old backend has to write to that table, reverse the migration as above before
+rolling back.
+
 ---
 
 ## 5. Troubleshooting
@@ -388,6 +539,10 @@ migration, reverse it before rolling back:
 |---|---|---|
 | Pod `ErrImageNeverPull` | The image wasn't imported into containerd, or the tag in the manifest has a typo | Re-run phase 5 and check with the kubectl image list; compare against the manifest tag |
 | Phase 6 says `MISSING on node` | The import didn't run, or imported into the wrong containerd namespace | The import must use `-n k8s.io`; re-run phase 5 |
+| Image missing from the node list, but the import printed `saved` | The kubelet hasn't refreshed the list yet, or the node has more than 50 images | Wait a minute; confirm with `sudo k3s crictl images \| grep <tag>`; remove old images (phase 8); if needed, use `SKIP_NODE_CHECK=1` |
+| `kubectl apply` reports `configured` for a deployment outside the release (e.g. `proxy`) | Only metadata changed (the last-applied annotation) | Nothing to do if the pod's `CREATED` time didn't change |
+| New route returns HTML titled "CSRF Verification Failed" | Expected for a POST without a session or CSRF token | The route is deployed; test it from the UI |
+| Feature email (2FA code, invite) never arrives | SMTP isn't set in god-mode, or the worker isn't running or is failing | God-mode → Email → **Send test email**; `kubectl -n plane logs deploy/worker --since=10m` |
 | Phase 6 says `tag not set for <c>` | The manifest uses a non-standard image name | Rename it to `cybernetics-project-<c>:<anything>` in the manifest, then re-run |
 | New endpoint returns `{"error": "Page not found."}` | The backend image wasn't updated, or the route isn't registered in `apps/api/plane/api/urls/__init__.py` | Check `kubectl -n plane get deploy api -o wide`; check URL registration |
 | Migrator Job fails | A broken migration, or the database is unreachable | `kubectl -n plane logs job/migrator`; the app pods are untouched, so fix and re-run |
@@ -417,6 +572,7 @@ Add one line per release. The newest goes on top.
 
 | Tag | Commit | Components | Notes |
 |---|---|---|---|
+| `release.2026-10-20T00-44-51Z.1` | `7458462ac8` | backend, web, space, admin | Email two-factor authentication (settings, sign-in and god-mode admin sign-in), migration `0124_user_two_factor_email` (adds two `user` columns), logo removed from email templates, email copy rebranded. No config changes: SMTP was already set in god-mode, and the `TWO_FACTOR_*` env vars use defaults. Server repo commit `33f3ef0`. Unused local `10-08T05-53-29` images removed; `10-06` backend/web images removed from the node, so the rollback point is `10-07` (backend, web) and `09-23` (space, admin). |
 | `release.2026-10-07T13-06-06Z.1` | `61c725bdc4` | backend, web | Agent avatar in work item rows: turning crimson gear with a small "ai" mark (`AgentMemberAvatar`); `api.py` `settings` import fix. No migrations (migrator ran as a no-op). Retagged from the hand-built `7-oct-2026` images, no rebuild. Previous `22-14-16` images removed from this machine and the node, so rollback needs a rebuild of `29db379364` or the older `11-56-45` images. |
 | `release.2026-10-06T22-14-16Z.1` | `29db379364` | backend, web | Agentic members: migration `0123_workspace_agent`, `/api/v1/.../agents/` (context, task brief), MCP 85 → 96 tools + `agent_persona` prompt + `plane://` resources, Agents page; react-markdown 8 → 10. Server repo commit `404b9cc`. |
 | `release.2026-10-06T11-56-45Z.1` | `a62f105547` | backend, web | MCP expansion (33 → 85 tools); estimate routes registered; default Intake on project create. Deployed by hand before this runbook existed: its rollback copies are `~/backend.yaml.pre-…`, `~/frontend.yaml.pre-…` and `~/migrator-job.yaml.pre-…` on the server (previous backend `release.2026-09-23T23-29-54Z.1`, previous web `plane-web:6-oct-2026`). |
