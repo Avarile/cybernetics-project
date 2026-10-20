@@ -97,7 +97,7 @@ export const GeneralConfigurationForm = observer(function GeneralConfigurationFo
         </div>
       </div>
 
-      <div className="space-y-6">
+      {/* <div className="space-y-6">
         <div className="border-b border-subtle pb-1.5 text-16 font-medium text-primary">Telemetry</div>
         <div className="flex items-center gap-14">
           <div className="flex grow items-center gap-4">
@@ -132,7 +132,7 @@ export const GeneralConfigurationForm = observer(function GeneralConfigurationFo
             />
           </div>
         </div>
-      </div>
+      </div> */}
 
       <div>
         <Button

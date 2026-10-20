@@ -1,0 +1,45 @@
+● I've written all of it on branch feat/CYBERDATA-50-email-2fa, but none of the database-backed tests have run. Nothing is committed yet.
+
+  The tests I could run all pass:
+  - Python: the 54 new unit tests, and the full unit suite (733 passed, 0 failed). The suite's 43 errors are database tests that can't create a test database locally.
+  - Frontend: type-check is clean for web, admin, space and the four shared packages I changed; lint is within each app's warning budget; formatting is clean.
+
+  What I couldn't verify
+
+  ┌─────┬──────────────────────────────────────────────┬──────────────────────────────────────────────────────────────────────┐
+  │ Key │                     Item                     │                                State                                 │
+  ├─────┼──────────────────────────────────────────────┼──────────────────────────────────────────────────────────────────────┤
+  │ 50  │ Parent                                       │ In Progress                                                          │
+  ├─────┼──────────────────────────────────────────────┼──────────────────────────────────────────────────────────────────────┤
+  │ 51  │ Foundation                                   │ Done                                                                 │
+  ├─────┼──────────────────────────────────────────────┼──────────────────────────────────────────────────────────────────────┤
+  │ 52  │ Emails                                       │ Done                                                                 │
+  ├─────┼──────────────────────────────────────────────┼──────────────────────────────────────────────────────────────────────┤
+  │ 53  │ Settings endpoints                           │ Done                                                                 │
+  ├─────┼──────────────────────────────────────────────┼──────────────────────────────────────────────────────────────────────┤
+  │ 54  │ Security page section and modal              │ In Progress: code done, end-to-end check outstanding                 │
+  ├─────┼──────────────────────────────────────────────┼──────────────────────────────────────────────────────────────────────┤
+  │ 55  │ Web app sign-in code step                    │ Done                                                                 │
+  ├─────┼──────────────────────────────────────────────┼──────────────────────────────────────────────────────────────────────┤
+  │ 56  │ Admin sign-in code step                      │ Done                                                                 │
+  ├─────┼──────────────────────────────────────────────┼──────────────────────────────────────────────────────────────────────┤
+  │ 57  │ Space refuses password sign-in for 2FA users │ Done                                                                 │
+  ├─────┼──────────────────────────────────────────────┼──────────────────────────────────────────────────────────────────────┤
+  │ 58  │ Verification                                 │ In Progress: needs the CI contract-test run and the end-to-end check │
+  └─────┴──────────────────────────────────────────────┴──────────────────────────────────────────────────────────────────────┘
+
+  Each closed item has an evidence comment.
+
+  Changes worth knowing about
+  - Dev database: I applied migration 0124 to your local dev database. It only adds the two new user columns.
+  - Translations: the new UI text is English only, as you chose. The i18n sync check now reports 28 keys missing in each of the 18 other languages. Its CI check only runs on preview, so PRs
+    into dev won't fail, but merging into preview will until they're translated.
+  - Profile updates can't touch 2FA: I marked the two new fields read-only on the profile-update endpoint. Without that, PATCH /api/users/me/ could have switched 2FA off with no code.
+  - Email worker: I listed the email task explicitly in CELERY_IMPORTS, because sign-in can't finish without that email being sent.
+  - Shared helper: maskEmail now lives in @plane/utils, since the web and admin apps both use it.
+
+  Two gaps outside the design
+  - Email change bypasses 2FA: an existing endpoint, users/me/email/, lets someone with a signed-in session change the account email using only a code sent to the new address. They could then
+    receive the 2FA codes, or reset the password. This isn't part of the 2FA work, but it's worth a follow-up.
+  - Email flooding: someone who knows the password can make a code email go out on every sign-in attempt. Guessing the code itself is capped (5 tries per code, a lock after 10 failures in 30
+    minutes), but nothing limits how often the first code is sent.

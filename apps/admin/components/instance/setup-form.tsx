@@ -142,8 +142,8 @@ export function InstanceSetupForm() {
       <div className="mt-10 flex w-full flex-grow flex-col items-center justify-center py-6">
         <div className="relative flex w-full max-w-[22.5rem] flex-col gap-6">
           <FormHeader
-            heading="Setup your Plane Instance"
-            subHeading="Post setup you will be able to manage this Plane instance."
+            heading="Setup your Cybernetics Project Instance"
+            subHeading="Post setup you will be able to manage this Cybernetics-Project instance."
           />
           {errorData.type &&
             errorData?.message &&
@@ -341,7 +341,7 @@ export function InstanceSetupForm() {
                 )}
             </div>
 
-            <div className="relative flex gap-2">
+            {/* <div className="relative flex gap-2">
               <div>
                 <Checkbox
                   className="h-4 w-4"
@@ -363,7 +363,7 @@ export function InstanceSetupForm() {
                   See More
                 </a>
               </label>
-            </div>
+            </div> */}
 
             <div className="py-2">
               <Button type="submit" size="xl" className="w-full" disabled={isButtonDisabled}>

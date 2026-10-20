@@ -1,177 +1,264 @@
+# Single-host deployment of Cybernetics Projects.
+#
+# Every application service has BOTH `build:` (so `docker compose build` works from a
+# checkout) and a fixed `image: cybernetics-project-<component>:${RELEASE}` name (so the images
+# can be `docker save`d, copied to a server and run there with no source tree and no registry).
+# Only the stock infra images (postgres, valkey, rabbitmq, minio) are pulled from Docker Hub.
+#
+# Configuration comes from ONE env file, never from apps/*/.env. Always pass it explicitly:
+#     docker compose --env-file <file> up -d
+# On a server the bundle ships `.env` next to this file, which compose reads by default.
+# On a dev checkout the repo-root `.env` is the dev-only one (it points at the shared
+# `platform-*` infra), so do not rely on it here.
+#
+# See deployments/docker-compose/README.md for the build/export/install workflow.
+
+x-redis-url: &redis-url redis://plane-redis:6379/
+
+x-db-env: &db-env
+  POSTGRES_HOST: plane-db
+  POSTGRES_PORT: "5432"
+  POSTGRES_USER: ${POSTGRES_USER:?}
+  POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?}
+  POSTGRES_DB: ${POSTGRES_DB:?}
+  DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@plane-db:5432/${POSTGRES_DB}
+
+x-mq-env: &mq-env
+  RABBITMQ_HOST: plane-mq
+  RABBITMQ_PORT: "5672"
+  RABBITMQ_USER: ${RABBITMQ_USER:?}
+  RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD:?}
+  RABBITMQ_VHOST: ${RABBITMQ_VHOST:?}
+  AMQP_URL: amqp://${RABBITMQ_USER}:${RABBITMQ_PASSWORD}@plane-mq:5672/${RABBITMQ_VHOST}
+
+x-s3-env: &s3-env
+  USE_MINIO: "1"
+  MINIO_ENDPOINT_SSL: ${MINIO_ENDPOINT_SSL:-0}
+  AWS_REGION: ${AWS_REGION:-}
+  AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID:?}
+  AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY:?}
+  AWS_S3_ENDPOINT_URL: http://plane-minio:9000
+  AWS_S3_BUCKET_NAME: ${AWS_S3_BUCKET_NAME:-uploads}
+  FILE_SIZE_LIMIT: ${FILE_SIZE_LIMIT:-5242880}
+
+x-app-env: &app-env
+  DEBUG: "0"
+  WEB_URL: ${WEB_URL:?}
+  CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:?}
+  SECRET_KEY: ${SECRET_KEY:?}
+  LIVE_SERVER_SECRET_KEY: ${LIVE_SERVER_SECRET_KEY:?}
+  REDIS_URL: *redis-url
+  REDIS_HOST: plane-redis
+  REDIS_PORT: "6379"
+  GUNICORN_WORKERS: ${GUNICORN_WORKERS:-2}
+  API_KEY_RATE_LIMIT: ${API_KEY_RATE_LIMIT:-60/minute}
+  MCP_SERVER_ENABLED: ${MCP_SERVER_ENABLED:-1}
+  MCP_READ_ONLY: ${MCP_READ_ONLY:-0}
+  MCP_TOOLSETS: ${MCP_TOOLSETS:-all}
+  CYBERNETICS_DATA_ENABLED: ${CYBERNETICS_DATA_ENABLED:-1}
+  CYBERNETICS_DATA_REQUIRE_HTTPS: ${CYBERNETICS_DATA_REQUIRE_HTTPS:-1}
+  CYBERNETICS_DATA_ALLOWED_IPS: ${CYBERNETICS_DATA_ALLOWED_IPS:-}
+  CYBERNETICS_DATA_ALLOWED_HOSTS: ${CYBERNETICS_DATA_ALLOWED_HOSTS:-}
+  WEBHOOK_ALLOWED_IPS: ${WEBHOOK_ALLOWED_IPS:-}
+  WEBHOOK_ALLOWED_HOSTS: ${WEBHOOK_ALLOWED_HOSTS:-}
+
+# Shared by api / worker / beat-worker / migrator (same image, different command).
+x-backend: &backend
+  image: cybernetics-project-backend:${RELEASE:?}
+  pull_policy: never
+  build:
+    context: ./apps/api
+    dockerfile: Dockerfile.api
+  restart: unless-stopped
+  environment:
+    <<: [*app-env, *db-env, *mq-env, *s3-env]
+
 services:
+  # ── application ────────────────────────────────────────────────────────────
   web:
-    container_name: web
+    image: cybernetics-project-web:${RELEASE:?}
+    pull_policy: never
     build:
       context: .
       dockerfile: ./apps/web/Dockerfile.web
-      args:
-        DOCKER_BUILDKIT: 1
-    restart: always
-    depends_on:
-      - api
+    restart: unless-stopped
+    depends_on: [api]
 
   admin:
-    container_name: admin
+    image: cybernetics-project-admin:${RELEASE:?}
+    pull_policy: never
     build:
       context: .
       dockerfile: ./apps/admin/Dockerfile.admin
-      args:
-        DOCKER_BUILDKIT: 1
-    restart: always
-    depends_on:
-      - api
-      - web
+    restart: unless-stopped
+    depends_on: [api]
 
   space:
-    container_name: space
+    image: cybernetics-project-space:${RELEASE:?}
+    pull_policy: never
     build:
       context: .
       dockerfile: ./apps/space/Dockerfile.space
-      args:
-        DOCKER_BUILDKIT: 1
-    restart: always
-    depends_on:
-      - api
-      - web
-
-  api:
-    container_name: api
-    build:
-      context: ./apps/api
-      dockerfile: Dockerfile.api
-      args:
-        DOCKER_BUILDKIT: 1
-    restart: always
-    command: ./bin/docker-entrypoint-api.sh
-    env_file:
-      - ./apps/api/.env
-    depends_on:
-      - plane-db
-      - plane-redis
-
-  worker:
-    container_name: bgworker
-    build:
-      context: ./apps/api
-      dockerfile: Dockerfile.api
-      args:
-        DOCKER_BUILDKIT: 1
-    restart: always
-    command: ./bin/docker-entrypoint-worker.sh
-    env_file:
-      - ./apps/api/.env
-    depends_on:
-      - api
-      - plane-db
-      - plane-redis
-
-  beat-worker:
-    container_name: beatworker
-    build:
-      context: ./apps/api
-      dockerfile: Dockerfile.api
-      args:
-        DOCKER_BUILDKIT: 1
-    restart: always
-    command: ./bin/docker-entrypoint-beat.sh
-    env_file:
-      - ./apps/api/.env
-    depends_on:
-      - api
-      - plane-db
-      - plane-redis
-
-  migrator:
-    container_name: plane-migrator
-    build:
-      context: ./apps/api
-      dockerfile: Dockerfile.api
-      args:
-        DOCKER_BUILDKIT: 1
-    restart: no
-    command: ./bin/docker-entrypoint-migrator.sh
-    env_file:
-      - ./apps/api/.env
-    depends_on:
-      - plane-db
-      - plane-redis
+    restart: unless-stopped
+    depends_on: [api]
 
   live:
-    container_name: plane-live
+    image: cybernetics-project-live:${RELEASE:?}
+    pull_policy: never
     build:
       context: .
       dockerfile: ./apps/live/Dockerfile.live
-      args:
-        DOCKER_BUILDKIT: 1
-    restart: always
+    restart: unless-stopped
+    environment:
+      API_BASE_URL: http://api:8000
+      LIVE_SERVER_SECRET_KEY: ${LIVE_SERVER_SECRET_KEY:?}
+      CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:?}
+      REDIS_URL: *redis-url
+      REDIS_HOST: plane-redis
+      REDIS_PORT: "6379"
+    depends_on:
+      plane-redis: {condition: service_healthy}
+      api: {condition: service_healthy}
 
+  api:
+    <<: *backend
+    command: ./bin/docker-entrypoint-api.sh
+    healthcheck:
+      # The alpine image has no curl; python is always there.
+      test: ["CMD", "python", "-c", "import urllib.request as u; u.urlopen('http://127.0.0.1:8000/api/instances/', timeout=4)"]
+      interval: 15s
+      timeout: 6s
+      retries: 10
+      start_period: 60s
+    depends_on:
+      migrator: {condition: service_completed_successfully}
+      minio-init: {condition: service_completed_successfully}
+      plane-redis: {condition: service_healthy}
+      plane-mq: {condition: service_healthy}
+
+  worker:
+    <<: *backend
+    command: ./bin/docker-entrypoint-worker.sh
+    depends_on:
+      api: {condition: service_healthy}
+
+  beat-worker:
+    <<: *backend
+    command: ./bin/docker-entrypoint-beat.sh
+    depends_on:
+      api: {condition: service_healthy}
+
+  # ── one-shot init jobs ─────────────────────────────────────────────────────
+  # Database schema: applies Django migrations, then exits. api/worker wait for it.
+  migrator:
+    <<: *backend
+    restart: "no"
+    command: ./bin/docker-entrypoint-migrator.sh
+    depends_on:
+      plane-db: {condition: service_healthy}
+      plane-redis: {condition: service_healthy}
+
+  # MinIO bucket: waits for MinIO, creates the bucket if missing, fails loudly otherwise.
+  # Runs from the backend image (boto3 is already there), so no extra image to ship or pull.
+  minio-init:
+    <<: *backend
+    restart: "no"
+    entrypoint: ["python", "/init/minio-init.py"]
+    command: []
+    volumes:
+      - ${INIT_DIR:-./deployments/docker-compose/init}:/init:ro
+    depends_on:
+      - plane-minio
+
+  # ── infrastructure (stock images, pulled from Docker Hub on first `up`) ───
   plane-db:
-    container_name: plane-db
     image: postgres:15.7-alpine
-    restart: always
+    restart: unless-stopped
     command: postgres -c 'max_connections=1000'
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:?}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?}
+      POSTGRES_DB: ${POSTGRES_DB:?}
+      PGDATA: /var/lib/postgresql/data
     volumes:
       - pgdata:/var/lib/postgresql/data
-    env_file:
-      - .env
-    environment:
-      POSTGRES_USER: ${POSTGRES_USER}
-      POSTGRES_DB: ${POSTGRES_DB}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
-      PGDATA: /var/lib/postgresql/data
+      # Runs only when the data volume is empty (first start). See the file for what it does.
+      - ${INIT_DIR:-./deployments/docker-compose/init}/db-init.sh:/docker-entrypoint-initdb.d/10-db-init.sh:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
 
   plane-redis:
-    container_name: plane-redis
     image: valkey/valkey:7.2.11-alpine
-    restart: always
+    restart: unless-stopped
     volumes:
       - redisdata:/data
+    healthcheck:
+      test: ["CMD", "valkey-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
 
   plane-mq:
-    container_name: plane-mq
     image: rabbitmq:3.13.6-management-alpine
-    restart: always
-    env_file:
-      - .env
+    restart: unless-stopped
     environment:
-      RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER}
-      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD}
-      RABBITMQ_DEFAULT_VHOST: ${RABBITMQ_VHOST}
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER:?}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD:?}
+      RABBITMQ_DEFAULT_VHOST: ${RABBITMQ_VHOST:?}
     volumes:
       - rabbitmq_data:/var/lib/rabbitmq
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 10s
+      timeout: 10s
+      retries: 20
+      start_period: 20s
 
   plane-minio:
-    container_name: plane-minio
-    image: minio/minio
-    restart: always
+    image: minio/minio:RELEASE.2025-04-22T22-12-26Z
+    restart: unless-stopped
     command: server /export --console-address ":9090"
+    environment:
+      MINIO_ROOT_USER: ${AWS_ACCESS_KEY_ID:?}
+      MINIO_ROOT_PASSWORD: ${AWS_SECRET_ACCESS_KEY:?}
     volumes:
       - uploads:/export
-    environment:
-      MINIO_ROOT_USER: ${AWS_ACCESS_KEY_ID}
-      MINIO_ROOT_PASSWORD: ${AWS_SECRET_ACCESS_KEY}
+    ports:
+      # Console only on loopback; reach it with `ssh -L 9090:127.0.0.1:9090 <server>`.
+      - "127.0.0.1:${MINIO_CONSOLE_PORT:-9090}:9090"
+    # No healthcheck: the image has no curl/mc. minio-init retries until it answers.
 
-  # Comment this if you already have a reverse proxy running
+  # The only service that publishes public ports.
   proxy:
-    container_name: proxy
+    image: cybernetics-project-proxy:${RELEASE:?}
+    pull_policy: never
     build:
       context: ./apps/proxy
       dockerfile: Dockerfile.ce
-    restart: always
-    ports:
-      - ${LISTEN_HTTP_PORT}:80
-      - ${LISTEN_HTTPS_PORT}:443
+    restart: unless-stopped
     environment:
       FILE_SIZE_LIMIT: ${FILE_SIZE_LIMIT:-5242880}
       BUCKET_NAME: ${AWS_S3_BUCKET_NAME:-uploads}
-    depends_on:
-      - web
-      - api
-      - space
-      - admin
+      SITE_ADDRESS: ${SITE_ADDRESS:-:80}
+      CERT_EMAIL: ${CERT_EMAIL:-}
+      CERT_ACME_CA: ${CERT_ACME_CA:-https://acme-v02.api.letsencrypt.org/directory}
+      CERT_ACME_DNS: ${CERT_ACME_DNS:-}
+      TRUSTED_PROXIES: ${TRUSTED_PROXIES:-0.0.0.0/0}
+    ports:
+      - "${LISTEN_HTTP_PORT:-80}:80"
+      - "${LISTEN_HTTPS_PORT:-443}:443"
+    volumes:
+      - proxy_config:/config
+      - proxy_data:/data
+    depends_on: [web, admin, space, live, api, plane-minio]
 
 volumes:
   pgdata:
   redisdata:
   uploads:
   rabbitmq_data:
+  proxy_config:
+  proxy_data:

@@ -21,19 +21,19 @@ import { useInstance, useTheme } from "@/hooks/store";
 const helpOptions = [
   {
     name: "Documentation",
-    href: "https://docs.plane.so/",
+    href: "https://blog.avarile.com/Cybernetics-Project-doc",
     Icon: PageIcon,
   },
   {
-    name: "Join our Forum",
-    href: "https://forum.plane.so",
+    name: "Join our Community",
+    href: "https://blog.avarile.com/Cybernetics-Project-forum",
     Icon: MessageSquare,
   },
-  {
-    name: "Report a bug",
-    href: "https://github.com/makeplane/plane/issues/new/choose",
-    Icon: GithubIcon,
-  },
+  // {
+  //   name: "Report a bug",
+  //   href: "https://github.com/makeplane/plane/issues/new/choose",
+  //   Icon: GithubIcon,
+  // },
 ];
 
 export const AdminSidebarHelpSection = observer(function AdminSidebarHelpSection() {
@@ -57,13 +57,13 @@ export const AdminSidebarHelpSection = observer(function AdminSidebarHelpSection
       )}
     >
       <div className={`flex items-center gap-1 ${isSidebarCollapsed ? "flex-col justify-center" : "w-full"}`}>
-        <Tooltip tooltipContent="Redirect to Plane" position="right" className="ml-4" disabled={!isSidebarCollapsed}>
+        <Tooltip tooltipContent="Return to the WorkSpace" position="right" className="ml-4" disabled={!isSidebarCollapsed}>
           <a
             href={redirectionLink}
             className={`relative flex items-center gap-1 rounded-sm bg-layer-1 px-2 py-1 text-body-xs-medium whitespace-nowrap text-secondary`}
           >
             <NewTabIcon width={14} height={14} />
-            {!isSidebarCollapsed && "Redirect to Plane"}
+            {!isSidebarCollapsed && "Return to the WorkSpace"}
           </a>
         </Tooltip>
         <Tooltip tooltipContent="Help" position={isSidebarCollapsed ? "right" : "top"} className="ml-4">
